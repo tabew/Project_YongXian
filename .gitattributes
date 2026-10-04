@@ -1,0 +1,2 @@
+# 统一使用 LF 换行，避免跨平台 / Windows 上的 CRLF 抖动
+* text=auto eol=lf
