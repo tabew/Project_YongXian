@@ -1,66 +1,40 @@
 extends Node2D
 
-## 游戏世界：生成随机地图、铺进 TileMapLayer、把主角放到出生点。
+## 游戏世界：建一个无限世界生成器，交给 ChunkManager 按区块加载，把主角放到出生点。
 
-## TileSet 里地形图集所在的 source id。
-const TILE_SOURCE_ID: int = 0
-## 图集是竖排的一条（6 格一列），所以图集坐标的列固定为 0，行才是地形编号。
-const TILE_ATLAS_COLUMN: int = 0
-
-@onready var tile_map: TileMapLayer = $TileMapLayer
+@onready var chunk_manager: ChunkManager = $ChunkManager
 @onready var player: PlayerCharacter = $Player
-
-var map_data: MapData = null
+@onready var hud: Control = $GameHUD/HUD
 
 
 func _ready() -> void:
 	# 直接从编辑器单独运行本场景时，也要能开局
-	if GameState.map_seed == 0:
-		GameState.start_new_game()
-	build_map(GameState.map_seed)
+	if GameState.world_seed == 0:
+		GameState.start_new_world()
+	build_world(GameState.world_seed)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("regenerate_map"):
-		regenerate_map()
+	if event.is_action_pressed("regenerate_world"):
+		regenerate_world()
 
 
-## 用指定种子生成一张地图并铺好，主角回到新的出生点。
-func build_map(seed_value: int) -> void:
-	map_data = MapGenerator.generate(GameState.map_width, GameState.map_height, seed_value)
-	GameState.map_seed = map_data.map_seed
+## 用指定种子重建整个世界。
+func build_world(seed_value: int) -> void:
+	var generator := WorldGenerator.new(seed_value)
+	GameState.world_seed = generator.world_seed
 
-	_paint_tiles()
-	player.spawn_on_map(map_data)
-	_apply_camera_limits()
+	chunk_manager.setup(generator, player)
+	hud.bind_world(chunk_manager, player)
 
-	EventBus.map_ready.emit(map_data)
+	# 出生点从原点向外找一块开阔地，避免一开局就被水围住
+	var spawn_tile: Vector2i = generator.find_spawn(Vector2i.ZERO)
+	player.spawn_on(generator, WorldGenerator.tile_to_world(spawn_tile))
 
-
-## 换一个种子重新生成，用于“再来一张”的验证。
-func regenerate_map() -> void:
-	var new_seed: int = GameState.reroll_seed()
-	build_map(new_seed)
-	EventBus.notification.emit("已重新生成地图（种子 %d）" % new_seed)
+	EventBus.world_ready.emit(generator.world_seed)
 
 
-func _paint_tiles() -> void:
-	tile_map.clear()
-	for y: int in map_data.height:
-		for x: int in map_data.width:
-			tile_map.set_cell(
-				Vector2i(x, y),
-				TILE_SOURCE_ID,
-				Vector2i(TILE_ATLAS_COLUMN, map_data.get_tile(x, y))
-			)
-
-
-## 把摄像机限制在地图范围内，避免镜头拍到地图外面。
-func _apply_camera_limits() -> void:
-	var camera := player.get_node_or_null("Camera2D") as Camera2D
-	if camera == null:
-		return
-	camera.limit_left = 0
-	camera.limit_top = 0
-	camera.limit_right = map_data.width * MapData.TILE_SIZE
-	camera.limit_bottom = map_data.height * MapData.TILE_SIZE
+## 换个种子重开世界。
+func regenerate_world() -> void:
+	build_world(WorldGenerator.random_seed())
+	EventBus.notification.emit("已生成新世界（种子 %d）" % GameState.world_seed)

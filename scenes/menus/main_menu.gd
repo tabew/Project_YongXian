@@ -23,7 +23,7 @@ func _ready() -> void:
 
 
 func _on_start_pressed() -> void:
-	GameState.start_new_game()
+	GameState.start_new_world()
 	SceneManager.change_scene("res://scenes/game/game_world.tscn")
 
 

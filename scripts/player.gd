@@ -3,8 +3,9 @@ extends CharacterBody2D
 
 ## 主角占位实现：WASD / 方向键控制，速度带加速度与摩擦力，摄像机跟随。
 ##
-## 地形阻挡不依赖物理层，而是直接查询 MapData 的格子是否可通行，
-## 后期若改用 TileSet 碰撞层，只要把 collide_with_terrain 关掉即可。
+## 地形阻挡不依赖物理层，而是直接问 WorldGenerator 这一格是什么地形。
+## 生成器是纯函数式的（只由种子和坐标决定），所以判定结果和画面上看到的永远一致，
+## 不需要等区块加载完。
 
 @export_group("移动手感")
 ## 最大速度（像素/秒）。
@@ -15,13 +16,17 @@ extends CharacterBody2D
 @export var friction: float = 1800.0
 
 @export_group("地形")
-## 打开后无法走进水域、山地和雪地。
+## 打开后无法走进深水、浅水、山地和雪峰。
 @export var collide_with_terrain: bool = true
 
 @onready var sprite: Sprite2D = $Sprite2D
 
-## 当前所在地图，由 GameWorld 铺好地图后注入。
-var map_data: MapData = null
+## 地形来源，由 GameWorld 注入。
+var terrain_source: WorldGenerator = null
+
+# 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
+var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
+var _cached_walkable: bool = true
 
 
 func _physics_process(delta: float) -> void:
@@ -43,7 +48,7 @@ func _apply_input(input_direction: Vector2, delta: float) -> void:
 
 
 func _integrate_movement(delta: float) -> void:
-	if map_data == null or not collide_with_terrain:
+	if terrain_source == null or not collide_with_terrain:
 		move_and_slide()
 		return
 
@@ -63,19 +68,24 @@ func _integrate_movement(delta: float) -> void:
 		velocity.y = 0.0
 
 
-## 该世界坐标所在的格子是否可通行。
+## 该世界坐标所在的格子是否可以站人。
 func can_stand_at(world_position: Vector2) -> bool:
-	if map_data == null:
+	if terrain_source == null:
 		return true
-	var tile: Vector2i = map_data.world_to_terrain(world_position)
-	return map_data.is_walkable(tile.x, tile.y)
+
+	var tile: Vector2i = WorldGenerator.world_to_tile(world_position)
+	if tile != _cached_tile:
+		_cached_tile = tile
+		_cached_walkable = Terrain.is_walkable(terrain_source.sample_terrain(tile))
+	return _cached_walkable
 
 
-## 由 GameWorld 调用：注入地图并把主角放到出生点。
-func spawn_on_map(map: MapData) -> void:
-	map_data = map
+## 由 GameWorld 调用：注入地形来源并把主角放到指定世界坐标。
+func spawn_on(source: WorldGenerator, world_position: Vector2) -> void:
+	terrain_source = source
 	velocity = Vector2.ZERO
-	global_position = map.terrain_to_world(map.spawn_tile)
+	global_position = world_position
+	_cached_tile = Vector2i(2147483647, 2147483647)
 
 
 func _update_facing() -> void:
