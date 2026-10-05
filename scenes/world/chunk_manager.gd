@@ -40,12 +40,18 @@ signal chunk_applied(coords: Vector2i)
 
 const MAX_GENERATOR_POOL: int = 16
 const MAX_LAYER_POOL: int = 64
-const TILE_SOURCE_ID: int = 0
-## 图集是竖排的一条，列固定 0，行才是地形编号。
+## TileSet 里地形图集 / 路网图集所在的 source id。
+const TERRAIN_SOURCE_ID: int = 0
+const ROAD_SOURCE_ID: int = 1
+## 两张图集都是竖排的，列固定 0，行才是编号。
 const TILE_ATLAS_COLUMN: int = 0
 const NO_CHUNK: Vector2i = Vector2i(2147483647, 2147483647)
 
 var focus_node: Node2D = null
+
+## 每次区块铺好或回收就 +1。小地图等表现层靠它判断"数据有没有变"，
+## 不变就不必重画，站着不动时一次重建都不会发生。
+var version: int = 0
 
 var _generator: WorldGenerator = null
 var _world_seed: int = 0
@@ -133,12 +139,23 @@ func get_biome_at(world_position: Vector2) -> int:
 	return _generator.sample_biome(WorldGenerator.world_to_tile(world_position))
 
 
+func get_route_at(world_position: Vector2) -> int:
+	if _generator == null:
+		return Route.Kind.NONE
+	return _generator.sample_route(WorldGenerator.world_to_tile(world_position))
+
+
 ## 当前已经铺出来的区块坐标，供调试或小地图使用。
 func loaded_chunks() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	for coords: Vector2i in _layers.keys():
 		result.append(coords)
 	return result
+
+
+## 取区块数据（含已卸载但仍在缓存里的）。小地图直接读这个，不重跑噪声。
+func get_cached_chunk(coords: Vector2i) -> ChunkData:
+	return _cache.get(coords)
 
 
 # ------------------------------------------------------------ 主循环
@@ -369,11 +386,22 @@ func _paint_chunk(data: ChunkData) -> void:
 	var index: int = 0
 	for local_y: int in WorldGenerator.CHUNK_SIZE:
 		for local_x: int in WorldGenerator.CHUNK_SIZE:
-			layer.set_cell(
-				Vector2i(local_x, local_y),
-				TILE_SOURCE_ID,
-				Vector2i(TILE_ATLAS_COLUMN, data.terrain[index])
-			)
+			var cell := Vector2i(local_x, local_y)
+			var road: int = data.route[index]
+			if road == Route.Kind.NONE:
+				layer.set_cell(
+					cell,
+					TERRAIN_SOURCE_ID,
+					Vector2i(TILE_ATLAS_COLUMN, data.terrain[index])
+				)
+			else:
+				# 路直接替换这一格的贴图；地形数据仍然原样保留，
+				# 所以生物群系和碰撞判定都不受影响
+				layer.set_cell(
+					cell,
+					ROAD_SOURCE_ID,
+					Vector2i(TILE_ATLAS_COLUMN, Route.atlas_row(road))
+				)
 			index += 1
 
 	add_child(layer)
@@ -382,6 +410,7 @@ func _paint_chunk(data: ChunkData) -> void:
 	data.last_used = Time.get_ticks_msec()
 	_store_cache(data)
 	stat_applied += 1
+	version += 1
 	chunk_applied.emit(data.coords)
 
 
@@ -400,6 +429,7 @@ func _recycle_layer(coords: Vector2i) -> void:
 	if layer == null:
 		return
 	_layers.erase(coords)
+	version += 1
 
 	remove_child(layer)
 	# 故意不清空：复用时 _paint_chunk 会把 32x32 全部重写一遍，不会留下旧格子
@@ -449,6 +479,7 @@ func _clear_scene() -> void:
 	_queue.clear()
 	_unload_queue.clear()
 	_apply_queue.clear()
+	version += 1
 
 
 func _reset_stats() -> void:

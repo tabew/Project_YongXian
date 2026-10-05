@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scenes/ui/minimap.gd" id="2_minimap"]
 
 [node name="HUD" type="Control"]
 layout_mode = 3
@@ -17,12 +18,25 @@ layout_mode = 1
 offset_left = 14.0
 offset_top = 10.0
 offset_right = 360.0
-offset_bottom = 92.0
+offset_bottom = 110.0
 theme_override_colors/font_color = Color(0.92, 0.94, 0.98, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.75)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 15
+
+[node name="Minimap" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -178.0
+offset_top = 14.0
+offset_right = -14.0
+offset_bottom = 178.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("2_minimap")
 
 [node name="StatsLabel" type="Label" parent="."]
 layout_mode = 1
@@ -30,9 +44,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -320.0
-offset_top = 10.0
+offset_top = 186.0
 offset_right = -14.0
-offset_bottom = 122.0
+offset_bottom = 298.0
 grow_horizontal = 0
 horizontal_alignment = 2
 theme_override_colors/font_color = Color(0.76, 0.86, 0.96, 1)

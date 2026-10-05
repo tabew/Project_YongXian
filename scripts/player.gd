@@ -16,7 +16,7 @@ extends CharacterBody2D
 @export var friction: float = 1800.0
 
 @export_group("地形")
-## 打开后无法走进深水、浅水、山地和雪峰。
+## 打开后无法走进深水、浅水、山地和雪峰（路上的格子除外）。
 @export var collide_with_terrain: bool = true
 
 @onready var sprite: Sprite2D = $Sprite2D
@@ -69,6 +69,7 @@ func _integrate_movement(delta: float) -> void:
 
 
 ## 该世界坐标所在的格子是否可以站人。
+## 判定交给生成器：地形可通行，或者那里是路（路会架桥 / 开山道）。
 func can_stand_at(world_position: Vector2) -> bool:
 	if terrain_source == null:
 		return true
@@ -76,7 +77,7 @@ func can_stand_at(world_position: Vector2) -> bool:
 	var tile: Vector2i = WorldGenerator.world_to_tile(world_position)
 	if tile != _cached_tile:
 		_cached_tile = tile
-		_cached_walkable = Terrain.is_walkable(terrain_source.sample_terrain(tile))
+		_cached_walkable = terrain_source.is_walkable(tile)
 	return _cached_walkable
 
 

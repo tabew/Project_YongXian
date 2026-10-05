@@ -278,6 +278,63 @@ TERRAINS = [
 ]
 
 
+# ---------------------------------------------------------------- 路网图集
+# 顺序必须与 resources/world/route.gd 里 Route.Kind 的绘制顺序一致
+# （Kind.NONE 不绘制，所以图集第 0 行 = Kind.DIRT）
+
+def slabs(img, color, step=5):
+    """石板拼缝。"""
+    draw = ImageDraw.Draw(img)
+    for y in range(0, TILE, step):
+        draw.line([(0, y), (TILE - 1, y)], fill=color, width=1)
+    row = 0
+    for y in range(0, TILE, step):
+        offset = (step // 2) if row % 2 else 0
+        row += 1
+        for x in range(offset, TILE, step):
+            draw.line([(x, y), (x, min(y + step - 1, TILE - 1))], fill=color, width=1)
+
+
+def planks(img, color, gap=4):
+    """木板条纹。"""
+    draw = ImageDraw.Draw(img)
+    for y in range(0, TILE, gap):
+        draw.line([(0, y), (TILE - 1, y)], fill=color, width=1)
+    for x in range(2, TILE, 6):
+        draw.point((x, min(gap, TILE - 1)), fill=color)
+
+
+def make_dirt_road():
+    img, n = tile((152, 126, 88), 10)
+    speckle(img, (130, 106, 72), 26)
+    speckle(img, (176, 152, 114), 16)
+    add_noise(img, n)
+    return img
+
+
+def make_stone_road():
+    img, n = tile((156, 152, 145), 8)
+    slabs(img, (128, 124, 118), 5)
+    speckle(img, (176, 173, 166), 14)
+    add_noise(img, n)
+    return img
+
+
+def make_bridge():
+    img, n = tile((124, 86, 52), 9)
+    planks(img, (94, 62, 36), 4)
+    speckle(img, (150, 108, 68), 12)
+    add_noise(img, n)
+    return img
+
+
+ROADS = [
+    ("DIRT", make_dirt_road),
+    ("STONE", make_stone_road),
+    ("BRIDGE", make_bridge),
+]
+
+
 # ---------------------------------------------------------------- 主角占位图
 
 def build_player_placeholder():
@@ -342,8 +399,14 @@ def main():
     atlas = Image.new("RGB", (TILE, TILE * len(TERRAINS)))
     for index, (name, builder) in enumerate(TERRAINS):
         atlas.paste(builder(), (0, index * TILE))
-        print("  tile %2d = %s" % (index, name))
+        print("  terrain %2d = %s" % (index, name))
     atlas.save(os.path.join(OUTPUT_DIR, "terrain_tiles.png"))
+
+    road_atlas = Image.new("RGB", (TILE, TILE * len(ROADS)))
+    for index, (name, builder) in enumerate(ROADS):
+        road_atlas.paste(builder(), (0, index * TILE))
+        print("  road    %2d = %s" % (index, name))
+    road_atlas.save(os.path.join(OUTPUT_DIR, "road_tiles.png"))
 
     build_player_placeholder().save(os.path.join(OUTPUT_DIR, "player_placeholder.png"))
 

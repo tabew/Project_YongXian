@@ -1,10 +1,12 @@
 extends Control
 
-## 游戏内 HUD：左上角基本信息，右上角性能面板（F3 开关），底部操作提示，顶部临时消息。
+## 游戏内 HUD：左上角基本信息，右上角小地图 + 性能面板（F3 开关），
+## 底部操作提示，顶部临时消息。
 
 const REFRESH_INTERVAL: float = 0.2
 
 @onready var info_label: Label = $InfoLabel
+@onready var minimap: Minimap = $Minimap
 @onready var stats_label: Label = $StatsLabel
 @onready var hint_label: Label = $HintLabel
 @onready var toast_label: Label = $ToastLabel
@@ -26,6 +28,7 @@ func _ready() -> void:
 func bind_world(manager: ChunkManager, player: Node2D) -> void:
 	_world = manager
 	_player = player
+	minimap.bind(manager, player)
 	_refresh_timer = 0.0
 
 
@@ -58,6 +61,11 @@ func _refresh() -> void:
 		Terrain.name_of(_world.get_terrain_at(position)),
 		Biome.name_of(_world.get_biome_at(position)),
 	])
+
+	var route: int = _world.get_route_at(position)
+	if route != Route.Kind.NONE:
+		lines.append("★ 走在%s上" % Route.name_of(route))
+
 	info_label.text = "\n".join(lines)
 
 	var stats: Dictionary = _world.get_stats()

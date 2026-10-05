@@ -38,11 +38,23 @@ const BLOCKING: Array[bool] = [
 	false, false, false, false, false, true, false, true,
 ]
 
+## 索引与 Kind 对齐；true 表示是水面（路跨过时要画成桥）。
+const WATER: Array[bool] = [
+	true, true, false, false, false, false, false, false,
+	false, false, false, false, false, false, false, false,
+]
+
 
 static func is_walkable(kind: int) -> bool:
 	if kind < 0 or kind >= COUNT:
 		return false
 	return not BLOCKING[kind]
+
+
+static func is_water(kind: int) -> bool:
+	if kind < 0 or kind >= COUNT:
+		return false
+	return WATER[kind]
 
 
 static func name_of(kind: int) -> String:
