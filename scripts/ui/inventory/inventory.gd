@@ -33,4 +33,10 @@ func add_item(item:ItemData,num:int)->void:
         items[item] += num
 
     inventory_update.emit()
+
+##返回背包内对应物品数量，没有返回0
+func get_count(item:ItemData) ->int:
+    if !items.has(item):
+        return 0
+    return items[item]
     

@@ -1,10 +1,12 @@
 [gd_scene format=3 uid="uid://bl88m473qw5s6"]
 
-[ext_resource type="Script" uid="uid://beik12il45io6" path="res://scripts/inventory/slot_item.gd" id="1_4u4ee"]
+[ext_resource type="Script" uid="uid://beik12il45io6" path="res://scripts/ui/inventory/slot_item.gd" id="1_4u4ee"]
+[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_p0qky"]
 
 [node name="SlotItem" type="Control" unique_id=1964065137]
 layout_mode = 3
 anchors_preset = 0
+mouse_filter = 1
 script = ExtResource("1_4u4ee")
 
 [node name="ItemTexture" type="TextureRect" parent="." unique_id=208282667]
@@ -14,23 +16,24 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -26.000002
-offset_top = -27.0
-offset_right = 102.0
-offset_bottom = 101.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 2
-scale = Vector2(0.39999968, 0.39999968)
 mouse_filter = 2
+texture = ExtResource("2_p0qky")
 
 [node name="AmountLabel" type="Label" parent="." unique_id=650801863]
 modulate = Color(1, 0, 0, 1)
 layout_mode = 0
-offset_left = -11.0
-offset_top = 9.0
-offset_right = 29.0
-offset_bottom = 32.0
+offset_left = -6.0
+offset_top = 13.0
+offset_right = 40.024033
+offset_bottom = 41.5349
 scale = Vector2(1.086389, 1.086389)
 theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 20
 text = "95"
 horizontal_alignment = 2

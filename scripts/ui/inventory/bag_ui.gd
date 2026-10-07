@@ -11,8 +11,6 @@ class_name BagUI
 @onready var slot_button:PackedScene = preload("res://scenes/ui/inventory/slot_button.tscn") #格子场景
 @onready var slot_item:PackedScene = preload("res://scenes/ui/inventory/slot_item.tscn") #物品图标
 
-var mouse_item:SlotItem = null #当前鼠标持有的物品
-
 func _ready() -> void:
 	button_mask = MOUSE_BUTTON_MASK_LEFT
 
@@ -22,6 +20,7 @@ func _ready() -> void:
 
 ##背包更新函数，同步背包数据
 func bag_update() ->void:
+
 	#加载背包内物品
 	for i in range(inventory.has_items.size()):
 		var item:ItemData = inventory.has_items[i]
@@ -37,52 +36,25 @@ func bag_update() ->void:
 		slot_item_.count = inventory.items[item]
 
 		bag_slot_container.add_child(slot_node)
-		slot_node.mouse_button_left_press.connect(mouse_left_slot_button.bind(slot_node))
-		slot_node.has_been_free.connect(remove_button.bind(item))
+		slot_node.take_item_signal.connect(take_item)
+		slot_node.put_item_signal.connect(put_item)
 		slot_node.slot_insert(slot_item_)
 
 		item_for_button[item] = slot_node
 
-##格子左键操作,拿取物品
-func mouse_left_slot_button(slot_button_:SlotButton)->void:
-	if !mouse_item:
-		
-		mouse_item = slot_button_.take_item(inventory)
 
-		add_child(mouse_item)
-		mouse_item.slot_item_update()
-
-		item_follow_mouse()
-
-##格子被释放
-func remove_button(item:ItemData)->void:
-	item_for_button.erase(item)
-
-##物品放入背包
-func _on_gui_input(event: InputEvent) -> void:
-	if mouse_item:
-		if event is InputEventMouseButton:
-			if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-
-				remove_child(mouse_item)
-
-				if item_for_button.has(mouse_item.item):
-					item_for_button[mouse_item.item].put_item(inventory,mouse_item)
-
-				else: 
-					var add_item = mouse_item.duplicate()
-					inventory.add_item(add_item.item,add_item.count)
-
-				mouse_item.queue_free()
-
-
-##物品跟随光标函数
-func item_follow_mouse() ->void:
-	if !mouse_item:
-		return
+func take_item(item:ItemData,num:int) ->void:
+	inventory.remove_item(item,num)
+	item_for_button[item].set_count(inventory.get_count(item))
 	
-	mouse_item.global_position = get_global_mouse_position()
+func put_item(item:ItemData,num:int) ->void:
+	inventory.add_item(item,num)
+	item_for_button[item].set_count(inventory.get_count(item))
+## 背包区域放回
+func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	if !(data is Dictionary):
+		return false
+	return data.has("item")
 
-#输入事件函数
-func _input(event: InputEvent) -> void:
-	item_follow_mouse()
+func _drop_data(_at_position: Vector2, data: Variant) -> void:
+	put_item(data.get("item"),data.get("count"))

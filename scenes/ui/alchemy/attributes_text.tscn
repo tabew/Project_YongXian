@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://8y63iuwbmvbn"]
+
+[ext_resource type="Script" uid="uid://drbsd0aldai13" path="res://scripts/ui/alchemy/attributes_text.gd" id="1_rbd6f"]
+
+[node name="AttributesText" type="Control" unique_id=326303259]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_rbd6f")
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=343571080]
+self_modulate = Color(1, 1, 1, 0)
+layout_mode = 0
+offset_right = 30.0
+offset_bottom = 30.0
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" unique_id=492938739]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="TextContainer" type="GridContainer" parent="PanelContainer/MarginContainer" unique_id=1425598504]
+layout_mode = 2
+columns = 4

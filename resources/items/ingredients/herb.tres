@@ -1,10 +1,21 @@
 [gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://0o07321sh6g1"]
 
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_hnmoy"]
 [ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_j1o5l"]
+[ext_resource type="Script" uid="uid://bwjh6ht06yssc" path="res://scripts/alchemical_attribute/heal.gd" id="2_ctiy6"]
 [ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_mb1bl"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_amedp"]
+
+[sub_resource type="Resource" id="Resource_2iyb1"]
+script = ExtResource("2_ctiy6")
+name = "治疗"
+max_level = 3
+metadata/_custom_type_script = "uid://bwjh6ht06yssc"
 
 [resource]
 script = ExtResource("1_j1o5l")
 name = "herb"
 texture = ExtResource("2_mb1bl")
+alchemical_attribute = Array[ExtResource("1_hnmoy")]([SubResource("Resource_2iyb1")])
+item_scene_path = "res://scenes/items/ingredients/herb.tscn"
 metadata/_custom_type_script = "uid://64jcv2bm81fk"

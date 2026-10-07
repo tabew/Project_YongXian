@@ -1,11 +1,14 @@
 [gd_scene format=3 uid="uid://dl5eend37uql3"]
 
+[ext_resource type="Script" uid="uid://dlhtygfs4ler1" path="res://scripts/items/ingredients/herb.gd" id="1_3vjeg"]
 [ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="1_cnamo"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_wp5od"]
 radius = 30.016663
 
-[node name="Herb" type="RigidBody2D" unique_id=1692393132]
+[node name="Herb" type="RigidBody2D" unique_id=38936394]
+script = ExtResource("1_3vjeg")
+metadata/_custom_type_script = "uid://h1ccj3m8c6tl"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=882047740]
 texture = ExtResource("1_cnamo")

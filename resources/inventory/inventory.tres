@@ -1,15 +1,15 @@
 [gd_resource type="Resource" script_class="Inventory" format=3 uid="uid://non3ac5ccv1p"]
 
-[ext_resource type="Script" uid="uid://bnhtavp4f1a7r" path="res://scripts/inventory/inventory.gd" id="1_3wndl"]
 [ext_resource type="Script" uid="uid://basv57d51ddac" path="res://scripts/items/item_data.gd" id="1_ap6wp"]
 [ext_resource type="Resource" uid="uid://0o07321sh6g1" path="res://resources/items/ingredients/herb.tres" id="2_ap6wp"]
 [ext_resource type="Resource" uid="uid://ey8i0ae0npht" path="res://resources/items/ingredients/testherb.tres" id="3_dl6u7"]
+[ext_resource type="Script" uid="uid://bnhtavp4f1a7r" path="res://scripts/ui/inventory/inventory.gd" id="4_dl6u7"]
 
 [resource]
-script = ExtResource("1_3wndl")
+script = ExtResource("4_dl6u7")
 has_items = Array[ExtResource("1_ap6wp")]([ExtResource("2_ap6wp"), ExtResource("3_dl6u7")])
 items = Dictionary[ExtResource("1_ap6wp"), int]({
-ExtResource("2_ap6wp"): 1,
+ExtResource("2_ap6wp"): 3,
 ExtResource("3_dl6u7"): 999
 })
 metadata/_custom_type_script = "uid://bnhtavp4f1a7r"

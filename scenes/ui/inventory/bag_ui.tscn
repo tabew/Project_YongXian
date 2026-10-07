@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c3w4yyisbn18w"]
 
-[ext_resource type="Script" uid="uid://dr1sdfqoa8ar4" path="res://scripts/inventory/bag_ui.gd" id="1_07fns"]
+[ext_resource type="Script" uid="uid://dr1sdfqoa8ar4" path="res://scripts/ui/inventory/bag_ui.gd" id="1_07fns"]
 
 [node name="BagUi" type="Button" unique_id=258613748]
 self_modulate = Color(1, 1, 1, 0)
@@ -9,10 +9,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -343.0
-offset_top = -165.5
-offset_right = 343.0
-offset_bottom = 165.5
+offset_left = -460.0
+offset_top = -217.5
+offset_right = 460.0
+offset_bottom = 217.5
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_07fns")
@@ -24,10 +24,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -343.0
-offset_top = -165.5
-offset_right = 343.0
-offset_bottom = 165.5
+offset_left = -460.0
+offset_top = -217.5
+offset_right = 460.0
+offset_bottom = 217.5
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -45,8 +45,7 @@ layout_mode = 2
 horizontal_scroll_mode = 0
 
 [node name="BagSlotContainer" type="GridContainer" parent="PanelContainer/MarginContainer/ScrollContainer" unique_id=853327853]
-custom_minimum_size = Vector2(656, 0)
-custom_maximum_size = Vector2(656, -1)
+custom_minimum_size = Vector2(890, 405)
 layout_mode = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 15

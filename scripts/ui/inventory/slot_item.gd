@@ -18,6 +18,10 @@ func _init(item_:ItemData = null,count_:int = 1) -> void:
 func slot_item_update()->void:
 	if !item: return
 
+	if count <= 0:
+		item_texture.self_modulate.a = 0.4
+	else:
+		item_texture.self_modulate.a = 1
 	item_texture.visible = true
 	item_texture.texture = item.texture
 
