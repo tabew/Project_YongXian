@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://bikx21x3xhux2"]
+
+[ext_resource type="Script" uid="uid://5v0nsfvfjebh" path="res://scripts/inventory/alchemical_ui.gd" id="1_wpcrx"]
+
+[node name="AlchemicalUi" type="Button" unique_id=1788431181]
+self_modulate = Color(1, 1, 1, 0)
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -548.0
+offset_top = -328.0
+offset_right = -224.0
+offset_bottom = 82.0
+grow_horizontal = 0
+grow_vertical = 2
+scale = Vector2(1.6, 1.6)
+script = ExtResource("1_wpcrx")
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=896010628]
+layout_mode = 1
+offset_right = 324.0
+offset_bottom = 410.0
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" unique_id=1618779690]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="ScrollContainer" type="ScrollContainer" parent="PanelContainer/MarginContainer" unique_id=1242501369]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="BagSlotContainer" type="GridContainer" parent="PanelContainer/MarginContainer/ScrollContainer" unique_id=1505827372]
+custom_minimum_size = Vector2(286, 0)
+custom_maximum_size = Vector2(286, -1)
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 15
+columns = 4
+
+[connection signal="gui_input" from="." to="." method="_on_gui_input"]

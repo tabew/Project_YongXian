@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://dl5eend37uql3"]
+
+[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="1_cnamo"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_wp5od"]
+radius = 30.016663
+
+[node name="Herb" type="RigidBody2D" unique_id=1692393132]
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=882047740]
+texture = ExtResource("1_cnamo")
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=1857158992]
+polygon = PackedVector2Array(-38, -15, -29, -25, -4, -2, 12, -24, 29, -34, 37, -27, 13, -1, 13, 29, 4, 35, -12, 11)
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1303590421]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=330164019]
+position = Vector2(0, -5)
+shape = SubResource("CircleShape2D_wp5od")

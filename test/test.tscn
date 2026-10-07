@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://biogohyf72s1a"]
+
+[ext_resource type="PackedScene" uid="uid://c3w4yyisbn18w" path="res://scenes/ui/inventory/bag_ui.tscn" id="1_vq6m5"]
+[ext_resource type="PackedScene" uid="uid://bikx21x3xhux2" path="res://scenes/ui/inventory/alchemical_ui.tscn" id="2_tl1hq"]
+[ext_resource type="PackedScene" uid="uid://cucs5cwgdhwgx" path="res://scenes/alchemy/cauldon.tscn" id="3_65205"]
+
+[node name="Test" type="Node2D" unique_id=998646551]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1890464144]
+
+[node name="BagUi" parent="CanvasLayer" unique_id=905817709 instance=ExtResource("1_vq6m5")]
+visible = false
+
+[node name="AlchemicalUi" parent="CanvasLayer" unique_id=119825343 instance=ExtResource("2_tl1hq")]
+
+[node name="Cauldon" parent="." unique_id=1136608732 instance=ExtResource("3_65205")]
+visible = false
+position = Vector2(350, 400)
+scale = Vector2(1.36, 1.28)

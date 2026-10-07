@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://crsq0wvmhgi63"]
+
+[ext_resource type="Script" uid="uid://djbordwq4kxkl" path="res://scripts/inventory/slot_button.gd" id="1_0kbok"]
+
+[node name="SlotButton" type="Button" unique_id=941150921]
+self_modulate = Color(1, 1, 1, 0)
+custom_minimum_size = Vector2(64, 64)
+offset_right = 64.0
+offset_bottom = 64.0
+script = ExtResource("1_0kbok")
+
+[node name="WaitforImage" type="ColorRect" parent="." unique_id=767410482]
+layout_mode = 0
+offset_right = 64.0
+offset_bottom = 64.0
+mouse_filter = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="WaitforImage" unique_id=1645783555]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.0
+offset_top = -24.0
+offset_right = 24.0
+offset_bottom = 24.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[connection signal="gui_input" from="." to="." method="_on_gui_input"]

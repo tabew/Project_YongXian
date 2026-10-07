@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://cucs5cwgdhwgx"]
+
+[ext_resource type="Script" uid="uid://buvv57kkrd03k" path="res://scripts/alchemy/cauldon.gd" id="1_2iyb1"]
+[ext_resource type="Texture2D" uid="uid://cwy7wkje1rxq0" path="res://assets/items/cauldon.png" id="1_8uf1t"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_530h6"]
+radius = 168.0
+height = 426.0
+
+[node name="Cauldon" type="StaticBody2D" unique_id=1136608732]
+script = ExtResource("1_2iyb1")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1046026505]
+texture = ExtResource("1_8uf1t")
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=493770000]
+polygon = PackedVector2Array(-151, -227, -188, -217, -159, -144, -218, -48, -222, 73, -145, 187, -125, 167, -176, 99, -186, -11, -121, -117)
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="." unique_id=1055594157]
+polygon = PackedVector2Array(-126, 166, -144, 186, -79, 226, -2, 243, 88, 226, 166, 178, 145, 159, 76, 202, 1, 218, -79, 202)
+
+[node name="CollisionPolygon2D3" type="CollisionPolygon2D" parent="." unique_id=122920886]
+polygon = PackedVector2Array(175, -232, 118, -124, 178, -54, 201, 54, 174, 125, 147, 160, 163, 178, 218, 102, 230, -1, 209, -83, 176, -129, 203, -212)
+
+[node name="Area2D" type="Area2D" parent="." unique_id=778814247]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=731534441]
+position = Vector2(3, 46)
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_530h6")
+
+[connection signal="body_entered" from="Area2D" to="." method="_get_ingredients"]
