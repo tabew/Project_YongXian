@@ -1,6 +1,9 @@
 class_name PlayerCharacter
 extends CharacterBody2D
 
+signal health_changed(current: int, maximum: int)
+signal defeated
+
 ## 主角占位实现：WASD / 方向键控制，速度带加速度与摩擦力，摄像机跟随。
 ##
 ## 地形阻挡不依赖物理层，而是直接问 WorldGenerator 这一格是什么地形。
@@ -23,19 +26,32 @@ extends CharacterBody2D
 ## 按顺序循环装备；添加资源即可扩充，无需按武器类型分支。
 @export var weapon_loadout: Array[WeaponDefinition] = []
 
+@export_group("生命")
+@export var max_health: int = 10
+
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var weapon_controller: WeaponController = $WeaponController
 
 ## 地形来源，由 GameWorld 注入。
 var terrain_source: WorldGenerator = null
+var health: int = 10
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
 var _cached_walkable: bool = true
 
 
+func _ready() -> void:
+	health = max_health
+	health_changed.emit(health, max_health)
+
+
 func _physics_process(delta: float) -> void:
 	weapon_controller.set_aim(get_global_mouse_position() - global_position)
+	if health <= 0:
+		velocity = Vector2.ZERO
+		weapon_controller.cancel_attack()
+		return
 	var input_direction: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
@@ -124,6 +140,26 @@ func spawn_on(source: WorldGenerator, world_position: Vector2) -> void:
 	velocity = Vector2.ZERO
 	global_position = world_position
 	_cached_tile = Vector2i(2147483647, 2147483647)
+	health = max_health
+	health_changed.emit(health, max_health)
+
+
+func take_damage(amount: int) -> void:
+	if amount <= 0 or health <= 0:
+		return
+	health = maxi(health - amount, 0)
+	health_changed.emit(health, max_health)
+	_notify("受到 %d 点伤害，剩余生命 %d/%d" % [amount, health, max_health])
+	if health == 0:
+		velocity = Vector2.ZERO
+		defeated.emit()
+		_notify("生命归零")
+
+
+func _notify(message: String) -> void:
+	var event_bus: Node = get_node_or_null("/root/EventBus")
+	if event_bus != null and event_bus.has_signal("notification"):
+		event_bus.emit_signal("notification", message)
 
 
 func _update_facing() -> void:

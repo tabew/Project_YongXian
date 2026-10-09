@@ -20,7 +20,7 @@ var _toast_tween: Tween = null
 
 
 func _ready() -> void:
-	hint_label.text = "WASD / 方向键 移动　·　R 换个世界　·　F3 性能面板"
+	hint_label.text = "WASD / 方向键 移动　·　M 展开地图　·　R 换个世界　·　F3 性能面板"
 	toast_label.modulate.a = 0.0
 	EventBus.notification.connect(_on_notification)
 	EventBus.world_ready.connect(_on_world_ready)
@@ -48,7 +48,14 @@ func _on_weapon_changed(weapon: WeaponDefinition) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_debug"):
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if key_event.echo:
+			return
+	if event.is_action_pressed("toggle_minimap"):
+		minimap.set_expanded(not minimap.is_expanded())
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("toggle_debug"):
 		stats_label.visible = not stats_label.visible
 
 
@@ -71,6 +78,9 @@ func _refresh() -> void:
 
 	var lines := PackedStringArray()
 	lines.append("种子 %d" % GameState.world_seed)
+	if _player is PlayerCharacter:
+		var character := _player as PlayerCharacter
+		lines.append("生命 %d/%d" % [character.health, character.max_health])
 	lines.append("坐标 %d, %d　区块 %d, %d" % [tile.x, tile.y, chunk.x, chunk.y])
 	lines.append("地形 %s　群系 %s" % [
 		Terrain.name_of(_world.get_terrain_at(position)),

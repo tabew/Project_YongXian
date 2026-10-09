@@ -82,10 +82,7 @@ var stat_last_generate_usec: int = 0
 
 func _exit_tree() -> void:
 	# 工作线程还在跑的时候释放本节点会踩到已回收的对象，必须等它们结束
-	for coords: Vector2i in _in_flight.keys():
-		var task_id: int = _in_flight[coords]
-		WorkerThreadPool.wait_for_task_completion(task_id)
-	_in_flight.clear()
+	_wait_for_generation_tasks()
 	_clear_scene()
 
 
@@ -93,12 +90,16 @@ func _exit_tree() -> void:
 
 ## 换一个世界（新种子）或首次进入时调用。
 func setup(generator: WorldGenerator, focus: Node2D) -> void:
+	# 旧任务必须先结束，否则相同坐标会被 _in_flight 跳过，旧种子的生成器也可能被复用。
 	_epoch += 1
+	_wait_for_generation_tasks()
+	_generator_pool.clear()
+	_clear_scene()
+
 	_generator = generator
 	_world_seed = generator.world_seed
 	focus_node = focus
 	_focus_chunk = NO_CHUNK
-	_clear_scene()
 	_reset_stats()
 
 
@@ -371,6 +372,14 @@ func _release_generator(worker: WorldGenerator) -> void:
 	if _generator_pool.size() < MAX_GENERATOR_POOL:
 		_generator_pool.append(worker)
 	_generator_mutex.unlock()
+
+
+## 等待当前世代的生成任务结束，供换世界和退出场景时统一收尾。
+func _wait_for_generation_tasks() -> void:
+	for coords: Vector2i in _in_flight.keys():
+		var task_id: int = _in_flight[coords]
+		WorkerThreadPool.wait_for_task_completion(task_id)
+	_in_flight.clear()
 
 
 # ------------------------------------------------------------ 铺图与回收

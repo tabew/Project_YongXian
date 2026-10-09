@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/game/game_world.gd" id="1_world"]
 [ext_resource type="TileSet" path="res://resources/terrain_tileset.tres" id="2_tileset"]
 [ext_resource type="PackedScene" path="res://scenes/game/player.tscn" id="3_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 [ext_resource type="Script" path="res://scenes/world/chunk_manager.gd" id="5_chunks"]
+[ext_resource type="Script" path="res://scripts/monsters/rainforest_monster_spawner.gd" id="6_monsters"]
 
 [node name="GameWorld" type="Node2D"]
 script = ExtResource("1_world")
@@ -12,6 +13,9 @@ script = ExtResource("1_world")
 [node name="ChunkManager" type="Node2D" parent="."]
 script = ExtResource("5_chunks")
 tile_set = ExtResource("2_tileset")
+
+[node name="MonsterSpawner" type="Node2D" parent="."]
+script = ExtResource("6_monsters")
 
 [node name="Player" parent="." instance=ExtResource("3_player")]
 

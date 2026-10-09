@@ -1,3 +1,4 @@
+class_name GameWorld
 extends Node2D
 
 ## 游戏世界：建一个无限世界生成器，交给 ChunkManager 按区块加载，把主角放到出生点。
@@ -7,6 +8,7 @@ const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.
 @export var spawn_training_dummy: bool = true
 
 @onready var chunk_manager: ChunkManager = $ChunkManager
+@onready var monster_spawner: RainforestMonsterSpawner = $MonsterSpawner
 @onready var player: PlayerCharacter = $Player
 @onready var hud: Control = $GameHUD/HUD
 
@@ -23,6 +25,19 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("regenerate_world"):
 		regenerate_world()
+	elif event.is_action_pressed("kill_all_monsters"):
+		kill_all_monsters()
+
+
+## 隐藏调试指令：只调用怪物死亡接口，不操作道具或其他世界实体。
+func kill_all_monsters() -> void:
+	kill_monsters_in_tree(get_tree())
+
+
+static func kill_monsters_in_tree(tree: SceneTree) -> void:
+	for monster: Node in tree.get_nodes_in_group("monsters"):
+		if monster.has_method("kill"):
+			monster.call("kill")
 
 
 ## 用指定种子重建整个世界。
@@ -31,12 +46,14 @@ func build_world(seed_value: int) -> void:
 	GameState.world_seed = generator.world_seed
 
 	chunk_manager.setup(generator, player)
-	hud.bind_world(chunk_manager, player)
 
 	# 出生点从原点向外找一块开阔地，避免一开局就被水围住
 	var spawn_tile: Vector2i = generator.find_spawn(Vector2i.ZERO)
 	player.spawn_on(generator, WorldGenerator.tile_to_world(spawn_tile))
 	_place_training_dummy(generator, spawn_tile)
+	monster_spawner.setup(generator, chunk_manager, player)
+	# 玩家到达新世界出生点后再绑定 HUD，避免把上一局的位置记为已探索。
+	hud.bind_world(chunk_manager, player)
 
 	EventBus.world_ready.emit(generator.world_seed)
 
