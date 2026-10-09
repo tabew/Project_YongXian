@@ -10,6 +10,8 @@ const REFRESH_INTERVAL: float = 0.2
 @onready var stats_label: Label = $StatsLabel
 @onready var hint_label: Label = $HintLabel
 @onready var toast_label: Label = $ToastLabel
+@onready var weapon_icon: TextureRect = $WeaponIcon
+@onready var weapon_label: Label = $WeaponLabel
 
 var _world: ChunkManager = null
 var _player: Node2D = null
@@ -26,10 +28,23 @@ func _ready() -> void:
 
 ## 由 GameWorld 注入区块管理器与主角。
 func bind_world(manager: ChunkManager, player: Node2D) -> void:
+	if _player is PlayerCharacter:
+		var previous_controller: WeaponController = (_player as PlayerCharacter).weapon_controller
+		if previous_controller.weapon_changed.is_connected(_on_weapon_changed):
+			previous_controller.weapon_changed.disconnect(_on_weapon_changed)
 	_world = manager
 	_player = player
+	if player is PlayerCharacter:
+		var controller: WeaponController = (player as PlayerCharacter).weapon_controller
+		controller.weapon_changed.connect(_on_weapon_changed)
+		_on_weapon_changed(controller.equipped_weapon)
 	minimap.bind(manager, player)
 	_refresh_timer = 0.0
+
+
+func _on_weapon_changed(weapon: WeaponDefinition) -> void:
+	weapon_icon.texture = weapon.icon if weapon != null else null
+	weapon_label.text = "%s\n%s 伤害  ·  %.1f 次/秒" % [weapon.display_name, str(weapon.damage), weapon.attacks_per_second()] if weapon != null else ""
 
 
 func _unhandled_input(event: InputEvent) -> void:

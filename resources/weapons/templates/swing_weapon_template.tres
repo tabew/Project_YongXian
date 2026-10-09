@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="SwingWeaponDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/weapons/swing_weapon_definition.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/swing_attack.tscn" id="2_attack"]
+[ext_resource type="Texture2D" path="res://assets/weapons/longsword.png" id="3_texture"]
+
+[resource]
+resource_name = "长剑类通用模板"
+script = ExtResource("1_data")
+id = &"new_swing_weapon"
+display_name = "长剑类武器模板"
+icon = ExtResource("3_texture")
+attack_scene = ExtResource("2_attack")
+damage = 18.0
+critical_chance = 0.04
+critical_multiplier = 2.0
+knockback = 110.0
+hit_mask = 4
+windup_seconds = 0.08
+active_seconds = 0.18
+recovery_seconds = 0.2
+reuse_delay = 0.04
+auto_repeat = true
+hand_distance = 9.0
+blade_length = 38.0
+blade_width = 7.0
+blade_inset = 6.0
+arc_degrees = 150.0
+aim_offset_degrees = 0.0
+texture = ExtResource("3_texture")
+texture_grip = Vector2(6, 7)
+trail_color = Color(0.72, 0.92, 1, 0.45)
+trail_degrees = 42.0

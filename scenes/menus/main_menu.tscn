@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://c385go7ge1ek4"]
 
-[ext_resource type="Script" path="res://scenes/menus/main_menu.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bda351x2qjirh" path="res://scenes/menus/main_menu.gd" id="1_script"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=850917211]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,17 +11,21 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=32812256]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -486.0
+offset_top = -202.0
+offset_right = -486.0
+offset_bottom = -202.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.08, 0.08, 0.12, 1)
 mouse_filter = 2
+color = Color(0.08, 0.08, 0.12, 1)
 
-[node name="TitleLabel" type="Label" parent="."]
+[node name="TitleLabel" type="Label" parent="." unique_id=1033633744]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -31,11 +35,11 @@ offset_top = 92.0
 offset_right = 240.0
 offset_bottom = 152.0
 grow_horizontal = 2
+theme_override_font_sizes/font_size = 52
 text = "Project YongXian"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 52
 
-[node name="SubtitleLabel" type="Label" parent="."]
+[node name="SubtitleLabel" type="Label" parent="." unique_id=569820987]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -45,12 +49,12 @@ offset_top = 158.0
 offset_right = 240.0
 offset_bottom = 184.0
 grow_horizontal = 2
-text = "随机地图 · 占位主角"
-horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.62, 0.66, 0.76, 1)
 theme_override_font_sizes/font_size = 16
+text = "随机地图 · 占位主角"
+horizontal_alignment = 1
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=324047542]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -65,29 +69,28 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 14
 
-[node name="BtnStart" type="Button" parent="VBoxContainer"]
+[node name="BtnStart" type="Button" parent="VBoxContainer" unique_id=893169353]
 custom_minimum_size = Vector2(220, 46)
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "开始游戏"
-theme_override_font_sizes/font_size = 18
 
-[node name="BtnQuit" type="Button" parent="VBoxContainer"]
+[node name="BtnQuit" type="Button" parent="VBoxContainer" unique_id=1092245304]
 custom_minimum_size = Vector2(220, 46)
 layout_mode = 2
-text = "退出"
 theme_override_font_sizes/font_size = 18
+text = "退出"
 
-[node name="VersionLabel" type="Label" parent="."]
+[node name="VersionLabel" type="Label" parent="." unique_id=1712998191]
 layout_mode = 1
-anchors_preset = 3
-anchor_left = 0.0
+anchors_preset = 2
 anchor_top = 1.0
-anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 10.0
 offset_top = -28.0
 offset_right = 200.0
 offset_bottom = -6.0
+grow_horizontal = 0
 grow_vertical = 0
-text = "v0.1.0"
 theme_override_font_sizes/font_size = 13
+text = "v0.1.0"

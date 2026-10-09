@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/depth_strike_attack.gd" id="1_attack"]
+
+[node name="DepthStrikeAttack" type="Node2D"]
+z_index = 2
+script = ExtResource("1_attack")
+
+[node name="Shaft" type="Polygon2D" parent="."]
+texture_filter = 1

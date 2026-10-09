@@ -1,6 +1,17 @@
 # Project YongXian
 
-使用 **Godot 4.7** 开发的 2D 肉鸽游戏项目。目前包含主菜单、**无限世界 + 区块流式加载 + 14 种生物群系 + 主路/支线路网**、右上角小地图，以及一个可用 WASD 控制、带加速度的占位主角。
+使用 **Godot 4.7** 开发的 2D 肉鸽游戏项目。目前包含主菜单、**无限世界 + 区块流式加载 + 14 种生物群系 + 主路/支线路网**、右上角小地图，以及一个可用 WASD 控制、带加速度的占位主角。已加入可配置近战武器系统、第一把长剑与可重生训练靶。
+
+## 近战武器
+
+鼠标瞄准，左键挥击，按住连续攻击，Q 切换长剑 / 长棍。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾。出生点附近的训练靶可验证伤害、暴击与击退。
+
+- **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres` 或 `resources/weapons/long_staff.tres`。
+- **长剑类通用模板**：[swing_weapon_template.tres](resources/weapons/templates/swing_weapon_template.tres)，150° 扇形横扫。
+- **长棍类通用模板**：[staff_weapon_template.tres](resources/weapons/templates/staff_weapon_template.tres)，40° 小扇形与由远到近过渡。
+- **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图，再加入玩家的 `weapon_loadout` 数组；无需新增脚本或攻击场景。
+- **添加不同类型武器**：继承 `WeaponDefinition` / `WeaponAttack`，配置独立攻击场景，无需修改玩家或控制器。
+- **完整说明**：[武器架构、参数、扩展和测试](docs/weapons.md)。
 
 ---
 
@@ -214,6 +225,8 @@ Project_YongXian/
 | 按键 | 功能 |
 |------|------|
 | W A S D / 方向键 | 移动主角 |
+| 鼠标 / 左键 | 瞄准 / 挥剑，按住连续攻击 |
+| Q | 循环切换长剑 / 长棍 |
 | R | 换个种子重开世界 |
 | F3 | 开关右上角性能面板 |
 

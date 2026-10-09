@@ -19,7 +19,12 @@ extends CharacterBody2D
 ## 打开后无法走进深水、浅水、山地和雪峰（路上的格子除外）。
 @export var collide_with_terrain: bool = true
 
+@export_group("武器")
+## 按顺序循环装备；添加资源即可扩充，无需按武器类型分支。
+@export var weapon_loadout: Array[WeaponDefinition] = []
+
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var weapon_controller: WeaponController = $WeaponController
 
 ## 地形来源，由 GameWorld 注入。
 var terrain_source: WorldGenerator = null
@@ -30,12 +35,43 @@ var _cached_walkable: bool = true
 
 
 func _physics_process(delta: float) -> void:
+	weapon_controller.set_aim(get_global_mouse_position() - global_position)
 	var input_direction: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
 	_apply_input(input_direction, delta)
 	_integrate_movement(delta)
 	_update_facing()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("attack"):
+		weapon_controller.set_trigger_pressed(true)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("cycle_weapon"):
+		equip_next_weapon()
+		get_viewport().set_input_as_handled()
+
+
+func equip_next_weapon() -> bool:
+	var current_index: int = weapon_loadout.find(weapon_controller.equipped_weapon)
+	for offset: int in range(1, weapon_loadout.size() + 1):
+		var candidate: WeaponDefinition = weapon_loadout[(current_index + offset) % weapon_loadout.size()]
+		if candidate != null and candidate != weapon_controller.equipped_weapon:
+			if weapon_controller.equip(candidate):
+				return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	# Release must also reach us when a UI control consumes the event.
+	if event.is_action_released("attack"):
+		weapon_controller.set_trigger_pressed(false)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(weapon_controller):
+		weapon_controller.cancel_attack()
 
 
 ## 有输入时朝目标速度加速，松手后按摩擦力减速到 0。
@@ -83,6 +119,7 @@ func can_stand_at(world_position: Vector2) -> bool:
 
 ## 由 GameWorld 调用：注入地形来源并把主角放到指定世界坐标。
 func spawn_on(source: WorldGenerator, world_position: Vector2) -> void:
+	weapon_controller.cancel_attack()
 	terrain_source = source
 	velocity = Vector2.ZERO
 	global_position = world_position
@@ -90,5 +127,7 @@ func spawn_on(source: WorldGenerator, world_position: Vector2) -> void:
 
 
 func _update_facing() -> void:
-	if absf(velocity.x) > 1.0:
+	if weapon_controller.is_attacking():
+		sprite.flip_h = weapon_controller.locked_aim().x < 0.0
+	elif absf(velocity.x) > 1.0:
 		sprite.flip_h = velocity.x < 0.0
