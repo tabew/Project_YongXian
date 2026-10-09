@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Holy" format=3 uid="uid://cbug2aym43gnx"]
+
+[ext_resource type="Script" uid="uid://bakux1700e72" path="res://scripts/alchemical_attribute/holy.gd" id="1_u4gvl"]
+
+[resource]
+script = ExtResource("1_u4gvl")
+attribute_id = 1
+name = "神圣"
+metadata/_custom_type_script = "uid://bakux1700e72"

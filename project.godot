@@ -22,6 +22,7 @@ config/icon="res://icon.svg"
 EventBus="*res://autoloads/event_bus.gd"
 GameState="*res://autoloads/game_state.gd"
 SceneManager="*res://autoloads/scene_manager.tscn"
+AlchemicalAttributeList="*uid://k5lsvl6bbbgk"
 
 [display]
 

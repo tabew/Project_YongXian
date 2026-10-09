@@ -1,0 +1,3 @@
+extends AlchemicalData
+
+class_name ContinuousHeal

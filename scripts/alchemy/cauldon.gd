@@ -11,7 +11,7 @@ var attribute:Array[AlchemicalData]
 var transforming_attribute:AlchemicalData
 ##将与指针反应的属性数组
 var prepared_attribute:Array[AlchemicalData]
-##已经反应了的属性数组
+##本回合已经被消耗的属性数组
 var has_transform:Array[AlchemicalData]
 
 
@@ -23,7 +23,7 @@ func _get_attributes(body: Node2D) -> void:
 
 		for i in ingredient_data.alchemical_attribute.size():
 			attribute.append(ingredient_data.alchemical_attribute[i])
-			
+
 			attributes_text.add_text(ingredient_data.alchemical_attribute[i])
 
 		body.queue_free()
@@ -42,19 +42,34 @@ func start_transform() -> void:
 			break
 
 		flag = true
+		has_transform.clear()
 
 		for i in attribute.size():
-			
+
 			transforming_attribute = attribute[i]
+
+			#本回合已经被消耗的属性不能再当反应主体，否则两个属性会反复互相反应、重复产出
+			if has_transform.has(transforming_attribute):
+				continue
+
+			prepared_attribute.clear()
 
 			#遍历其它属性，检测是否可以与之反应
 			for j in attribute.size():
 				if i == j:
 					continue
-				
+
+				#本回合已经被消耗的属性不再参与反应
+				if has_transform.has(attribute[j]):
+					continue
+
 				if transforming_attribute.can_interact_with(attribute[j]):
 					prepared_attribute.append(attribute[j])
-			
+
+			#没有反应物就不要调用反应函数
+			if prepared_attribute.is_empty():
+				continue
+
 			var result = transforming_attribute.interact(prepared_attribute)
 			var transformed = transforming_attribute.interact(prepared_attribute,2)
 
@@ -69,7 +84,9 @@ func start_transform() -> void:
 				for k in transformed.size():
 					has_transform.append(transformed[k])
 
+		#本回合结束，统一把被消耗的属性从坩埚里移除。
 		for i in has_transform.size():
 			attribute.erase(has_transform[i])
-	
+
+	flag = false
 	text_update()
