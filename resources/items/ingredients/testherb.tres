@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://ey8i0ae0npht"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_m5qgs"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_twtpf"]
+[ext_resource type="Resource" uid="uid://cbug2aym43gnx" path="res://resources/alchemical_attribute/holy.tres" id="2_2hhj0"]
+[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_udxms"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_wu55y"]
+
+[resource]
+script = ExtResource("1_m5qgs")
+id = 1
+name = "test"
+texture = ExtResource("2_udxms")
+alchemical_attribute = Array[ExtResource("1_twtpf")]([ExtResource("2_2hhj0")])
+item_scene_path = "uid://mermt4pycayc"
+metadata/_custom_type_script = "uid://64jcv2bm81fk"

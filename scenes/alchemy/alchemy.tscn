@@ -1,0 +1,76 @@
+[gd_scene format=3 uid="uid://862mtq7arhfy"]
+
+[ext_resource type="PackedScene" uid="uid://cucs5cwgdhwgx" path="res://scenes/alchemy/cauldon.tscn" id="1_0gm81"]
+[ext_resource type="PackedScene" uid="uid://j2i8dlooatb4" path="res://scenes/ui/alchemy/alchemicalUi.tscn" id="2_4oxu3"]
+[ext_resource type="PackedScene" uid="uid://8y63iuwbmvbn" path="res://scenes/ui/alchemy/attributes_text.tscn" id="2_p2eye"]
+[ext_resource type="Script" uid="uid://ckab2fmfygqf8" path="res://scripts/alchemy/item_drop_zone.gd" id="3_cbe7x"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uy7mj"]
+bg_color = Color(0.235294, 0.831373, 0.470588, 0.0784314)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.235294, 0.831373, 0.470588, 0.588235)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="Alchemy" type="Node2D" unique_id=389668861]
+y_sort_enabled = true
+
+[node name="SpawnedItems" type="Node2D" parent="." unique_id=1764169039]
+scale = Vector2(1.36, 1.28)
+
+[node name="Cauldon" parent="." unique_id=1136608732 instance=ExtResource("1_0gm81")]
+position = Vector2(492, 454)
+
+[node name="Button" type="Button" parent="Cauldon" unique_id=1883543845]
+offset_left = -436.0
+offset_top = -297.0
+offset_right = -226.0
+offset_bottom = -212.0
+theme_override_font_sizes/font_size = 53
+text = "Start!"
+
+[node name="AttributesText" parent="Cauldon" unique_id=326303259 instance=ExtResource("2_p2eye")]
+offset_left = -129.0
+offset_top = -11.0
+offset_right = -129.0
+offset_bottom = -11.0
+
+[node name="LeftDropZone" type="Control" parent="Cauldon" unique_id=1448328919]
+layout_mode = 3
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = -139.0
+offset_top = -425.0
+offset_right = 142.0
+offset_bottom = -186.0
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("3_cbe7x")
+
+[node name="Panel" type="Panel" parent="Cauldon/LeftDropZone" unique_id=529519088]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_uy7mj")
+
+[node name="AlchemicalUi" parent="." unique_id=1419464354 instance=ExtResource("2_4oxu3")]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+offset_left = 766.0
+offset_top = 36.0
+offset_right = 766.0
+offset_bottom = 36.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[connection signal="button_up" from="Cauldon/Button" to="Cauldon" method="start_transform"]

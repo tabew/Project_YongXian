@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://j2i8dlooatb4"]
+
+[ext_resource type="PackedScene" uid="uid://bikx21x3xhux2" path="res://scenes/ui/alchemy/alchemical_bag.tscn" id="1_8jhus"]
+
+[node name="AlchemicalUi" type="Control" unique_id=1419464354]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AlchemicalBag" parent="." unique_id=1788431181 instance=ExtResource("1_8jhus")]
+layout_mode = 1
+scale = Vector2(1, 1)

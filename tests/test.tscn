@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://biogohyf72s1a"]
+
+[ext_resource type="PackedScene" uid="uid://c3w4yyisbn18w" path="res://scenes/ui/inventory/bag_ui.tscn" id="1_vq6m5"]
+[ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/alchemy/alchemy.tscn" id="3_65205"]
+
+[node name="Test" type="Node2D" unique_id=998646551]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1890464144]
+
+[node name="BagUi" parent="CanvasLayer" unique_id=905817709 instance=ExtResource("1_vq6m5")]
+visible = false
+
+[node name="Alchemy" parent="." unique_id=389668861 instance=ExtResource("3_65205")]

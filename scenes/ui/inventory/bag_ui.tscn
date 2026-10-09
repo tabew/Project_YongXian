@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://c3w4yyisbn18w"]
+
+[ext_resource type="Script" uid="uid://dr1sdfqoa8ar4" path="res://scripts/ui/inventory/bag_ui.gd" id="1_07fns"]
+
+[node name="BagUi" type="Button" unique_id=258613748]
+self_modulate = Color(1, 1, 1, 0)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -460.0
+offset_top = -217.5
+offset_right = 460.0
+offset_bottom = 217.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_07fns")
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=1700129393]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -460.0
+offset_top = -217.5
+offset_right = 460.0
+offset_bottom = 217.5
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" unique_id=1960808044]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="ScrollContainer" type="ScrollContainer" parent="PanelContainer/MarginContainer" unique_id=1274073533]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="BagSlotContainer" type="GridContainer" parent="PanelContainer/MarginContainer/ScrollContainer" unique_id=853327853]
+custom_minimum_size = Vector2(890, 405)
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 15
+columns = 9
+
+[connection signal="gui_input" from="." to="." method="_on_gui_input"]

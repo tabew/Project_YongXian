@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://0o07321sh6g1"]
+
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_hnmoy"]
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_j1o5l"]
+[ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="2_ctiy6"]
+[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_mb1bl"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_amedp"]
+
+[resource]
+script = ExtResource("1_j1o5l")
+name = "herb"
+texture = ExtResource("2_mb1bl")
+alchemical_attribute = Array[ExtResource("1_hnmoy")]([ExtResource("2_ctiy6")])
+item_scene_path = "uid://dl5eend37uql3"
+metadata/_custom_type_script = "uid://64jcv2bm81fk"

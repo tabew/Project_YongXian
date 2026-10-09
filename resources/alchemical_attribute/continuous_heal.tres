@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ContinuousHeal" format=3 uid="uid://8ugmywcuoule"]
+
+[ext_resource type="Script" uid="uid://lqt074b7iugc" path="res://scripts/alchemical_attribute/continuous_heal.gd" id="1_55llq"]
+
+[resource]
+script = ExtResource("1_55llq")
+attribute_id = 2
+name = "恢复"
+max_level = 3
+metadata/_custom_type_script = "uid://lqt074b7iugc"

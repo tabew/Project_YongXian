@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Heal" format=3 uid="uid://dr8pg4jbg83or"]
+
+[ext_resource type="Script" uid="uid://bwjh6ht06yssc" path="res://scripts/alchemical_attribute/heal.gd" id="2_lw1qg"]
+
+[resource]
+script = ExtResource("2_lw1qg")
+name = "治疗"
+max_level = 3
+can_be_interacted_attribute = Array[int]([0, 1])
+metadata/_custom_type_script = "uid://bwjh6ht06yssc"
