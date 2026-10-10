@@ -22,11 +22,11 @@ func _ready() -> void:
 func bag_update() ->void:
 
 	#加载背包内物品
-	for i in range(inventory.has_items.size()):
-		var item:ItemData = inventory.has_items[i]
+	for item in inventory.has_items:
 
 		#判断是否已经加载了背包中的某个物品，已加载则跳过
 		if item_for_button.has(item):
+			item_for_button[item].set_count(inventory.get_count(item))
 			continue
 
 		var slot_item_:SlotItem = slot_item.instantiate()
@@ -36,6 +36,8 @@ func bag_update() ->void:
 		slot_item_.count = inventory.items[item]
 
 		bag_slot_container.add_child(slot_node)
+		slot_node.take_item_signal.connect(take_item)
+		slot_node.put_item_signal.connect(put_item)
 		slot_node.slot_insert(slot_item_)
 
 		item_for_button[item] = slot_node
@@ -44,6 +46,8 @@ func bag_update() ->void:
 func take_item(item:ItemData,num:int) ->void:
 	inventory.remove_item(item,num)
 	item_for_button[item].set_count(inventory.get_count(item))
+	if item_for_button[item].slot_item.count <= 0:
+		item_for_button.erase(item)
 	
 func put_item(item:ItemData,num:int) ->void:
 	inventory.add_item(item,num)
@@ -63,3 +67,14 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		if Input.is_action_just_pressed("open_inventory"):
 			visible = !visible
+			_input_update()
+
+		if Input.is_action_just_pressed("alchemy_menu"):
+			visible = false
+
+func _input_update():
+	if visible:
+		for item in item_for_button:
+			item_for_button[item].queue_free()
+		item_for_button.clear()
+		bag_update()

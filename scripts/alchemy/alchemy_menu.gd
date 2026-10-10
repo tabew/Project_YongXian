@@ -5,3 +5,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		if Input.is_action_just_pressed("alchemy_menu"):
 			visible = !visible
+		
+		if Input.is_action_just_pressed("open_inventory"):
+			visible = false
+
