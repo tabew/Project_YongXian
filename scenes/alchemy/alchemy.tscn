@@ -1,9 +1,10 @@
 [gd_scene format=3 uid="uid://862mtq7arhfy"]
 
 [ext_resource type="PackedScene" uid="uid://cucs5cwgdhwgx" path="res://scenes/alchemy/cauldon.tscn" id="1_0gm81"]
-[ext_resource type="PackedScene" uid="uid://j2i8dlooatb4" path="res://scenes/ui/alchemy/alchemicalUi.tscn" id="2_4oxu3"]
+[ext_resource type="Script" uid="uid://d2q0qwx28g54y" path="res://scripts/alchemy/alchemy_menu.gd" id="1_uy7mj"]
 [ext_resource type="PackedScene" uid="uid://8y63iuwbmvbn" path="res://scenes/ui/alchemy/attributes_text.tscn" id="2_p2eye"]
 [ext_resource type="Script" uid="uid://ckab2fmfygqf8" path="res://scripts/alchemy/item_drop_zone.gd" id="3_cbe7x"]
+[ext_resource type="PackedScene" uid="uid://bikx21x3xhux2" path="res://scenes/ui/alchemy/alchemical_bag.tscn" id="5_uy7mj"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uy7mj"]
 bg_color = Color(0.235294, 0.831373, 0.470588, 0.0784314)
@@ -19,6 +20,7 @@ corner_radius_bottom_left = 10
 
 [node name="Alchemy" type="Node2D" unique_id=389668861]
 y_sort_enabled = true
+script = ExtResource("1_uy7mj")
 
 [node name="SpawnedItems" type="Node2D" parent="." unique_id=1764169039]
 scale = Vector2(1.36, 1.28)
@@ -62,15 +64,11 @@ grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_uy7mj")
 
-[node name="AlchemicalUi" parent="." unique_id=1419464354 instance=ExtResource("2_4oxu3")]
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-offset_left = 766.0
+[node name="AlchemicalBag" parent="." unique_id=1788431181 instance=ExtResource("5_uy7mj")]
+offset_left = 803.0
 offset_top = 36.0
-offset_right = 766.0
-offset_bottom = 36.0
-grow_horizontal = 0
-grow_vertical = 0
+offset_right = 1223.0
+offset_bottom = 681.0
+scale = Vector2(1, 1)
 
 [connection signal="button_up" from="Cauldon/Button" to="Cauldon" method="start_transform"]

@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://cei2bfjxogxkp"]
+
+[ext_resource type="PackedScene" uid="uid://crsq0wvmhgi63" path="res://scenes/ui/inventory/slot_button.tscn" id="1_6rj5y"]
+
+[node name="BottomBagUi" type="Control" unique_id=69592941]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=383120958]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -436.0
+offset_top = -120.0
+offset_right = 436.0
+grow_horizontal = 2
+grow_vertical = 0
+scale = Vector2(0.8, 0.8)
+pivot_offset = Vector2(437.5, 58.4375)
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" unique_id=1729236359]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/MarginContainer" unique_id=1989703401]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SlotButton" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=941150921 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton2" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=814056959 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton3" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1938950542 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton4" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=2108514623 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton5" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1704868639 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton6" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=328852580 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton7" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1180989107 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton8" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1257923154 instance=ExtResource("1_6rj5y")]
+layout_mode = 2
+
+[node name="SlotButton9" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=288052252 instance=ExtResource("1_6rj5y")]
+layout_mode = 2

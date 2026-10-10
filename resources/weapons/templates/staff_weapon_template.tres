@@ -1,36 +1,19 @@
-[gd_resource type="Resource" script_class="DepthStrikeWeaponDefinition" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="DepthStrikeWeaponDefinition" format=3 uid="uid://jy5044i4y0u5"]
 
-[ext_resource type="Script" path="res://resources/weapons/depth_strike_weapon_definition.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://bdalie5up148l" path="res://resources/weapons/depth_strike_weapon_definition.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/depth_strike_attack.tscn" id="2_attack"]
-[ext_resource type="Texture2D" path="res://assets/weapons/long_staff.png" id="3_texture"]
+[ext_resource type="Texture2D" uid="uid://cftwkgvhuis3e" path="res://assets/weapons/long_staff.png" id="3_texture"]
 
 [resource]
 resource_name = "长棍类通用模板"
 script = ExtResource("1_data")
+texture = ExtResource("3_texture")
 id = &"new_staff_weapon"
 display_name = "长棍类武器模板"
 icon = ExtResource("3_texture")
 attack_scene = ExtResource("2_attack")
 damage = 20.0
-critical_chance = 0.04
-critical_multiplier = 2.0
 knockback = 180.0
-hit_mask = 4
 windup_seconds = 0.12
-active_seconds = 0.18
 recovery_seconds = 0.24
 reuse_delay = 0.1
-auto_repeat = true
-shaft_length = 24.0
-hand_distance = 8.0
-forward_travel = 4.0
-grip_inset = 3.0
-hit_width = 4.0
-arc_degrees = 40.0
-near_pitch_degrees = 15.0
-far_pitch_degrees = -35.0
-reverse_strike = false
-perspective_strength = 0.28
-texture = ExtResource("3_texture")
-texture_grip = Vector2(8, 2.5)
-trail_color = Color(0.88, 0.95, 0.7, 0.3)

@@ -33,6 +33,8 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 
 ##具有等级的属性升级，需要两个相同等级的属性
 func can_upgrade_level(attribute:AlchemicalData) -> bool:
+	if level >= max_level:
+		return false
 	if attribute.level == level:
 		return true
 	else :

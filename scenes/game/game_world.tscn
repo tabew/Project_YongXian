@@ -1,25 +1,33 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://dvsb5c07qik5g"]
 
-[ext_resource type="Script" path="res://scenes/game/game_world.gd" id="1_world"]
-[ext_resource type="TileSet" path="res://resources/terrain_tileset.tres" id="2_tileset"]
+[ext_resource type="Script" uid="uid://i5vskmnypufq" path="res://scenes/game/game_world.gd" id="1_world"]
+[ext_resource type="TileSet" uid="uid://gxl163d2jwii" path="res://resources/terrain_tileset.tres" id="2_tileset"]
 [ext_resource type="PackedScene" path="res://scenes/game/player.tscn" id="3_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
-[ext_resource type="Script" path="res://scenes/world/chunk_manager.gd" id="5_chunks"]
-[ext_resource type="Script" path="res://scripts/monsters/rainforest_monster_spawner.gd" id="6_monsters"]
+[ext_resource type="Script" uid="uid://cxpsf8i31tdrc" path="res://scenes/world/chunk_manager.gd" id="5_chunks"]
+[ext_resource type="Script" uid="uid://hw4o24yrhpx6" path="res://scripts/monsters/rainforest_monster_spawner.gd" id="6_monsters"]
+[ext_resource type="PackedScene" uid="uid://c3w4yyisbn18w" path="res://scenes/ui/inventory/bag_ui.tscn" id="7_jmprd"]
+[ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/alchemy/alchemy.tscn" id="8_lsk7w"]
 
-[node name="GameWorld" type="Node2D"]
+[node name="GameWorld" type="Node2D" unique_id=408146263]
 script = ExtResource("1_world")
 
-[node name="ChunkManager" type="Node2D" parent="."]
+[node name="ChunkManager" type="Node2D" parent="." unique_id=1278449827]
 script = ExtResource("5_chunks")
 tile_set = ExtResource("2_tileset")
 
-[node name="MonsterSpawner" type="Node2D" parent="."]
+[node name="MonsterSpawner" type="Node2D" parent="." unique_id=46169950]
 script = ExtResource("6_monsters")
 
-[node name="Player" parent="." instance=ExtResource("3_player")]
+[node name="Player" parent="." unique_id=512090753 instance=ExtResource("3_player")]
 
-[node name="GameHUD" type="CanvasLayer" parent="."]
+[node name="GameHUD" type="CanvasLayer" parent="." unique_id=115689404]
 layer = 2
 
-[node name="HUD" parent="GameHUD" instance=ExtResource("4_hud")]
+[node name="HUD" parent="GameHUD" unique_id=330524913 instance=ExtResource("4_hud")]
+
+[node name="BagUi" parent="GameHUD" unique_id=258613748 instance=ExtResource("7_jmprd")]
+visible = false
+
+[node name="Alchemy" parent="GameHUD" unique_id=389668861 instance=ExtResource("8_lsk7w")]
+visible = false

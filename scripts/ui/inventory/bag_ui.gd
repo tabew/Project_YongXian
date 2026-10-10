@@ -36,8 +36,6 @@ func bag_update() ->void:
 		slot_item_.count = inventory.items[item]
 
 		bag_slot_container.add_child(slot_node)
-		slot_node.take_item_signal.connect(take_item)
-		slot_node.put_item_signal.connect(put_item)
 		slot_node.slot_insert(slot_item_)
 
 		item_for_button[item] = slot_node
@@ -50,6 +48,7 @@ func take_item(item:ItemData,num:int) ->void:
 func put_item(item:ItemData,num:int) ->void:
 	inventory.add_item(item,num)
 	item_for_button[item].set_count(inventory.get_count(item))
+
 ## 背包区域放回
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if !(data is Dictionary):
@@ -58,3 +57,9 @@ func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 
 func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	put_item(data.get("item"),data.get("count"))
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		if Input.is_action_just_pressed("open_inventory"):
+			visible = !visible

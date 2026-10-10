@@ -126,7 +126,7 @@ Enemy (Node2D / CharacterBody2D)
   Sprite2D
   Health (Node + HealthComponent)
   Hurtbox (Area2D + CombatHurtbox)
-    CollisionShape2D
+	CollisionShape2D
 ```
 
 将 Hurtbox 的 `health` 拖到 Health 节点，`team` 设为 2，`collision_layer` 勾选 EnemyHurtbox，`collision_mask` 清空。Hurtbox 保持 `monitorable = true`，不需要主动 monitoring。玩家控制器默认 team 为 1，相同阵营不互相伤害，武器持有者自身的子节点也会被排除。

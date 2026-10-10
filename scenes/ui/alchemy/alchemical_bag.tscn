@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bikx21x3xhux2"]
 
-[ext_resource type="Script" uid="uid://dr1sdfqoa8ar4" path="res://scripts/ui/inventory/bag_ui.gd" id="1_jc7ft"]
+[ext_resource type="Script" uid="uid://5v0nsfvfjebh" path="res://scripts/ui/alchemy/alchemical_bag.gd" id="1_jc7ft"]
 
 [node name="AlchemicalBag" type="Button" unique_id=1788431181]
 self_modulate = Color(1, 1, 1, 0)
