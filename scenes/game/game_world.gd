@@ -1,7 +1,7 @@
 class_name GameWorld
 extends Node2D
 
-## 游戏世界：建一个无限世界生成器，交给 ChunkManager 按区块加载，把主角放到出生点。
+## 传统 RPG 箱庭：触及出口立即换到目标入口，主视图只显示当前区域。
 
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
@@ -11,15 +11,50 @@ const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.
 @onready var monster_spawner: RainforestMonsterSpawner = $MonsterSpawner
 @onready var player: PlayerCharacter = $Player
 @onready var hud: Control = $GameHUD/HUD
+@onready var camera: Camera2D = $Player/Camera2D
 
 var _training_dummy: TrainingDummy
+var _training_dummy_map: int = -1
+var _generator: WorldGenerator = null
+var _current_node: int = -1
+var _base_zoom: Vector2 = Vector2(2.0, 2.0)
+var _hud_bound: bool = false
+var _monster_map: int = -1
+## 怪物已释放到地上的道具按地图保存，离图暂停，回图继续。
+var _map_entity_roots: Dictionary = {}
 
 
 func _ready() -> void:
-	# 直接从编辑器单独运行本场景时，也要能开局
+	_base_zoom = camera.zoom
+	get_viewport().size_changed.connect(_on_viewport_resized)
+	# 直接从编辑器单独运行本场景时，也要能开局。
 	if GameState.world_seed == 0:
 		GameState.start_new_world()
 	build_world(GameState.world_seed)
+
+
+func _process(_delta: float) -> void:
+	if _generator == null or player.active_map == null:
+		return
+	_sync_training_dummy()
+	_confine_map_monsters()
+	if player.health <= 0:
+		return
+	var spec: MapSpec = player.active_map
+	var local: Vector2i = WorldGenerator.world_to_tile(player.global_position) - spec.origin
+	for link: Dictionary in _generator.gate_links(_current_node):
+		var side: int = link["side"]
+		if player.velocity.x * side <= 0.1:
+			continue
+		if absi(local.y - int(link["y"])) > MapSpec.GATE_HALF_HEIGHT:
+			continue
+		if (side < 0 and local.x <= 1) or (side > 0 and local.x >= spec.extent.x - 2):
+			var carried_velocity: Vector2 = player.velocity
+			_enter_map(link["target"], link["arrival_side"], link["arrival_y"])
+			# 落点与出口带分离，按住同方向即可走进新箱庭，不会立即弹回。
+			player.velocity = carried_velocity
+			EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
+			return
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -40,22 +75,64 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 			monster.call("kill")
 
 
-## 用指定种子重建整个世界。
+## 用指定种子重建整个世界；只有重建世界才恢复玩家生命。
 func build_world(seed_value: int) -> void:
-	var generator := WorldGenerator.new(seed_value)
-	GameState.world_seed = generator.world_seed
-
-	chunk_manager.setup(generator, player)
-
-	# 出生点从原点向外找一块开阔地，避免一开局就被水围住
-	var spawn_tile: Vector2i = generator.find_spawn(Vector2i.ZERO)
-	player.spawn_on(generator, WorldGenerator.tile_to_world(spawn_tile))
-	_place_training_dummy(generator, spawn_tile)
-	monster_spawner.setup(generator, chunk_manager, player)
-	# 玩家到达新世界出生点后再绑定 HUD，避免把上一局的位置记为已探索。
+	_hud_bound = false
+	_clear_map_entities()
+	_generator = WorldGenerator.new(seed_value)
+	GameState.world_seed = _generator.world_seed
+	chunk_manager.setup(_generator, player)
+	_enter_map(_generator.run.start_node(), 0, -1, true)
+	_place_training_dummy(_generator, WorldGenerator.world_to_tile(player.global_position))
+	_setup_map_monsters()
+	# 初图落位并加载后才绑定，避免把上一局的位置记为已探索。
 	hud.bind_world(chunk_manager, player)
+	_hud_bound = true
+	_sync_minimap()
+	EventBus.world_ready.emit(_generator.world_seed)
 
-	EventBus.world_ready.emit(generator.world_seed)
+
+## 一次同步完成入口落位、相机跳转与可见地图替换，不播放淡入淡出。
+func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health: bool = false) -> void:
+	var spec: MapSpec = _generator.map_spec(map_node_id)
+	if spec == null:
+		return
+	_current_node = map_node_id
+	player.spawn_on(_generator, _generator.entry_position(map_node_id, side, gate_y), spec, reset_health)
+	_limit_camera(spec)
+	chunk_manager.load_map(map_node_id)
+	if _hud_bound:
+		_sync_training_dummy()
+		_setup_map_monsters()
+		_sync_minimap()
+
+
+func _sync_minimap() -> void:
+	hud.minimap.refresh_position()
+	hud._refresh()
+
+
+func _limit_camera(spec: MapSpec) -> void:
+	var start: Vector2i = spec.origin * WorldGenerator.TILE_SIZE
+	var finish: Vector2i = (spec.origin + spec.extent) * WorldGenerator.TILE_SIZE
+	camera.limit_left = start.x
+	camera.limit_top = start.y
+	camera.limit_right = finish.x
+	camera.limit_bottom = finish.y
+	# 边缘硬停止；切图重置平滑，避免飞过地图间隙。
+	camera.limit_smoothed = false
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var fit: float = maxf(viewport_size.x / float(finish.x - start.x), viewport_size.y / float(finish.y - start.y))
+	camera.zoom = Vector2(maxf(_base_zoom.x, fit), maxf(_base_zoom.y, fit))
+	camera.reset_smoothing()
+	camera.force_update_scroll()
+
+
+func _on_viewport_resized() -> void:
+	if player.active_map == null:
+		return
+	_limit_camera(player.active_map)
+	chunk_manager.prepare_visible()
 
 
 func _place_training_dummy(generator: WorldGenerator, spawn_tile: Vector2i) -> void:
@@ -63,17 +140,107 @@ func _place_training_dummy(generator: WorldGenerator, spawn_tile: Vector2i) -> v
 		remove_child(_training_dummy)
 		_training_dummy.queue_free()
 	_training_dummy = null
+	_training_dummy_map = -1
 	if not spawn_training_dummy:
 		return
-	# The spawn finder guarantees open ground, so keep the target close to the player.
+	# 保留开局附近训练靶，且候选落点必须属于初始地图。
 	for offset: Vector2i in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3), Vector2i(2, 0), Vector2i(-2, 0)]:
 		var tile: Vector2i = spawn_tile + offset
-		if generator.is_walkable(tile):
+		var local: Vector2i = tile - player.active_map.origin
+		if player.active_map.contains_local(local.x, local.y) and generator.is_walkable(tile):
 			_training_dummy = TRAINING_DUMMY.instantiate() as TrainingDummy
 			_training_dummy.position = WorldGenerator.tile_to_world(tile)
 			_training_dummy.terrain_source = generator
+			_training_dummy_map = _current_node
 			add_child(_training_dummy)
+			_sync_training_dummy()
 			return
+
+
+func _sync_training_dummy() -> void:
+	if not is_instance_valid(_training_dummy):
+		return
+	var spec: MapSpec = _generator.map_spec(_training_dummy_map)
+	if spec == null:
+		return
+	# 击退与回家仍由训练靶原脚本处理，外层只保证不越出所属箱庭。
+	_training_dummy.global_position = _clamp_to_map(_training_dummy.global_position, spec)
+	var is_active: bool = _training_dummy_map == _current_node
+	_training_dummy.visible = is_active
+	_training_dummy.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
+
+
+## 原 spawner 保留全部生成/战斗功能；切图重建实体，避免旧区域怪物继续攻击。
+func _setup_map_monsters() -> void:
+	if chunk_manager.chunk_applied.is_connected(_on_monster_chunk_applied):
+		chunk_manager.chunk_applied.disconnect(_on_monster_chunk_applied)
+	# 死亡掉落会被原怪物脚本移到 spawner；保存到所属地图，避免跨图显示或攻击。
+	if _monster_map >= 0:
+		var previous_root: Node2D = _map_entity_root(_monster_map)
+		for child: Node in monster_spawner.get_children():
+			if not child is BaseMonster:
+				child.reparent(previous_root, true)
+	for map_id: int in _map_entity_roots.keys():
+		var root: Node2D = _map_entity_roots[map_id]
+		var is_active: bool = map_id == _current_node
+		root.visible = is_active
+		root.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
+	_monster_map = _current_node
+	monster_spawner.setup(_generator, chunk_manager, player)
+	# 新加载器长期保留整张地图，不能沿用旧版按距离卸载且等区块重铺才刷新的逻辑。
+	# 只关闭 spawner 的距离回收；怪物子节点仍正常处理，切图由 setup 统一回收。
+	monster_spawner.set_process(false)
+	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
+	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
+	_on_monster_chunk_applied(Vector2i.ZERO)
+
+
+func _map_entity_root(map_node_id: int) -> Node2D:
+	if not _map_entity_roots.has(map_node_id):
+		var root := Node2D.new()
+		root.name = "MapEntities_%d" % map_node_id
+		add_child(root)
+		_map_entity_roots[map_node_id] = root
+	return _map_entity_roots[map_node_id]
+
+
+func _clear_map_entities() -> void:
+	for root: Node2D in _map_entity_roots.values():
+		remove_child(root)
+		root.queue_free()
+	_map_entity_roots.clear()
+	for child: Node in monster_spawner.get_children():
+		if not child is BaseMonster:
+			monster_spawner.remove_child(child)
+			child.queue_free()
+	_monster_map = -1
+
+
+func _on_monster_chunk_applied(_coords: Vector2i) -> void:
+	if player.active_map == null:
+		return
+	for child: Node in monster_spawner.get_children():
+		if not child is BaseMonster:
+			continue
+		var monster := child as BaseMonster
+		var local: Vector2i = WorldGenerator.world_to_tile(monster.global_position) - player.active_map.origin
+		if not player.active_map.contains_local(local.x, local.y):
+			monster_spawner.remove_child(monster)
+			monster.queue_free()
+
+
+func _confine_map_monsters() -> void:
+	for child: Node in monster_spawner.get_children():
+		if child is BaseMonster:
+			var monster := child as BaseMonster
+			monster.global_position = _clamp_to_map(monster.global_position, player.active_map)
+
+
+func _clamp_to_map(position: Vector2, spec: MapSpec) -> Vector2:
+	var half_tile := Vector2.ONE * float(WorldGenerator.TILE_SIZE) * 0.5
+	var start: Vector2 = Vector2(spec.origin) * WorldGenerator.TILE_SIZE + half_tile
+	var finish: Vector2 = Vector2(spec.origin + spec.extent) * WorldGenerator.TILE_SIZE - half_tile
+	return position.clamp(start, finish)
 
 
 ## 换个种子重开世界。

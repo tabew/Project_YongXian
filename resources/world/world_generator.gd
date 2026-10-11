@@ -1,77 +1,62 @@
 class_name WorldGenerator
 extends RefCounted
 
-## 无限世界的区块生成器。
-##
-## 关键性质：地形只由 (世界种子, 格子坐标) 决定，**与区块无关**，
-## 所以区块之间不会出现接缝，也不需要在生成时读取邻居区块。
-##
-## 每个实例各自持有一套噪声对象，因此可以给不同线程各分配一个实例并发调用。
+## 传统 RPG 陆地箱庭：随机庭院、山谷和林间空地，以山壁 / 密林围合。
+## 主干与岔路通过出入口瞬间切换，周围仍是陆地，水域只作为少量河流与池塘。
+## 同种子同坐标的布局、地形与道路确定一致，工作线程使用独立生成器。
 
 const CHUNK_SIZE: int = 32
 const TILE_SIZE: int = 16
 
-## 大陆噪声（0..1）的阈值
-const DEEP_LEVEL: float = 0.27
-const SEA_LEVEL: float = 0.38
-
-## 陆地内部按海拔再分层
-const BEACH_LEVEL: float = 0.05
-const MOUNTAIN_LEVEL: float = 0.56
-const ALPINE_LEVEL: float = 0.76
-
-## 对比度增益：把噪声往两端拉，否则单纯形噪声几乎都在 0.5 附近，
-## 沙漠 / 雨林 / 雪峰这类需要极端温湿度的群系会永远出不来。
-const CONTINENT_CONTRAST: float = 1.20
-const CLIMATE_CONTRAST: float = 1.90
-
-## 海拔每升高 1.0 带来的降温，让高山自然变冷
-const ALTITUDE_COOLING: float = 0.34
-
-## 路网宽度阈值，作用在 abs(噪声) 上：越小路越窄。
-## 低频主路噪声变化慢，同样的阈值得到更宽的路面。
-const MAIN_ROAD_WIDTH: float = 0.0125
-const BRANCH_ROAD_WIDTH: float = 0.0220
-
-## 出生点要求周围 SPAWN_CHECK_RADIUS 格范围内至少这么多比例可通行
+## 保留既有生成器的开阔出生点查询接口。
 const SPAWN_CHECK_RADIUS: int = 3
 const SPAWN_OPEN_RATIO: float = 0.72
-
 const SPAWN_NOT_FOUND: Vector2i = Vector2i(2147483647, 2147483647)
 
-var world_seed: int = 0
+const MOUNTAIN_LEVEL: float = 0.56
+const ALPINE_LEVEL: float = 0.76
+const ALTITUDE_COOLING: float = 0.34
+const CLIMATE_CONTRAST: float = 1.90
 
-var _continent := FastNoiseLite.new()
+## 箱庭边缘的山脚过渡，以及河湖的岸边宽度。
+const WALL_FOOT_WIDTH: float = 3.0
+const WATER_BANK_WIDTH: float = 1.4
+
+var world_seed: int = 0
+var run: RunGraph = null
+
 var _temperature := FastNoiseLite.new()
 var _humidity := FastNoiseLite.new()
 var _variation := FastNoiseLite.new()
-var _main_route := FastNoiseLite.new()
-var _branch_route := FastNoiseLite.new()
+var _groves := FastNoiseLite.new()
+var _ridges := FastNoiseLite.new()
+var _edges := FastNoiseLite.new()
+
+# 每线程一个实例，所以这些缓存天然是线程局部的
+var _map_cache: Dictionary = {}
+var _road_cache: Dictionary = {}
+var _specs: Array[MapSpec] = []
+var _connections: Array[Dictionary] = []
+var _map_bins: Dictionary = {}
+var _gate_cache: Dictionary = {}
+const REGION_GAP: int = 12
 
 # _classify 的输出缓冲，避免为每个格子分配对象
-var _last_terrain: int = Terrain.Kind.WATER
-var _last_biome: int = Biome.Kind.OCEAN
+var _last_terrain: int = Terrain.Kind.DEEP_WATER
+var _last_biome: int = Biome.Kind.DEEP_OCEAN
 var _last_route: int = Route.Kind.NONE
+var _last_map: MapSpec = null
+var _last_gate: int = -1
 
 
 func _init(seed_value: int = 0) -> void:
 	world_seed = seed_value if seed_value != 0 else random_seed()
+	run = RunGraph.create()
+	_build_layout()
 	_configure_noise()
 
 
 func _configure_noise() -> void:
-	_continent.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_continent.seed = world_seed
-	_continent.frequency = 0.006
-	_continent.fractal_octaves = 4
-	_continent.fractal_gain = 0.5
-	_continent.fractal_lacunarity = 2.0
-	# 用引擎内置的域扭曲打散海岸线，比手写两层扭曲噪声少两次采样
-	_continent.domain_warp_enabled = true
-	_continent.domain_warp_type = FastNoiseLite.DOMAIN_WARP_SIMPLEX
-	_continent.domain_warp_amplitude = 26.0
-	_continent.domain_warp_frequency = 0.012
-
 	_temperature.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_temperature.seed = world_seed + 8191
 	_temperature.frequency = 0.0035
@@ -87,21 +72,18 @@ func _configure_noise() -> void:
 	_variation.frequency = 0.085
 	_variation.fractal_octaves = 1
 
-	# 主路：低频 + 域扭曲 -> 大尺度蜿蜒的主干道，路面宽
-	_main_route.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_main_route.seed = world_seed + 49157
-	_main_route.frequency = 0.0022
-	_main_route.fractal_octaves = 2
-	_main_route.domain_warp_enabled = true
-	_main_route.domain_warp_type = FastNoiseLite.DOMAIN_WARP_SIMPLEX
-	_main_route.domain_warp_amplitude = 40.0
-	_main_route.domain_warp_frequency = 0.006
-
-	# 支线：频率高一些 -> 短而密的岔路，路面窄
-	_branch_route.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_branch_route.seed = world_seed + 65537
-	_branch_route.frequency = 0.0075
-	_branch_route.fractal_octaves = 2
+	_groves.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_groves.seed = world_seed + 65537
+	_groves.frequency = 0.045
+	_groves.fractal_octaves = 2
+	_ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_ridges.seed = world_seed + 104729
+	_ridges.frequency = 0.013
+	_ridges.fractal_octaves = 2
+	_edges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_edges.seed = world_seed + 130363
+	_edges.frequency = 0.060
+	_edges.fractal_octaves = 2
 
 
 static func random_seed() -> int:
@@ -111,7 +93,6 @@ static func random_seed() -> int:
 
 
 # ------------------------------------------------------------ 坐标换算
-# 全部用 floor，保证世界延伸到负数坐标时区块与格子依然对齐
 
 static func world_to_tile(world_position: Vector2) -> Vector2i:
 	return Vector2i(
@@ -134,9 +115,226 @@ static func tile_to_chunk(tile: Vector2i) -> Vector2i:
 	)
 
 
+# ------------------------------------------------------------ 箱庭布局与出口关系
+
+func map_spec(map_node_id: int) -> MapSpec:
+	return _map_cache.get(map_node_id)
+
+
+func map_specs() -> Array[MapSpec]:
+	return _specs.duplicate()
+
+
+## 供地图连通性检查与世界总览使用。坐标为世界格子中心。
+func connections() -> Array[Dictionary]:
+	return _connections.duplicate(true)
+
+
+func _build_layout() -> void:
+	var used_extents: Dictionary = {}
+	var floor_widths: PackedInt32Array = PackedInt32Array()
+	var layout_rng := RandomNumberGenerator.new()
+	layout_rng.seed = MapSpec.node_seed(world_seed, 7919)
+	for floor_ids: PackedInt32Array in run.floors:
+		var width: int = 0
+		for id: int in floor_ids:
+			var spec: MapSpec = MapSpec.create(world_seed, id, run.has_entrance(id), run.exit_count(id))
+			while used_extents.has(spec.extent):
+				# 只扩展包围范围；主庭中心和已经生成的庭室保持一致。
+				spec.extent.x += 1
+				spec.axes.x = float(spec.extent.x) * 0.4
+			used_extents[spec.extent] = true
+			spec.size = maxi(spec.extent.x, spec.extent.y)
+			spec.west_gates.clear()
+			spec.west_gate_y = -1
+			_map_cache[id] = spec
+			_specs.append(spec)
+			width = maxi(width, spec.extent.x)
+		floor_widths.append(width)
+
+	var cursor_x: int = 0
+	var main_y: int = 0
+	for floor_index: int in run.floors.size():
+		var main: MapSpec = map_spec(run.floors[floor_index][0])
+		if floor_index > 0:
+			main_y = clampi(main_y + layout_rng.randi_range(-28, 28), -64, 64)
+		main.origin = Vector2i(cursor_x, main_y - int(main.center.y))
+		for id: int in run.floors[floor_index]:
+			if id == main.node_id:
+				continue
+			var branch: MapSpec = map_spec(id)
+			var separation: int = layout_rng.randi_range(6, 14)
+			var y: int = main.origin.y - branch.extent.y - separation
+			if layout_rng.randf() < 0.5:
+				y = main.origin.y + main.extent.y + separation
+			branch.origin = Vector2i(cursor_x + layout_rng.randi_range(0, floor_widths[floor_index] - branch.extent.x), y)
+		cursor_x += floor_widths[floor_index] + layout_rng.randi_range(6, REGION_GAP)
+
+	# 出口靠向小地图里的目标方向，两端只保存瞬切关系，不生成中间道路。
+	for spec: MapSpec in _specs:
+		for exit_index: int in run.exit_count(spec.node_id):
+			var target: MapSpec = map_spec(run.target_of(spec.node_id, exit_index))
+			var source_y: int = int(spec.center.y)
+			if RunGraph.variant_of(target.node_id) == RunGraph.BRANCH_VARIANT:
+				source_y = int(spec.extent.y * (0.25 if target.origin.y < spec.origin.y else 0.75))
+			var target_y: int = int(target.center.y)
+			if RunGraph.variant_of(spec.node_id) == RunGraph.BRANCH_VARIANT:
+				target_y = int(target.extent.y * (0.25 if spec.origin.y < target.origin.y else 0.75))
+			spec.east_gates[exit_index] = source_y
+			target.west_gates.append(target_y)
+			target.west_gate_y = target.west_gates[0]
+			var a: Vector2 = Vector2(spec.origin) + Vector2(float(spec.extent.x) - 0.5, float(source_y) + 0.5)
+			var b: Vector2 = Vector2(target.origin) + Vector2(0.5, float(target_y) + 0.5)
+			_connections.append({"a": a, "b": b, "from": spec.node_id, "to": target.node_id, "exit": exit_index, "entrance": target.west_gates.size() - 1})
+
+	for spec: MapSpec in _specs:
+		_index_bounds(_map_bins, Rect2(Vector2(spec.origin), Vector2(spec.extent)), spec)
+
+
+func _index_bounds(bins: Dictionary, bounds: Rect2, item: Variant) -> void:
+	var first: Vector2i = tile_to_chunk(Vector2i(floori(bounds.position.x), floori(bounds.position.y)))
+	var last: Vector2i = tile_to_chunk(Vector2i(ceili(bounds.end.x), ceili(bounds.end.y)))
+	for cy: int in range(first.y, last.y + 1):
+		for cx: int in range(first.x, last.x + 1):
+			var key := Vector2i(cx, cy)
+			if not bins.has(key):
+				bins[key] = []
+			bins[key].append(item)
+
+
+func _spec_at(tile: Vector2i) -> MapSpec:
+	var candidates: Array = _map_bins.get(tile_to_chunk(tile), [])
+	for spec: MapSpec in candidates:
+		var local: Vector2i = tile - spec.origin
+		if spec.contains_local(local.x, local.y):
+			return spec
+	return null
+
+
+## 出口和入口都是瞬切点，多前驱区域分别保留各自的回程出口。
+func gate_links(map_node_id: int) -> Array[Dictionary]:
+	if _gate_cache.has(map_node_id):
+		return _gate_cache[map_node_id]
+	var links: Array[Dictionary] = []
+	for connection: Dictionary in _connections:
+		if connection["from"] == map_node_id:
+			var source: MapSpec = map_spec(map_node_id)
+			var target: MapSpec = map_spec(connection["to"])
+			var y: int = source.east_gates[connection["exit"]]
+			links.append({"side": 1, "y": y, "target": target.node_id,
+				"arrival_side": -1, "arrival_y": target.west_gates[connection["entrance"]],
+				"point": source.origin + Vector2i(source.extent.x - 1, y)})
+		elif connection["to"] == map_node_id:
+			var source: MapSpec = map_spec(connection["from"])
+			var target: MapSpec = map_spec(map_node_id)
+			var y: int = target.west_gates[connection["entrance"]]
+			links.append({"side": -1, "y": y, "target": source.node_id,
+				"arrival_side": 1, "arrival_y": source.east_gates[connection["exit"]],
+				"point": target.origin + Vector2i(0, y)})
+	_gate_cache[map_node_id] = links
+	return links
+
+
+## 落点沿目标箱庭实际道路向里缩八格，保证可走且不会立刻触发回程。
+func entry_position(map_node_id: int, side: int = 0, gate_y: int = -1) -> Vector2:
+	var spec: MapSpec = map_spec(map_node_id)
+	if side == 0 or gate_y < 0:
+		return tile_to_world(spec.origin + Vector2i(spec.center))
+	var roads: PackedFloat32Array = _map_roads(map_node_id)
+	var gate := Vector2(0.5 if side < 0 else float(spec.extent.x) - 0.5, float(gate_y) + 0.5)
+	for base: int in range(0, roads.size(), 5):
+		var a := Vector2(roads[base], roads[base + 1])
+		var b := Vector2(roads[base + 2], roads[base + 3])
+		if a.distance_to(gate) > 0.01 and b.distance_to(gate) > 0.01:
+			continue
+		var dx: float = b.x - a.x
+		if absf(dx) < 0.001:
+			continue
+		var target_x: float = 8.5 if side < 0 else float(spec.extent.x) - 8.5
+		var t: float = clampf((target_x - a.x) / dx, 0.0, 1.0)
+		var delta: Vector2 = b - a
+		var normal: Vector2 = Vector2(delta.y, -delta.x).normalized()
+		var point: Vector2 = a.lerp(b, t) + normal * MapSpec.road_offset(t, roads[base + 4])
+		return tile_to_world(spec.origin + Vector2i(point.floor()))
+	return tile_to_world(spec.origin + Vector2i(spec.center))
+
+
+## 这张地图的路段（带缓存）。
+func _map_roads(map_node_id: int) -> PackedFloat32Array:
+	if _road_cache.has(map_node_id):
+		return _road_cache[map_node_id]
+	var data: PackedFloat32Array = map_spec(map_node_id).build_roads()
+	if _road_cache.size() >= 256:
+		_road_cache.clear()
+	_road_cache[map_node_id] = data
+	return data
+
+
+## 一局开始时的落脚点：第一张地图的主庭中心（路一定穿过中心，所以这里必定可走）。
+## 从指定位置寻找开阔道路；箱庭外找不到时回到初始箱庭主庭。
+func find_spawn(origin: Vector2i = Vector2i.ZERO, max_radius: int = 320) -> Vector2i:
+	var on_road: Vector2i = _search_spawn(origin, max_radius, true)
+	if on_road != SPAWN_NOT_FOUND:
+		return on_road
+	var anywhere: Vector2i = _search_spawn(origin, max_radius, false)
+	if anywhere != SPAWN_NOT_FOUND:
+		return anywhere
+	return world_to_tile(start_world_position())
+
+
+func _search_spawn(origin: Vector2i, max_radius: int, require_road: bool) -> Vector2i:
+	if is_open_area(origin, require_road):
+		return origin
+	var radius: int = 6
+	while radius <= max_radius:
+		var steps: int = maxi(8, radius / 4)
+		for step: int in steps:
+			var angle: float = TAU * float(step) / float(steps)
+			var candidate := Vector2i(origin.x + int(roundf(cos(angle) * float(radius))), origin.y + int(roundf(sin(angle) * float(radius))))
+			if is_open_area(candidate, require_road):
+				return candidate
+		radius += 6
+	return SPAWN_NOT_FOUND
+
+
+func is_open_area(tile: Vector2i, require_road: bool = false) -> bool:
+	_classify(tile.x, tile.y)
+	if not Terrain.is_walkable(_last_terrain) and _last_route == Route.Kind.NONE:
+		return false
+	if require_road and _last_route == Route.Kind.NONE:
+		return false
+	var walkable: int = 0
+	var total: int = 0
+	for dy: int in range(-SPAWN_CHECK_RADIUS, SPAWN_CHECK_RADIUS + 1):
+		for dx: int in range(-SPAWN_CHECK_RADIUS, SPAWN_CHECK_RADIUS + 1):
+			total += 1
+			if is_walkable(tile + Vector2i(dx, dy)):
+				walkable += 1
+	return float(walkable) / float(total) >= SPAWN_OPEN_RATIO
+
+
+func start_world_position() -> Vector2:
+	var spec: MapSpec = map_spec(run.start_node())
+	return tile_to_world(Vector2i(
+		spec.origin.x + int(spec.center.x),
+		spec.origin.y + int(spec.center.y)
+	))
+
+
+## 兼容旧接口的入口定位；完整多入口切换使用 gate_links 与 entry_position。
+func gate_entry_position(map_node_id: int, gate: int) -> Vector2:
+	var spec: MapSpec = map_spec(map_node_id)
+	if gate <= 0:
+		return entry_position(map_node_id, -1, spec.west_gate_y)
+	var east_index: int = gate - 1
+	if east_index >= spec.east_gates.size():
+		return entry_position(map_node_id)
+	return entry_position(map_node_id, 1, spec.east_gates[east_index])
+
+
 # ------------------------------------------------------------ 生成
 
-## 生成一个区块的全部地形。可以在工作线程里调用。
+## 生成一个区块。可以在工作线程里调用。
 func generate_chunk(chunk_coords: Vector2i, epoch: int = 0) -> ChunkData:
 	var data := ChunkData.create(chunk_coords, CHUNK_SIZE)
 	data.epoch = epoch
@@ -157,7 +355,6 @@ func generate_chunk(chunk_coords: Vector2i, epoch: int = 0) -> ChunkData:
 	return data
 
 
-## 只要一个格子的地形，供玩家碰撞等即时查询使用。
 func sample_terrain(tile: Vector2i) -> int:
 	_classify(tile.x, tile.y)
 	return _last_terrain
@@ -173,80 +370,178 @@ func sample_route(tile: Vector2i) -> int:
 	return _last_route
 
 
+## 这一格是哪张地图的；地图之外返回 null。
+func sample_map(tile: Vector2i) -> MapSpec:
+	_classify(tile.x, tile.y)
+	return _last_map
+
+
+## 这一格是不是路口：-1 不是，0 西侧入口，1 起是东侧第 n 个出口。
+func sample_gate(tile: Vector2i) -> int:
+	_classify(tile.x, tile.y)
+	return _last_gate
+
+
 ## 玩家能否站上这一格：地形本身可通行，或者这里是路。
-## 路一定可通行——主干道会架桥过水、开山道过山，保证顺得下去。
+## 箱庭外不可通行；跨区由 GameWorld 在出口触发瞬间切换。
 func is_walkable(tile: Vector2i) -> bool:
 	_classify(tile.x, tile.y)
 	return Terrain.is_walkable(_last_terrain) or _last_route != Route.Kind.NONE
 
 
-## 单个格子的完整判定：一次算完地形、群系与路网，写入成员变量。
+## 单个格子的完整判定：一次算完所在地图、地形、群系、路网与路口。
 func _classify(tile_x: int, tile_y: int) -> void:
-	var fx: float = float(tile_x)
-	var fy: float = float(tile_y)
+	var tile := Vector2i(tile_x, tile_y)
+	var spec: MapSpec = _spec_at(tile)
+	_last_gate = -1
+	_last_map = spec
+	_last_route = Route.Kind.NONE
+	# 箱庭之间不生成实体道路，区域外不可通行，主视图也不会绘制此处。
+	if spec == null:
+		_last_terrain = Terrain.Kind.MOUNTAIN
+		_last_biome = Biome.Kind.MOUNTAIN
+		return
+	var world_point := Vector2(float(tile_x) + 0.5, float(tile_y) + 0.5)
+	var point: Vector2 = world_point - Vector2(spec.origin)
+	var road_distance: float = _road_distance(point, spec)
+	var edge_noise: float = _edges.get_noise_2d(float(tile_x), float(tile_y))
+	var room_depth: float = spec.clearance(point) + edge_noise * 4.0
+	var passage_depth: float = spec.pass_half_width - road_distance
+	var open_depth: float = maxf(room_depth, passage_depth)
+	var ridge: float = _ridges.get_noise_2d(float(tile_x), float(tile_y))
+	var grove: float = _groves.get_noise_2d(float(tile_x), float(tile_y))
+	var variation: float = (_variation.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5
 
-	_last_terrain = _classify_terrain(fx, fy)
+	# 箱庭外仍是连贯的陆地；山壁和密林构成边界，出口开在自然山口。
+	if open_depth <= 0.0:
+		var boundary: int = spec.boundary_kind if spec != null else Terrain.Kind.MOUNTAIN
+		if spec == null and grove > -0.10 and ridge < 0.18:
+			boundary = Terrain.Kind.FOREST
+		_last_terrain = boundary
+		_last_biome = Biome.Kind.MOUNTAIN if boundary == Terrain.Kind.MOUNTAIN else (Biome.Kind.TAIGA if boundary == Terrain.Kind.TAIGA else Biome.Kind.FOREST)
+		return
 
-	var road: int = _classify_route(fx, fy)
-	# 路跨过水面时画成桥
-	if road != Route.Kind.NONE and Terrain.is_water(_last_terrain):
-		road = Route.Kind.BRIDGE
-	_last_route = road
-
-
-## 地形与群系：完全沿用原来的算法，路网不影响它。
-func _classify_terrain(fx: float, fy: float) -> int:
-	var continent: float = _sharpen(
-		(_continent.get_noise_2d(fx, fy) + 1.0) * 0.5, CONTINENT_CONTRAST
-	)
-
-	if continent < DEEP_LEVEL:
-		_last_biome = Biome.Kind.DEEP_OCEAN
-		return Terrain.Kind.DEEP_WATER
-
-	var temperature: float = _sharpen(
-		(_temperature.get_noise_2d(fx, fy) + 1.0) * 0.5, CLIMATE_CONTRAST
-	)
-
-	if continent < SEA_LEVEL:
-		_last_biome = Biome.Kind.OCEAN
-		return Terrain.Kind.ICE if temperature < 0.20 else Terrain.Kind.WATER
-
-	var altitude: float = (continent - SEA_LEVEL) / (1.0 - SEA_LEVEL)
-	var humidity: float = _sharpen(
-		(_humidity.get_noise_2d(fx, fy) + 1.0) * 0.5, CLIMATE_CONTRAST
-	)
-	# 高处更冷，于是山脉自然过渡到雪原 / 雪峰
+	var climate_spec: MapSpec = spec
+	var bias: Vector2 = spec.climate_bias
+	var temperature: float = clampf(_sharpen((_temperature.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5, CLIMATE_CONTRAST) + bias.x, 0.0, 1.0)
+	var humidity: float = clampf(_sharpen((_humidity.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5, CLIMATE_CONTRAST) + bias.y, 0.0, 1.0)
+	# 地面起伏来自山脊，不再把每片区域的中心变成圆锥雪峰。
+	var altitude: float = maxf(0.0, ridge) * 0.85
 	temperature = clampf(temperature - altitude * ALTITUDE_COOLING, 0.0, 1.0)
+	_last_biome = _pick_biome(altitude, temperature, humidity)
+	_last_terrain = _open_land_terrain(_last_biome, variation, temperature, grove)
 
-	var biome: int = _pick_biome(altitude, temperature, humidity)
-	_last_biome = biome
+	var nearest_road: float = road_distance
+	if nearest_road < MapSpec.ROAD_HALF_WIDTH:
+		_last_route = Route.Kind.DIRT
+		if climate_spec != null and climate_spec.shape == 4:
+			_last_route = Route.Kind.STONE
+	# 道路旁留出空地，区域内也能离开道路探索，而非只能沿一条细线走。
+	if nearest_road < 7.0 and not Terrain.is_walkable(_last_terrain):
+		_last_terrain = _ground_cover(_last_biome)
+	if open_depth < WALL_FOOT_WIDTH and not Terrain.is_water(_last_terrain):
+		_last_terrain = Terrain.Kind.STONE if ridge > 0.0 else _ground_cover(_last_biome)
 
-	var variation: float = (_variation.get_noise_2d(fx, fy) + 1.0) * 0.5
-	return _pick_terrain(biome, variation, temperature)
+	# 水域是局部河流 / 池塘，控制在箱庭内部；道路遇水生成桥。
+	if spec != null and room_depth > 5.0 and point.distance_to(spec.center) > 10.0:
+		var water: float = spec.water_depth(point)
+		if water > 0.0:
+			_last_terrain = Terrain.Kind.WATER
+			_last_biome = Biome.Kind.OCEAN
+			if _last_route != Route.Kind.NONE:
+				_last_route = Route.Kind.BRIDGE
+		elif water > -WATER_BANK_WIDTH and nearest_road >= 7.0:
+			_last_terrain = Terrain.Kind.SAND
+	if spec != null:
+		var local: Vector2i = tile - spec.origin
+		_check_gate(local.x, local.y, spec)
 
 
-## 路网判定：abs(噪声) 越小越靠近零等值线，那里就是路面。
-func _classify_route(fx: float, fy: float) -> int:
-	if absf(_main_route.get_noise_2d(fx, fy)) < MAIN_ROAD_WIDTH:
-		return Route.Kind.STONE
-	if absf(_branch_route.get_noise_2d(fx, fy)) < BRANCH_ROAD_WIDTH:
-		return Route.Kind.DIRT
-	return Route.Kind.NONE
+func _ground_cover(biome: int) -> int:
+	match biome:
+		Biome.Kind.DESERT:
+			return Terrain.Kind.DESERT
+		Biome.Kind.SAVANNA:
+			return Terrain.Kind.SAVANNA
+		Biome.Kind.TUNDRA:
+			return Terrain.Kind.TUNDRA
+		Biome.Kind.SNOWY_PLAINS, Biome.Kind.TAIGA, Biome.Kind.ALPINE:
+			return Terrain.Kind.SNOW
+		Biome.Kind.MOUNTAIN:
+			return Terrain.Kind.STONE
+	return Terrain.Kind.GRASS
 
+
+func _open_land_terrain(biome: int, variation: float, temperature: float, grove: float) -> int:
+	var terrain: int = _pick_terrain(biome, variation, temperature)
+	# 树林成片分布，林地群系仍保留大量可探索的草地与空地。
+	if terrain == Terrain.Kind.FOREST or terrain == Terrain.Kind.TAIGA or terrain == Terrain.Kind.RAINFOREST:
+		return terrain if grove > 0.14 else _ground_cover(biome)
+	if terrain == Terrain.Kind.MOUNTAIN or terrain == Terrain.Kind.SNOW_PEAK:
+		return terrain if grove > 0.24 else _ground_cover(biome)
+	# 沼泽使用湿地，不通过零散噪声把大面积陆地变成水面。
+	if Terrain.is_water(terrain):
+		return Terrain.Kind.SWAMP
+	if terrain == Terrain.Kind.ICE:
+		return Terrain.Kind.SNOW
+	return terrain
+
+
+## 兼容的边缘路口标记；完整双向切换由 gate_links 提供每个入口的目标。
+func _check_gate(local_x: int, local_y: int, spec: MapSpec) -> void:
+	if local_x == 0 and spec.west_gate_y >= 0:
+		if absi(local_y - spec.west_gate_y) <= MapSpec.GATE_HALF_HEIGHT:
+			_last_gate = 0
+			return
+
+	if local_x == spec.extent.x - 1:
+		for index: int in spec.east_gates.size():
+			if absi(local_y - spec.east_gates[index]) <= MapSpec.GATE_HALF_HEIGHT:
+				_last_gate = index + 1
+				return
+
+
+# ------------------------------------------------------------ 道路
+
+## 这个点到这张地图里最近一条路的距离（考虑沿路的正弦摆动）。
+func _road_distance(point: Vector2, spec: MapSpec) -> float:
+	var data: PackedFloat32Array = _map_roads(spec.node_id)
+	var best: float = 1.0e9
+	var pad: float = spec.pass_half_width + MapSpec.ROAD_WOBBLE + WALL_FOOT_WIDTH
+	var segment_count: int = data.size() / 5
+
+	for segment: int in segment_count:
+		var base: int = segment * 5
+		var ax: float = data[base]
+		var ay: float = data[base + 1]
+		var bx: float = data[base + 2]
+		var by: float = data[base + 3]
+
+		if point.x < minf(ax, bx) - pad or point.x > maxf(ax, bx) + pad:
+			continue
+		if point.y < minf(ay, by) - pad or point.y > maxf(ay, by) + pad:
+			continue
+
+		best = minf(best, MapSpec.segment_distance(
+			point, Vector2(ax, ay), Vector2(bx, by), data[base + 4]
+		))
+
+	return best
+
+
+# ------------------------------------------------------------ 群系
 
 ## 以 0.5 为中心做对比度拉伸，gain > 1 会把值推向两端。
 static func _sharpen(value: float, gain: float) -> float:
 	return clampf((value - 0.5) * gain + 0.5, 0.0, 1.0)
 
 
+## 地面群系由山脊、温度和湿度决定；箱庭围墙与局部河湖另行处理。
 static func _pick_biome(altitude: float, temperature: float, humidity: float) -> int:
 	if altitude > ALPINE_LEVEL:
 		return Biome.Kind.ALPINE
 	if altitude > MOUNTAIN_LEVEL:
 		return Biome.Kind.MOUNTAIN
-	if altitude < BEACH_LEVEL:
-		return Biome.Kind.BEACH
 
 	if temperature < 0.18:
 		return Biome.Kind.SNOWY_PLAINS
@@ -278,59 +573,3 @@ static func _pick_terrain(biome: int, variation: float, temperature: float) -> i
 	if variation >= Biome.SPLIT_A:
 		return Biome.SECONDARY[biome]
 	return Biome.PRIMARY[biome]
-
-
-# ------------------------------------------------------------ 出生点
-
-## 从 origin 向外一圈圈找落脚点。
-## 先找"开阔且在路上的"，这样一开局就站在主路上；找不到再放宽为只要开阔。
-func find_spawn(origin: Vector2i = Vector2i.ZERO, max_radius: int = 320) -> Vector2i:
-	var on_road: Vector2i = _search_spawn(origin, max_radius, true)
-	if on_road != SPAWN_NOT_FOUND:
-		return on_road
-
-	var anywhere: Vector2i = _search_spawn(origin, max_radius, false)
-	if anywhere != SPAWN_NOT_FOUND:
-		return anywhere
-
-	return origin
-
-
-func _search_spawn(origin: Vector2i, max_radius: int, require_road: bool) -> Vector2i:
-	if is_open_area(origin, require_road):
-		return origin
-
-	var radius: int = 6
-	while radius <= max_radius:
-		var steps: int = maxi(8, radius / 4)
-		for step: int in steps:
-			var angle: float = TAU * float(step) / float(steps)
-			var candidate := Vector2i(
-				origin.x + int(roundf(cos(angle) * float(radius))),
-				origin.y + int(roundf(sin(angle) * float(radius)))
-			)
-			if is_open_area(candidate, require_road):
-				return candidate
-		radius += 6
-
-	return SPAWN_NOT_FOUND
-
-
-## 先看中心一格（便宜），再统计周围一圈的可通行比例。路也算可通行。
-func is_open_area(tile: Vector2i, require_road: bool = false) -> bool:
-	_classify(tile.x, tile.y)
-	if not Terrain.is_walkable(_last_terrain) and _last_route == Route.Kind.NONE:
-		return false
-	if require_road and _last_route == Route.Kind.NONE:
-		return false
-
-	var walkable: int = 0
-	var total: int = 0
-	for dy: int in range(-SPAWN_CHECK_RADIUS, SPAWN_CHECK_RADIUS + 1):
-		for dx: int in range(-SPAWN_CHECK_RADIUS, SPAWN_CHECK_RADIUS + 1):
-			total += 1
-			_classify(tile.x + dx, tile.y + dy)
-			if Terrain.is_walkable(_last_terrain) or _last_route != Route.Kind.NONE:
-				walkable += 1
-
-	return float(walkable) / float(total) >= SPAWN_OPEN_RATIO

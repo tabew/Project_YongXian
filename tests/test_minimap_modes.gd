@@ -34,7 +34,7 @@ func _run() -> void:
 
 	minimap.bind(manager, player)
 	var compact_size: Vector2i = minimap._image.get_size()
-	if compact_size != Vector2i(80, 80):
+	if compact_size != Vector2i(128, 128):
 		push_error("Compact minimap resolution changed: %s" % compact_size)
 		get_tree().quit(1)
 		return
@@ -51,7 +51,7 @@ func _run() -> void:
 		return
 
 	minimap.set_expanded(false)
-	if minimap._image.get_size() != Vector2i(80, 80):
+	if minimap._image.get_size() != Vector2i(128, 128):
 		push_error("Compact minimap was not restored after closing the full map")
 		get_tree().quit(1)
 		return

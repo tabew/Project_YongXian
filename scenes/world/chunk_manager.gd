@@ -1,69 +1,66 @@
 class_name ChunkManager
 extends Node2D
 
-## 区块加载器：把无限世界切成固定大小的区块按需生成与卸载。
-##
-## 性能设计要点：
-##  1. 地形生成只依赖 (种子, 坐标)，因此每个区块可以独立生成，不需要邻居数据，也就没有接缝。
-##  2. 数据生成丢到 WorkerThreadPool，主线程只负责把结果铺进 TileMapLayer。
-##  3. 铺格子和提交生成都有"每帧上限"，避免一次性卡顿。
-##  4. 区块数据做 LRU 缓存，走回头路时直接命中缓存，不再算噪声。
-##  5. 每个区块一个 TileMapLayer，格子坐标只用 0..CHUNK_SIZE-1，节点位置承担世界偏移。
-##     这样图层内部的四叉树始终很小，坐标不会随玩家走远而膨胀。
-##  6. TileMapLayer 节点池化复用，卸载区块不销毁节点。
+## 箱庭区块加载器：每张地图拥有独立 root 和裁剪到矩形边界的图层。
+## 只显示当前地图，隐藏预铺所有直连邻居；区块数据按世界坐标共享同种子缓存。
+## 首次进入同步铺好相机视口，其余整图生成与铺图按每帧预算分摊。
+## 每个区块一个 TileMapLayer，本地格子坐标和节点偏移保持图层四叉树较小。
 
 signal chunk_applied(coords: Vector2i)
 
 @export var tile_set: TileSet
 
-@export_group("加载范围")
-## 以玩家所在区块为中心要显示的范围（单位：区块）。
-@export var load_radius: int = 2
-## 超过这个范围才卸载；比 load_radius 大是为了留迟滞，免得在边界来回抖动。
-@export var unload_radius: int = 3
+## 保留旧组件查询接口；箱庭加载范围实际由完整地图矩形决定。
+var load_radius: int = 2
+var unload_radius: int = 3
+var unloads_per_frame: int = 4
+const NO_CHUNK: Vector2i = Vector2i(2147483647, 2147483647)
 
 @export_group("每帧预算")
 ## 每帧最多提交几个区块去生成。
 @export var generations_per_frame: int = 4
-## 每帧最多把几个区块铺进 TileMapLayer（主线程开销的大头）。
-@export var applications_per_frame: int = 2
-## 每帧最多回收几个区块；瞬移时几十个区块同时过期，不摊开就会卡一下。
-@export var unloads_per_frame: int = 4
+## 每帧最多把几个区块铺进 TileMapLayer（主线程开销的大头，实测约 0.28 ms/块）。
+@export var applications_per_frame: int = 4
 
 @export_group("缓存")
-## 区块数据缓存上限（每块 2 KB）。
+## 区块数据缓存上限（每块 3 KB）。跨地图也保留，回头再进同一张图就能直接命中。
 @export var cache_limit: int = 512
 
 @export_group("调试")
 ## 关掉则全部在主线程生成，方便对比。
 @export var use_worker_threads: bool = true
 
+## 兼容旧测试的常量；加载范围现在由地图完整矩形决定。
+const RENDER_RADIUS: int = 3
+const RETAIN_RADIUS: int = 4
 const MAX_GENERATOR_POOL: int = 16
-const MAX_LAYER_POOL: int = 64
-## TileSet 里地形图集 / 路网图集所在的 source id。
+const MAX_LAYER_POOL: int = 512
 const TERRAIN_SOURCE_ID: int = 0
 const ROAD_SOURCE_ID: int = 1
-## 两张图集都是竖排的，列固定 0，行才是编号。
 const TILE_ATLAS_COLUMN: int = 0
-const NO_CHUNK: Vector2i = Vector2i(2147483647, 2147483647)
 
 var focus_node: Node2D = null
 
-## 每次区块铺好或回收就 +1。小地图等表现层靠它判断"数据有没有变"，
-## 不变就不必重画，站着不动时一次重建都不会发生。
+## 世界重建、当前地图变化或已加载区块变化时递增，供小地图判断是否刷新。
 var version: int = 0
 
 var _generator: WorldGenerator = null
 var _world_seed: int = 0
 var _epoch: int = 0
-var _focus_chunk: Vector2i = NO_CHUNK
+var _spec: MapSpec = null
+var _focus_chunk: Vector2i = Vector2i.ZERO
 
+## _layers 始终引用当前地图的 dictionary，供小地图和测试读取。
 var _layers: Dictionary = {}
+## node_id -> {root, spec, layers, chunks}；chunks 覆盖该地图完整矩形。
+var _regions: Dictionary = {}
+var _desired: Dictionary = {}
 var _cache: Dictionary = {}
 var _queue: Array[Vector2i] = []
-var _unload_queue: Array[Vector2i] = []
 var _in_flight: Dictionary = {}
-var _apply_queue: Array[ChunkData] = []
+## 每项包含 map_id 和 data；共享区块会分别裁剪铺入多个地图。
+var _apply_queue: Array[Dictionary] = []
+var _pending: Dictionary = {}
 var _completed: Array[ChunkData] = []
 
 var _layer_pool: Array[TileMapLayer] = []
@@ -82,25 +79,127 @@ var stat_last_generate_usec: int = 0
 
 func _exit_tree() -> void:
 	# 工作线程还在跑的时候释放本节点会踩到已回收的对象，必须等它们结束
-	_wait_for_generation_tasks()
-	_clear_scene()
+	_wait_for_tasks()
+	_free_all_layers()
 
 
 # ------------------------------------------------------------ 对外接口
 
-## 换一个世界（新种子）或首次进入时调用。
+## 重建世界：旧任务结束前不能替换种子或生成器，也不能清空生成器池。
 func setup(generator: WorldGenerator, focus: Node2D) -> void:
-	# 旧任务必须先结束，否则相同坐标会被 _in_flight 跳过，旧种子的生成器也可能被复用。
+	_wait_for_tasks()
 	_epoch += 1
-	_wait_for_generation_tasks()
+	_free_all_layers()
+	_cache.clear()
+	_queue.clear()
+	_generator_mutex.lock()
 	_generator_pool.clear()
-	_clear_scene()
-
+	_generator_mutex.unlock()
 	_generator = generator
 	_world_seed = generator.world_seed
 	focus_node = focus
-	_focus_chunk = NO_CHUNK
+	_spec = null
+	_focus_chunk = Vector2i.ZERO
 	_reset_stats()
+	version += 1
+
+
+## 切换可见地图，不更换 epoch；旧任务仍可为同一种子的缓存提供数据。
+func load_map(map_node_id: int) -> void:
+	if _generator == null:
+		return
+	var next_spec: MapSpec = _generator.map_spec(map_node_id)
+	if next_spec == null:
+		return
+	_spec = next_spec
+	_desired.clear()
+	_desired[map_node_id] = true
+	# gate_links 包含入口与出口，所有直接邻居都隐藏预加载。
+	for link: Dictionary in _generator.gate_links(map_node_id):
+		var target: int = int(link["target"])
+		if _generator.map_spec(target) != null:
+			_desired[target] = true
+	for id: int in _regions.keys():
+		if not _desired.has(id):
+			_release_region(id)
+	for id: int in _desired.keys():
+		if not _regions.has(id):
+			_create_region(_generator.map_spec(id))
+		var root: Node2D = _regions[id]["root"]
+		root.visible = id == map_node_id
+	_layers = _regions[map_node_id]["layers"]
+	_reap_tasks()
+	_drain_results()
+	prepare_visible()
+	_rebuild_queue()
+	version += 1
+
+
+## 同步补齐当前相机视口。若该坐标已在线程中生成，等待它而不重复生成。
+func prepare_visible() -> void:
+	if _spec == null or focus_node == null or not _regions.has(_spec.node_id):
+		return
+	var viewport: Viewport = focus_node.get_viewport()
+	var camera: Camera2D = viewport.get_camera_2d()
+	var half_view: Vector2 = viewport.get_visible_rect().size * 0.5
+	var center: Vector2 = focus_node.global_position
+	if camera != null:
+		half_view /= camera.zoom.abs().max(Vector2.ONE * 0.001)
+		# 使用传送后的焦点位置，避免切换当帧 Camera2D 的上一帧屏幕中心。
+		center += camera.offset
+	var bounds := Rect2(Vector2(_spec.origin) * WorldGenerator.TILE_SIZE,
+		Vector2(_spec.extent) * WorldGenerator.TILE_SIZE)
+	var low: Vector2 = bounds.position + half_view
+	var high: Vector2 = bounds.end - half_view
+	center.x = clampf(center.x, low.x, high.x) if low.x <= high.x else bounds.get_center().x
+	center.y = clampf(center.y, low.y, high.y) if low.y <= high.y else bounds.get_center().y
+	# 额外一格覆盖边缘 tile 和相机的像素取整。
+	var visible: Rect2 = Rect2(center - half_view, half_view * 2.0).grow(WorldGenerator.TILE_SIZE).intersection(bounds)
+	if not visible.has_area():
+		return
+	var first: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(visible.position))
+	var last: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(visible.end - Vector2.ONE * 0.001))
+	var started: int = Time.get_ticks_usec()
+	for cy: int in range(first.y, last.y + 1):
+		for cx: int in range(first.x, last.x + 1):
+			var coords := Vector2i(cx, cy)
+			if _layers.has(coords):
+				continue
+			var data: ChunkData = _available_chunk(coords)
+			if data != null:
+				stat_cache_hits += 1
+			elif _in_flight.has(coords):
+				WorkerThreadPool.wait_for_task_completion(_in_flight[coords])
+				_in_flight.erase(coords)
+				# 保留直接结果，即使极小的 LRU 限额立即淘汰了这一块。
+				var incoming: Dictionary = _drain_results()
+				data = incoming.get(coords, _cache.get(coords))
+			if data == null:
+				data = _generate_inline(coords)
+			_paint_chunk(data, _spec.node_id)
+	stat_apply_usec += Time.get_ticks_usec() - started
+
+
+func get_generator() -> WorldGenerator:
+	return _generator
+
+
+func get_map_spec() -> MapSpec:
+	return _spec
+
+
+## 当前地图在整局里的描述，例如"第 3 层（岔路）"。
+func describe_map() -> String:
+	if _generator == null or _spec == null:
+		return "—"
+	return _generator.run.describe(_spec.node_id)
+
+
+func map_ready() -> bool:
+	if _spec == null or not _regions.has(_spec.node_id):
+		return false
+	var chunks: Array[Vector2i] = _regions[_spec.node_id]["chunks"]
+	return _layers.size() == chunks.size()
 
 
 func get_stats() -> Dictionary:
@@ -130,13 +229,13 @@ func get_stats() -> Dictionary:
 ## 即时查询某个世界坐标的地形；不走区块缓存，直接算，结果与铺出来的完全一致。
 func get_terrain_at(world_position: Vector2) -> int:
 	if _generator == null:
-		return Terrain.Kind.WATER
+		return Terrain.Kind.DEEP_WATER
 	return _generator.sample_terrain(WorldGenerator.world_to_tile(world_position))
 
 
 func get_biome_at(world_position: Vector2) -> int:
 	if _generator == null:
-		return Biome.Kind.OCEAN
+		return Biome.Kind.DEEP_OCEAN
 	return _generator.sample_biome(WorldGenerator.world_to_tile(world_position))
 
 
@@ -146,12 +245,11 @@ func get_route_at(world_position: Vector2) -> int:
 	return _generator.sample_route(WorldGenerator.world_to_tile(world_position))
 
 
-## 当前已经铺出来的区块坐标，供调试或小地图使用。
-func loaded_chunks() -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	for coords: Vector2i in _layers.keys():
-		result.append(coords)
-	return result
+## 这个位置踩没踩到路口：-1 没有，0 西侧入口，1 起是东侧第 n 个出口。
+func get_gate_at(world_position: Vector2) -> int:
+	if _generator == null:
+		return -1
+	return _generator.sample_gate(WorldGenerator.world_to_tile(world_position))
 
 
 ## 取区块数据（含已卸载但仍在缓存里的）。小地图直接读这个，不重跑噪声。
@@ -159,42 +257,128 @@ func get_cached_chunk(coords: Vector2i) -> ChunkData:
 	return _cache.get(coords)
 
 
+func loaded_chunks() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for coords: Vector2i in _layers.keys():
+		result.append(coords)
+	return result
+
+
 # ------------------------------------------------------------ 主循环
 
 func _process(_delta: float) -> void:
-	if _generator == null or focus_node == null:
+	if _generator == null or _spec == null or focus_node == null:
 		return
-
-	var focus_chunk: Vector2i = WorldGenerator.tile_to_chunk(
-		WorldGenerator.world_to_tile(focus_node.global_position)
-	)
-	if focus_chunk != _focus_chunk:
-		_focus_chunk = focus_chunk
-		_rebuild_queue()
-		_scan_for_unload()
-
 	_reap_tasks()
 	_drain_results()
+	# 移动或改变 zoom 后也补齐视口，其余区块继续使用后台预算。
+	prepare_visible()
+	_rebuild_queue()
 	_dispatch()
-	_unload_due()
 	_apply_results()
 
 
+func _create_region(spec: MapSpec) -> void:
+	var root := Node2D.new()
+	root.name = "Map_%d" % spec.node_id
+	root.visible = false
+	add_child(root)
+	var chunks: Array[Vector2i] = []
+	var first: Vector2i = WorldGenerator.tile_to_chunk(spec.origin)
+	var last: Vector2i = WorldGenerator.tile_to_chunk(spec.origin + spec.extent - Vector2i.ONE)
+	for cy: int in range(first.y, last.y + 1):
+		for cx: int in range(first.x, last.x + 1):
+			chunks.append(Vector2i(cx, cy))
+	_regions[spec.node_id] = {"root": root, "spec": spec, "layers": {}, "chunks": chunks}
+
+
 func _rebuild_queue() -> void:
+	# 待铺结果持有数据引用，不因 LRU 淘汰而丢块或重复生成。
+	var available: Dictionary = {}
+	for entry: Dictionary in _apply_queue:
+		var id: int = entry["map_id"]
+		var data: ChunkData = entry["data"]
+		if _desired.has(id) and _regions.has(id) and data.epoch == _epoch:
+			available[data.coords] = data
 	_queue.clear()
-	for dy: int in range(-load_radius, load_radius + 1):
-		for dx: int in range(-load_radius, load_radius + 1):
-			var coords: Vector2i = _focus_chunk + Vector2i(dx, dy)
-			if _layers.has(coords) or _in_flight.has(coords):
+	_apply_queue.clear()
+	_pending.clear()
+	if _generator == null or _spec == null:
+		return
+	if focus_node != null:
+		_focus_chunk = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(focus_node.global_position))
+	var queued: Dictionary = {}
+	# 当前整图优先，其余直接邻居随后；同坐标只提交一次生成。
+	var ids: Array[int] = [_spec.node_id]
+	for id: int in _desired.keys():
+		if id != _spec.node_id:
+			ids.append(id)
+	for id: int in ids:
+		var layers: Dictionary = _regions[id]["layers"]
+		var chunks: Array[Vector2i] = _regions[id]["chunks"]
+		for coords: Vector2i in chunks:
+			if layers.has(coords):
 				continue
-			_queue.append(coords)
+			var data: ChunkData = available.get(coords, _cache.get(coords))
+			if data != null and data.epoch == _epoch:
+				if not available.has(coords):
+					stat_cache_hits += 1
+				_enqueue_application(id, data)
+			elif not _in_flight.has(coords) and not queued.has(coords):
+				queued[coords] = true
+				_queue.append(coords)
 	_sort_queue()
 
 
-## 近的区块先处理。
+func _available_chunk(coords: Vector2i) -> ChunkData:
+	var cached: ChunkData = _cache.get(coords)
+	if cached != null and cached.epoch == _epoch:
+		return cached
+	for entry: Dictionary in _apply_queue:
+		var data: ChunkData = entry["data"]
+		if data.coords == coords and data.epoch == _epoch:
+			return data
+	return null
+
+
+func _enqueue_application(map_id: int, data: ChunkData) -> void:
+	if not _desired.has(map_id) or not _regions.has(map_id):
+		return
+	var layers: Dictionary = _regions[map_id]["layers"]
+	if layers.has(data.coords):
+		return
+	if not _pending.has(map_id):
+		_pending[map_id] = {}
+	var pending: Dictionary = _pending[map_id]
+	if pending.has(data.coords):
+		return
+	pending[data.coords] = true
+	_apply_queue.append({"map_id": map_id, "data": data})
+
+
+func _enqueue_data(data: ChunkData) -> void:
+	for id: int in _desired.keys():
+		var spec: MapSpec = _regions[id]["spec"]
+		var chunk_bounds := Rect2i(data.coords * WorldGenerator.CHUNK_SIZE, Vector2i.ONE * WorldGenerator.CHUNK_SIZE)
+		if Rect2i(spec.origin, spec.extent).intersects(chunk_bounds):
+			_enqueue_application(id, data)
+
+
+func _current_needs(coords: Vector2i) -> bool:
+	if _spec == null or _layers.has(coords):
+		return false
+	return Rect2i(_spec.origin, _spec.extent).intersects(
+		Rect2i(coords * WorldGenerator.CHUNK_SIZE, Vector2i.ONE * WorldGenerator.CHUNK_SIZE))
+
+
+## 玩家脚下的区块先铺，其余按距离排队。
 func _sort_queue() -> void:
 	var center: Vector2i = _focus_chunk
 	_queue.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var a_current: bool = _current_needs(a)
+		var b_current: bool = _current_needs(b)
+		if a_current != b_current:
+			return a_current
 		var ax: int = a.x - center.x
 		var ay: int = a.y - center.y
 		var bx: int = b.x - center.x
@@ -209,34 +393,9 @@ func _sort_queue() -> void:
 	)
 
 
-## 只在玩家换区块时扫一遍，把过期的区块排进待回收队列。
-func _scan_for_unload() -> void:
-	if _layers.is_empty():
-		return
-	var limit: int = unload_radius * unload_radius
-	for coords: Vector2i in _layers.keys():
-		if _unload_queue.has(coords):
-			continue
-		var dx: int = coords.x - _focus_chunk.x
-		var dy: int = coords.y - _focus_chunk.y
-		if dx * dx + dy * dy > limit:
-			_unload_queue.append(coords)
-
-
-## 每帧按预算回收，避免一次释放几十个图层造成掉帧。
-func _unload_due() -> void:
-	var budget: int = unloads_per_frame
-	while budget > 0 and not _unload_queue.is_empty():
-		var coords: Vector2i = _unload_queue.pop_front()
-		if _layers.has(coords):
-			_recycle_layer(coords)
-			budget -= 1
-
-
-## 收掉已经跑完的线程任务，把任务槽释放回作业池。
-func _reap_tasks() -> void:
+func _reap_tasks() -> bool:
 	if _in_flight.is_empty():
-		return
+		return false
 	var finished: Array[Vector2i] = []
 	for coords: Vector2i in _in_flight.keys():
 		var task_id: int = _in_flight[coords]
@@ -245,18 +404,24 @@ func _reap_tasks() -> void:
 			finished.append(coords)
 	for coords: Vector2i in finished:
 		_in_flight.erase(coords)
+	return not finished.is_empty()
 
 
-func _drain_results() -> void:
+func _drain_results() -> Dictionary:
 	_result_mutex.lock()
 	var incoming: Array[ChunkData] = _completed.duplicate()
 	_completed.clear()
 	_result_mutex.unlock()
-
+	var result: Dictionary = {}
 	for data: ChunkData in incoming:
 		if data.epoch != _epoch:
 			continue
-		_apply_queue.append(data)
+		data.last_used = Time.get_ticks_msec()
+		_store_cache(data)
+		result[data.coords] = data
+		# 已回收区域不会重建；迟到结果只向目前仍 desired 的区域铺图。
+		_enqueue_data(data)
+	return result
 
 
 func _dispatch() -> void:
@@ -264,14 +429,14 @@ func _dispatch() -> void:
 	while dispatched < generations_per_frame and not _queue.is_empty():
 		var coords: Vector2i = _queue[0]
 		_queue.remove_at(0)
-		if _layers.has(coords) or _in_flight.has(coords):
+		if _in_flight.has(coords):
 			continue
 
 		var cached: ChunkData = _cache.get(coords)
-		if cached != null:
+		if cached != null and cached.epoch == _epoch:
 			cached.last_used = Time.get_ticks_msec()
 			stat_cache_hits += 1
-			_apply_queue.append(cached)
+			_enqueue_data(cached)
 			dispatched += 1
 			continue
 
@@ -285,33 +450,32 @@ func _dispatch() -> void:
 func _apply_results() -> void:
 	if _apply_queue.is_empty():
 		return
-
 	var center: Vector2i = _focus_chunk
-	_apply_queue.sort_custom(func(a: ChunkData, b: ChunkData) -> bool:
-		var ax: int = a.coords.x - center.x
-		var ay: int = a.coords.y - center.y
-		var bx: int = b.coords.x - center.x
-		var by: int = b.coords.y - center.y
-		return ax * ax + ay * ay < bx * bx + by * by
+	var current_id: int = _spec.node_id
+	_apply_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_current: bool = int(a["map_id"]) == current_id
+		var b_current: bool = int(b["map_id"]) == current_id
+		if a_current != b_current:
+			return a_current
+		var a_data: ChunkData = a["data"]
+		var b_data: ChunkData = b["data"]
+		return (a_data.coords - center).length_squared() < (b_data.coords - center).length_squared()
 	)
-
-	var limit: int = unload_radius * unload_radius
 	var applied: int = 0
 	var started: int = Time.get_ticks_usec()
-
 	while applied < applications_per_frame and not _apply_queue.is_empty():
-		var data: ChunkData = _apply_queue.pop_front()
-
-		# 玩家在生成期间跑远了：不铺，但留进缓存，回来时不用重算
-		var dx: int = data.coords.x - center.x
-		var dy: int = data.coords.y - center.y
-		if dx * dx + dy * dy > limit:
-			_store_cache(data)
+		var entry: Dictionary = _apply_queue.pop_front()
+		var data: ChunkData = entry["data"]
+		var map_id: int = entry["map_id"]
+		if _pending.has(map_id):
+			_pending[map_id].erase(data.coords)
+		if data.epoch != _epoch or not _desired.has(map_id) or not _regions.has(map_id):
 			continue
-
-		_paint_chunk(data)
+		var layers: Dictionary = _regions[map_id]["layers"]
+		if layers.has(data.coords):
+			continue
+		_paint_chunk(data, map_id)
 		applied += 1
-
 	stat_apply_usec += Time.get_ticks_usec() - started
 
 
@@ -343,15 +507,20 @@ func _generate_task(coords: Vector2i, task_epoch: int) -> void:
 	_result_mutex.unlock()
 
 
-func _generate_inline(coords: Vector2i) -> void:
+func _generate_inline(coords: Vector2i) -> ChunkData:
 	var started: int = Time.get_ticks_usec()
 	var data: ChunkData = _generator.generate_chunk(coords, _epoch)
 	var elapsed: int = Time.get_ticks_usec() - started
 
+	_result_mutex.lock()
 	stat_generated += 1
 	stat_generate_usec += elapsed
 	stat_last_generate_usec = elapsed
-	_apply_queue.append(data)
+	_result_mutex.unlock()
+	data.last_used = Time.get_ticks_msec()
+	_store_cache(data)
+	_enqueue_data(data)
+	return data
 
 
 # 每个工作线程各拿一个生成器实例，避免多个线程共用同一套噪声对象
@@ -374,18 +543,27 @@ func _release_generator(worker: WorldGenerator) -> void:
 	_generator_mutex.unlock()
 
 
-## 等待当前世代的生成任务结束，供换世界和退出场景时统一收尾。
-func _wait_for_generation_tasks() -> void:
-	for coords: Vector2i in _in_flight.keys():
-		var task_id: int = _in_flight[coords]
-		WorkerThreadPool.wait_for_task_completion(task_id)
-	_in_flight.clear()
-
-
 # ------------------------------------------------------------ 铺图与回收
 
-func _paint_chunk(data: ChunkData) -> void:
+func _paint_chunk(data: ChunkData, map_id: int = -1) -> void:
+	if map_id == -1:
+		if _spec == null:
+			return
+		map_id = _spec.node_id
+	if data.epoch != _epoch or not _desired.has(map_id) or not _regions.has(map_id):
+		return
+	var region: Dictionary = _regions[map_id]
+	var layers: Dictionary = region["layers"]
+	if layers.has(data.coords):
+		return
+	var spec: MapSpec = region["spec"]
+	var bounds := Rect2i(spec.origin, spec.extent)
+	var tile_origin: Vector2i = data.coords * WorldGenerator.CHUNK_SIZE
+	if not bounds.intersects(Rect2i(tile_origin, Vector2i.ONE * WorldGenerator.CHUNK_SIZE)):
+		return
 	var layer: TileMapLayer = _take_layer()
+	# 裁剪后的边缘区块不会重写每格，复用前必须清掉上一张地图的格子。
+	layer.clear()
 	# 节点位置承担世界偏移，格子坐标只用 0..CHUNK_SIZE-1
 	layer.position = Vector2(
 		data.coords.x * WorldGenerator.CHUNK_SIZE * WorldGenerator.TILE_SIZE,
@@ -396,6 +574,9 @@ func _paint_chunk(data: ChunkData) -> void:
 	for local_y: int in WorldGenerator.CHUNK_SIZE:
 		for local_x: int in WorldGenerator.CHUNK_SIZE:
 			var cell := Vector2i(local_x, local_y)
+			if not bounds.has_point(tile_origin + cell):
+				index += 1
+				continue
 			var road: int = data.route[index]
 			if road == Route.Kind.NONE:
 				layer.set_cell(
@@ -413,14 +594,16 @@ func _paint_chunk(data: ChunkData) -> void:
 				)
 			index += 1
 
-	add_child(layer)
-	_layers[data.coords] = layer
+	var root: Node2D = region["root"]
+	root.add_child(layer)
+	layers[data.coords] = layer
 
 	data.last_used = Time.get_ticks_msec()
 	_store_cache(data)
 	stat_applied += 1
-	version += 1
-	chunk_applied.emit(data.coords)
+	if _spec != null and map_id == _spec.node_id:
+		version += 1
+		chunk_applied.emit(data.coords)
 
 
 func _take_layer() -> TileMapLayer:
@@ -433,19 +616,29 @@ func _take_layer() -> TileMapLayer:
 	return layer
 
 
-func _recycle_layer(coords: Vector2i) -> void:
-	var layer: TileMapLayer = _layers.get(coords)
+func _recycle_layer(coords: Vector2i, layers: Dictionary) -> void:
+	var layer: TileMapLayer = layers.get(coords)
 	if layer == null:
 		return
-	_layers.erase(coords)
-	version += 1
-
-	remove_child(layer)
-	# 故意不清空：复用时 _paint_chunk 会把 32x32 全部重写一遍，不会留下旧格子
+	layers.erase(coords)
+	layer.get_parent().remove_child(layer)
+	layer.clear()
 	if _layer_pool.size() < MAX_LAYER_POOL:
 		_layer_pool.append(layer)
 	else:
 		layer.queue_free()
+
+
+func _release_region(map_id: int) -> void:
+	var region: Dictionary = _regions[map_id]
+	var layers: Dictionary = region["layers"]
+	for coords: Vector2i in layers.keys():
+		_recycle_layer(coords, layers)
+	var root: Node2D = region["root"]
+	root.visible = false
+	remove_child(root)
+	root.queue_free()
+	_regions.erase(map_id)
 
 
 func _store_cache(data: ChunkData) -> void:
@@ -454,26 +647,34 @@ func _store_cache(data: ChunkData) -> void:
 		return
 
 	# LRU：淘汰最久没被碰过的那一块
-	var oldest_coords: Vector2i = NO_CHUNK
+	var oldest_coords: Vector2i = Vector2i(2147483647, 2147483647)
 	var oldest_time: int = 2147483647
 	for coords: Vector2i in _cache.keys():
 		var entry: ChunkData = _cache[coords]
 		if entry.last_used < oldest_time:
 			oldest_time = entry.last_used
 			oldest_coords = coords
-	if oldest_coords != NO_CHUNK:
+	if oldest_coords.x != 2147483647:
 		_cache.erase(oldest_coords)
 
 
 # ------------------------------------------------------------ 清理
 
-func _clear_scene() -> void:
-	for coords: Vector2i in _layers.keys():
-		var layer: TileMapLayer = _layers[coords]
-		if is_instance_valid(layer):
-			remove_child(layer)
-			layer.queue_free()
-	_layers.clear()
+func _wait_for_tasks() -> void:
+	# 等待时不持有互斥锁：任务需要归还生成器和提交结果后才能结束。
+	for coords: Vector2i in _in_flight.keys():
+		var task_id: int = _in_flight[coords]
+		WorkerThreadPool.wait_for_task_completion(task_id)
+	_in_flight.clear()
+
+
+func _free_all_layers() -> void:
+	for id: int in _regions.keys():
+		_release_region(id)
+	_layers = {}
+	_desired.clear()
+	_pending.clear()
+	_queue.clear()
 
 	for layer: TileMapLayer in _layer_pool:
 		if is_instance_valid(layer):
@@ -484,11 +685,7 @@ func _clear_scene() -> void:
 	_completed.clear()
 	_result_mutex.unlock()
 
-	_cache.clear()
-	_queue.clear()
-	_unload_queue.clear()
 	_apply_queue.clear()
-	version += 1
 
 
 func _reset_stats() -> void:

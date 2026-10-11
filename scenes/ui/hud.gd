@@ -20,7 +20,7 @@ var _toast_tween: Tween = null
 
 
 func _ready() -> void:
-	hint_label.text = "WASD / 方向键 移动　·　M 展开地图　·　R 换个世界　·　F3 性能面板"
+	hint_label.text = "WASD / 方向键 移动　·　走到出口立即切换箱庭　·　M 展开地图　·　R 换个世界　·　F3 性能面板"
 	toast_label.modulate.a = 0.0
 	EventBus.notification.connect(_on_notification)
 	EventBus.world_ready.connect(_on_world_ready)
@@ -75,9 +75,13 @@ func _refresh() -> void:
 	var position: Vector2 = _player.global_position
 	var tile: Vector2i = WorldGenerator.world_to_tile(position)
 	var chunk: Vector2i = WorldGenerator.tile_to_chunk(tile)
+	var spec: MapSpec = _world.get_map_spec()
 
 	var lines := PackedStringArray()
 	lines.append("种子 %d" % GameState.world_seed)
+	if spec != null:
+		lines.append("%s　区域 %d × %d" % [_world.describe_map(), spec.extent.x, spec.extent.y])
+		lines.append(spec.shape_name())
 	if _player is PlayerCharacter:
 		var character := _player as PlayerCharacter
 		lines.append("生命 %d/%d" % [character.health, character.max_health])

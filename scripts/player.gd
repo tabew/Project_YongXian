@@ -34,6 +34,8 @@ signal defeated
 
 ## 地形来源，由 GameWorld 注入。
 var terrain_source: WorldGenerator = null
+## 当前箱庭的矩形通行边界，出口由 GameWorld 瞬切。
+var active_map: MapSpec = null
 var health: int = 10
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
@@ -100,7 +102,7 @@ func _apply_input(input_direction: Vector2, delta: float) -> void:
 
 
 func _integrate_movement(delta: float) -> void:
-	if terrain_source == null or not collide_with_terrain:
+	if active_map == null and (terrain_source == null or not collide_with_terrain):
 		move_and_slide()
 		return
 
@@ -123,10 +125,13 @@ func _integrate_movement(delta: float) -> void:
 ## 该世界坐标所在的格子是否可以站人。
 ## 判定交给生成器：地形可通行，或者那里是路（路会架桥 / 开山道）。
 func can_stand_at(world_position: Vector2) -> bool:
-	if terrain_source == null:
-		return true
-
 	var tile: Vector2i = WorldGenerator.world_to_tile(world_position)
+	if active_map != null:
+		var local: Vector2i = tile - active_map.origin
+		if not active_map.contains_local(local.x, local.y):
+			return false
+	if terrain_source == null or not collide_with_terrain:
+		return true
 	if tile != _cached_tile:
 		_cached_tile = tile
 		_cached_walkable = terrain_source.is_walkable(tile)
@@ -134,14 +139,16 @@ func can_stand_at(world_position: Vector2) -> bool:
 
 
 ## 由 GameWorld 调用：注入地形来源并把主角放到指定世界坐标。
-func spawn_on(source: WorldGenerator, world_position: Vector2) -> void:
+func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec = null, reset_health: bool = true) -> void:
 	weapon_controller.cancel_attack()
 	terrain_source = source
+	active_map = map_spec
 	velocity = Vector2.ZERO
 	global_position = world_position
 	_cached_tile = Vector2i(2147483647, 2147483647)
-	health = max_health
-	health_changed.emit(health, max_health)
+	if reset_health:
+		health = max_health
+		health_changed.emit(health, max_health)
 
 
 func take_damage(amount: int) -> void:

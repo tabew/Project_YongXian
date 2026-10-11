@@ -32,9 +32,9 @@ const NAMES: Array[String] = [
 	"沼泽", "稀树草原", "沙漠", "苔原", "石地", "山地", "雪原", "雪峰",
 ]
 
-## 索引与 Kind 对齐；true 表示挡路。
+## 索引与 Kind 对齐；true 表示挡路。箱庭密林构成边界，林间空地和道路可走。
 const BLOCKING: Array[bool] = [
-	true, true, false, false, false, false, false, false,
+	true, true, false, false, false, true, true, true,
 	false, false, false, false, false, true, false, true,
 ]
 
