@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cei2bfjxogxkp"]
 
 [ext_resource type="PackedScene" uid="uid://crsq0wvmhgi63" path="res://scenes/ui/inventory/slot_button.tscn" id="1_6rj5y"]
+[ext_resource type="Script" uid="uid://dfr04jiprjwds" path="res://scripts/ui/inventory/bottom_bag_ui.gd" id="1_r1okk"]
 
 [node name="BottomBagUi" type="Control" unique_id=69592941]
 layout_mode = 3
@@ -9,6 +10,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_r1okk")
 
 [node name="PanelContainer" type="PanelContainer" parent="." unique_id=383120958]
 layout_mode = 1
@@ -40,27 +42,36 @@ theme_override_constants/separation = 4
 
 [node name="SlotButton" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=941150921 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton2" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=814056959 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton3" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1938950542 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton4" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=2108514623 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton5" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1704868639 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton6" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=328852580 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton7" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1180989107 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton8" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=1257923154 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true
 
 [node name="SlotButton9" parent="PanelContainer/MarginContainer/HBoxContainer" unique_id=288052252 instance=ExtResource("1_6rj5y")]
 layout_mode = 2
+is_handy_button = true

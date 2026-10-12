@@ -5,15 +5,21 @@ class_name BagUI
 
 @onready var bag_slot_container:GridContainer = $PanelContainer/MarginContainer/ScrollContainer/BagSlotContainer
 
-@onready var item_for_button:Dictionary[ItemData,SlotButton]
+@onready var item_for_button:Dictionary[int,SlotButton]
 
-@onready var inventory:Inventory = preload("res://resources/inventory/inventory.tres") #背包数据
 @onready var slot_button:PackedScene = preload("res://scenes/ui/inventory/slot_button.tscn") #格子场景
 @onready var slot_item:PackedScene = preload("res://scenes/ui/inventory/slot_item.tscn") #物品图标
 
+@export var player:PlayerCharacter
+
+var inventory:Inventory
+
 func _ready() -> void:
 	button_mask = MOUSE_BUTTON_MASK_LEFT
+	
+	player = get_tree().get_first_node_in_group("player")
 
+	inventory = player.inventory
 	inventory.inventory_update.connect(bag_update)
 	
 	bag_update()
@@ -21,47 +27,61 @@ func _ready() -> void:
 ##背包更新函数，同步背包数据
 func bag_update() ->void:
 
-	#加载背包内物品
-	for item in inventory.has_items:
+	#加载背包内物品，has_items里装的是物品id
+	for item_id in inventory.has_items:
 
 		#判断是否已经加载了背包中的某个物品，已加载则跳过
-		if item_for_button.has(item):
-			item_for_button[item].set_count(inventory.get_count(item))
+		if item_for_button.has(item_id):
+			item_for_button[item_id].set_count(inventory.get_count(item_id))
+			continue
+
+		var item:ItemData = ItemListGlobal.get_template(item_id)
+
+		if item == null:
 			continue
 
 		var slot_item_:SlotItem = slot_item.instantiate()
 		var slot_node: SlotButton = slot_button.instantiate()
 
-		slot_item_.item = item
-		slot_item_.count = inventory.items[item]
+		slot_item_.set_item_id(item_id) # item_list 重构：id定种类，实例来自注册表
+		slot_item_.count = inventory.items[item_id]
 
 		bag_slot_container.add_child(slot_node)
 		slot_node.take_item_signal.connect(take_item)
 		slot_node.put_item_signal.connect(put_item)
 		slot_node.slot_insert(slot_item_)
 
-		item_for_button[item] = slot_node
+		item_for_button[item_id] = slot_node
 
 
-func take_item(item:ItemData,num:int) ->void:
-	inventory.remove_item(item,num)
-	item_for_button[item].set_count(inventory.get_count(item))
-	if item_for_button[item].slot_item.count <= 0:
-		item_for_button.erase(item)
+##拿取物品，item_id为物品id
+func take_item(item_id:int,num:int) ->void:
+	inventory.remove_item(item_id,num)
+
+	if !item_for_button.has(item_id): #格子可能已经被释放
+		return
+
+	item_for_button[item_id].set_count(inventory.get_count(item_id))
+	if item_for_button[item_id].slot_item.count <= 0:
+		item_for_button.erase(item_id)
 	
-func put_item(item:ItemData,num:int) ->void:
-	inventory.add_item(item,num)
-	item_for_button[item].set_count(inventory.get_count(item))
+##放入物品，item_id为物品id
+func put_item(item_id:int,num:int) ->void:
+	inventory.add_item(item_id,num)
+
+	if !item_for_button.has(item_id): #格子可能已经被释放
+		return
+
+	item_for_button[item_id].set_count(inventory.get_count(item_id))
 
 ## 背包区域放回
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if !(data is Dictionary):
 		return false
-	return data.has("item")
+	return data.has("item_id")
 
 func _drop_data(_at_position: Vector2, data: Variant) -> void:
-	put_item(data.get("item"),data.get("count"))
-
+	put_item(data.get("item_id"),data.get("count"))
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
@@ -74,7 +94,7 @@ func _input(event: InputEvent) -> void:
 
 func _input_update():
 	if visible:
-		for item in item_for_button:
-			item_for_button[item].queue_free()
+		for item_id in item_for_button:
+			item_for_button[item_id].queue_free()
 		item_for_button.clear()
 		bag_update()

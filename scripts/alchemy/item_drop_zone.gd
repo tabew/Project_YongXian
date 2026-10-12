@@ -6,8 +6,31 @@ extends Control
 func _ready() -> void:
 	spawn_pos = get_parent().get_parent().get_node("SpawnedItems")
 
+# ==============================================================================
+# ↓↓↓↓ item_list 注册表重构段：拖拽载荷只带物品id，实例从注册表取 ↓↓↓↓
+# ==============================================================================
+##从拖拽载荷里取回物品模板实例
+func _get_dragged_item(data: Variant) -> ItemData:
+
+	if !(data is Dictionary):
+		return null
+
+	var item_id:int = int((data as Dictionary).get("item_id", -1))
+
+	#不是物品载荷(没有id/没注册)就直接当没有，别去注册表问不存在的id
+	if item_id < 0 or !ItemListGlobal.has_template(item_id):
+		return null
+
+	return ItemListGlobal.get_template(item_id)
+
+
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	return ((data as Dictionary).get("item") as IngredientData).create_model() != null
+	var ingredient := _get_dragged_item(data) as IngredientData
+
+	if ingredient == null:
+		return false
+
+	return ingredient.create_model() != null
 
 
 ##放下材料
@@ -16,7 +39,10 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	if !(data is Dictionary):
 		return
 
-	var ingredient := (data as Dictionary).get("item") as IngredientData
+	var ingredient := _get_dragged_item(data) as IngredientData
+# ==============================================================================
+# ↑↑↑↑ item_list 注册表重构段（结束）↑↑↑↑
+# ==============================================================================
 
 	if ingredient == null:
 		return

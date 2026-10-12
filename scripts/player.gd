@@ -32,6 +32,8 @@ signal defeated
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var weapon_controller: WeaponController = $WeaponController
 
+@export_group("背包")
+@export var inventory:Inventory
 ## 地形来源，由 GameWorld 注入。
 var terrain_source: WorldGenerator = null
 ## 当前箱庭的矩形通行边界，出口由 GameWorld 瞬切。
