@@ -9,10 +9,42 @@ extends CharacterBody2D
 @export var path_refresh_interval: float = 2.0
 @export var path_margin_tiles: int = 6
 
+@export_group("受击反馈")
+## 基础反馈只产生约2像素位移；武器击退仍按强度加算，形成更明显的推开。
+@export_range(0.0, 500.0, 1.0) var default_knockback_speed: float = 40.0
+@export_range(0.01, 1.0, 0.01) var knockback_duration: float = 0.10
+@export_range(0.01, 1.0, 0.01) var hit_flash_duration: float = 0.06
+
+var _knockback_impulse: Vector2 = Vector2.ZERO
+var _knockback_remaining: float = 0.0
+var _knockback_applied_this_frame: bool = false
+var _hit_flash_remaining: float = 0.0
+
 @onready var target_raycast: RayCast2D = $TargetRayCast
 
 var player: PlayerCharacter = null
 var world_generator: WorldGenerator = null
+var spawn_chunk: Vector2i = Vector2i.ZERO
+var _has_player_aggro: bool = false
+
+## 共享占位动画轨道；子类可替换动画库和 Visual 下的外形。
+var _visual_height: float = 0.0:
+	set(value):
+		_visual_height = value
+		_update_visual_pose()
+var visual_pose: Vector2 = Vector2.ZERO:
+	set(value):
+		visual_pose = value
+		_update_visual_pose()
+var visual_tint: Color = Color.WHITE:
+	set(value):
+		visual_tint = value
+		_update_visual_pose()
+
+## 由通用模板创建，使用各怪物自己的 HealthComponent。
+var health_bar: ProgressBar = null
+var animation_tree: AnimationTree = null
+var animation_playback: AnimationNodeStateMachinePlayback = null
 
 var _path: Array[Vector2i] = []
 var _path_index: int = 0
@@ -25,10 +57,163 @@ var _last_physics_collider: CollisionObject2D = null
 func _ready() -> void:
 	add_to_group("monsters")
 	target_raycast.add_exception(self)
+	_setup_health_bar()
+	animation_tree = get_node_or_null("AnimationTree") as AnimationTree
+	if animation_tree != null:
+		animation_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		animation_tree.active = true
+		animation_playback = animation_tree.get("parameters/playback")
+		animation_playback.start(&"Idle")
+		animation_tree.advance(0.0)
+	var health_component := get_node_or_null("Health") as HealthComponent
+	if health_component != null:
+		health_component.damaged.connect(_on_monster_damaged)
+		health_component.died.connect(_on_monster_died)
+
+
+func _physics_process(delta: float) -> void:
+	advance_monster_animation(delta)
+	_hit_flash_remaining = maxf(_hit_flash_remaining - delta, 0.0)
+	_update_hit_flash()
+	_knockback_applied_this_frame = _knockback_remaining > 0.0
+	if _knockback_applied_this_frame:
+		var step_time: float = minf(delta, _knockback_remaining)
+		var strength: float = maxf(_knockback_remaining - step_time * 0.5, 0.0) / knockback_duration
+		_move_knockback(_knockback_impulse * strength * step_time)
+		_knockback_remaining = maxf(_knockback_remaining - delta, 0.0)
+		_path_refresh_timer = 0.0
+
+
+## 子类调用 super._physics_process() 后应优先处理这一状态，避免 AI 覆盖击退。
+func is_receiving_knockback() -> bool:
+	return _knockback_remaining > 0.0 or _knockback_applied_this_frame
+
+
+func _update_hit_flash() -> void:
+	var visual := get_node_or_null("Visual") as CanvasItem
+	if visual != null and visual.material is ShaderMaterial:
+		(visual.material as ShaderMaterial).set_shader_parameter("hit_flash", 1.0 if _hit_flash_remaining > 0.0 else 0.0)
+
+
+func _resolve_knockback(hit: CombatHit) -> Vector2:
+	if not hit.knockback.is_zero_approx():
+		# 同方向加算：武器击退强度 + 模板基础击退强度。
+		return hit.knockback + hit.knockback.normalized() * default_knockback_speed
+	var direction: Vector2 = Vector2.ZERO
+	if is_instance_valid(hit.source) and hit.source != self:
+		direction = hit.source.global_position.direction_to(global_position)
+	if direction.is_zero_approx() and not hit.position.is_equal_approx(global_position):
+		direction = hit.position.direction_to(global_position)
+	if direction.is_zero_approx() and is_instance_valid(player):
+		direction = player.global_position.direction_to(global_position)
+	if direction.is_zero_approx():
+		direction = Vector2.UP
+	return direction * default_knockback_speed
+
+
+func _move_knockback(motion: Vector2) -> void:
+	# 小步检查程序化地形，再让物理引擎扫掠身体，不能被击退穿过墙体。
+	var steps: int = maxi(ceili(motion.length() / (WorldGenerator.TILE_SIZE * 0.25)), 1)
+	var step: Vector2 = motion / float(steps)
+	for _index: int in steps:
+		var destination: Vector2 = global_position + step
+		if world_generator != null and not is_navigation_tile_allowed(WorldGenerator.world_to_tile(destination)):
+			_knockback_impulse = Vector2.ZERO
+			break
+		if move_and_collide(step) != null:
+			_knockback_impulse = Vector2.ZERO
+			break
+
+
+func _update_visual_pose() -> void:
+	var visual := get_node_or_null("Visual") as Node2D
+	if visual != null:
+		visual.position = visual_pose + Vector2(0.0, -_visual_height)
+		visual.modulate = visual_tint
+	queue_redraw()
+
+
+func _on_monster_damaged(hit: CombatHit, _actual_damage: float) -> void:
+	_hit_flash_remaining = hit_flash_duration
+	_update_hit_flash()
+	var health_component := get_node_or_null("Health") as HealthComponent
+	if not health_component.is_alive():
+		return
+	stop_navigation()
+	_knockback_impulse = _resolve_knockback(hit)
+	_knockback_remaining = knockback_duration if not _knockback_impulse.is_zero_approx() else 0.0
+	# 受击打断动作，包括跳跃；Hurt 的高度轨道会立即落地归零。
+	play_monster_animation(&"Hurt", true)
+
+
+func _on_monster_died(_hit: CombatHit) -> void:
+	kill()
+
+
+func play_monster_animation(state: StringName, restart: bool = false) -> void:
+	if animation_playback == null:
+		return
+	if restart:
+		animation_playback.start(state)
+	elif animation_playback.get_current_node() != state:
+		animation_playback.travel(state)
+	else:
+		return
+	animation_tree.advance(0.0)
+	# travel 首次求值处理状态切换，第二次应用新状态的初始轨道。
+	animation_tree.advance(0.0)
+
+
+func monster_animation_state() -> StringName:
+	return animation_playback.get_current_node() if animation_playback != null else &"Idle"
+
+
+func advance_monster_animation(delta: float) -> void:
+	if animation_tree != null:
+		animation_tree.advance(delta)
+
+
+func _setup_health_bar() -> void:
+	var health_component := get_node_or_null("Health") as HealthComponent
+	if health_component == null:
+		return
+
+	health_bar = get_node_or_null("HealthBar") as ProgressBar
+	if health_bar == null:
+		health_bar = ProgressBar.new()
+		health_bar.name = "HealthBar"
+		add_child(health_bar)
+	health_bar.show_percentage = false
+	health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar.size = Vector2(28.0, 4.0)
+	health_bar.position = Vector2(-14.0, -22.0)
+	health_bar.z_index = 1
+	var name_label := get_node_or_null("NameLabel") as Label
+	if name_label != null:
+		health_bar.position.y = name_label.position.y + name_label.size.y + 1.0
+
+	var background := StyleBoxFlat.new()
+	background.bg_color = Color(0.10, 0.08, 0.08, 0.95)
+	background.border_color = Color(0.02, 0.02, 0.02)
+	background.set_border_width_all(1)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.78, 0.18, 0.16)
+	health_bar.add_theme_stylebox_override("background", background)
+	health_bar.add_theme_stylebox_override("fill", fill)
+	health_component.health_changed.connect(_update_health_bar)
+	_update_health_bar(health_component.current_health, health_component.max_health)
+
+
+func _update_health_bar(current: float, maximum: float) -> void:
+	health_bar.max_value = maxf(maximum, 1.0)
+	health_bar.value = current
 
 
 ## 调试全灭与正常死亡共用；先释放怪物携带的道具，避免随父节点一起删除。
 func kill() -> void:
+	if is_queued_for_deletion():
+		return
+	play_monster_animation(&"Death", true)
 	var world_parent: Node = get_parent()
 	if world_parent != null:
 		for child: Node in get_children():
@@ -37,13 +222,50 @@ func kill() -> void:
 	queue_free()
 
 
+## MonsterSpawner 的统一初始化接口；子类需要扩展时调用 super.configure()。
+func configure(
+	target_player: PlayerCharacter,
+	generator: WorldGenerator,
+	chunk_coords: Vector2i
+) -> void:
+	configure_target(target_player, generator)
+	spawn_chunk = chunk_coords
+
+
 func configure_target(target_player: PlayerCharacter, generator: WorldGenerator) -> void:
 	player = target_player
 	world_generator = generator
+	_knockback_impulse = Vector2.ZERO
+	_knockback_remaining = 0.0
+	_knockback_applied_this_frame = false
+	_hit_flash_remaining = 0.0
+	_update_hit_flash()
+	clear_player_aggro()
 	_path.clear()
 	_path_index = 0
 	_path_refresh_timer = 0.0
 	_last_path_target = Vector2i(2147483647, 2147483647)
+
+
+## 子类传入自身的索敌范围判断；首次仇恨只能在视线无遮挡时建立。
+func try_acquire_player_aggro(within_detection_range: bool) -> bool:
+	if _has_player_aggro:
+		return true
+	if within_detection_range and has_clear_line_to_player():
+		_has_player_aggro = true
+	return _has_player_aggro
+
+
+func has_player_aggro() -> bool:
+	return _has_player_aggro
+
+
+func clear_player_aggro() -> void:
+	_has_player_aggro = false
+	_path.clear()
+	_path_index = 0
+	_path_refresh_timer = 0.0
+	stop_navigation()
 
 
 func has_clear_line_to_player() -> bool:
@@ -87,13 +309,15 @@ func _terrain_line_is_clear(from: Vector2, to: Vector2) -> bool:
 	return true
 
 
-## 子类可追加群系限制；例如“给”不允许离开热带雨林。
+## 子类可追加自己的移动限制；默认仅检查地形可通行性。
 func is_navigation_tile_allowed(tile: Vector2i) -> bool:
 	return world_generator != null and world_generator.is_walkable(tile)
 
 
 func navigate_toward_player(delta: float) -> bool:
-	if not is_instance_valid(player) or world_generator == null:
+	if is_receiving_knockback():
+		return false
+	if not has_player_aggro() or not is_instance_valid(player) or world_generator == null:
 		stop_navigation()
 		return false
 
@@ -123,11 +347,15 @@ func navigate_toward_player(delta: float) -> bool:
 	move_and_slide()
 	if get_slide_collision_count() > 0:
 		_path_refresh_timer = 0.0
+	play_monster_animation(&"Move")
 	return true
 
 
 func stop_navigation() -> void:
 	velocity = Vector2.ZERO
+	match monster_animation_state():
+		&"Idle", &"Move":
+			play_monster_animation(&"Idle")
 
 
 func _rebuild_path(target_tile: Vector2i) -> void:

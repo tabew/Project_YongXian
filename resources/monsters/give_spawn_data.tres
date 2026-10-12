@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MonsterSpawnData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/monsters/monster_spawn_data.gd" id="1_spawn_data"]
+[ext_resource type="PackedScene" path="res://scenes/monsters/give_monster.tscn" id="2_monster"]
+
+[resource]
+script = ExtResource("1_spawn_data")
+monster_id = &"give"
+monster_scene = ExtResource("2_monster")
+allowed_biomes = Array[int]([6, 9, 7])
+chunk_spawn_chance = 1.0
+max_per_chunk = 2
+candidate_attempts = 32

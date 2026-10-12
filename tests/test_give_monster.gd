@@ -131,14 +131,22 @@ func _test_health_and_kill_all() -> bool:
 	var loose_stone := MockThrowableStone.new()
 	get_tree().root.add_child(loose_stone)
 
-	var started_at_one_hundred: bool = monster.health == 100
+	var name_label := monster.get_node("NameLabel") as Label
+	var started_at_one_hundred: bool = (
+		monster.health == 100 and monster.health_bar.value == 100.0
+		and monster.health_bar.max_value == 100.0
+		and monster.health_bar.position.y >= name_label.position.y + name_label.size.y
+		and monster.health_bar.position.y + monster.health_bar.size.y < 0.0
+	)
 	var weapon_hit := CombatHit.new()
 	weapon_hit.source = _player
 	weapon_hit.damage = 99.0
 	weapon_hit.position = monster.global_position
 	var hurtbox := monster.get_node("Hurtbox") as CombatHurtbox
 	var weapon_hit_received: bool = hurtbox.receive_hit(weapon_hit)
-	var damage_applied: bool = weapon_hit_received and monster.health == 1
+	var damage_applied: bool = (
+		weapon_hit_received and monster.health == 1 and monster.health_bar.value == 1.0
+	)
 	GameWorld.kill_monsters_in_tree(get_tree())
 	var carried_item_released: bool = carried_stone.get_parent() == get_tree().root
 	var loose_item_untouched: bool = loose_stone.get_parent() == get_tree().root
@@ -163,11 +171,40 @@ func _test_outside_aggro() -> bool:
 	_player.spawn_on(_generator, Vector2(WorldGenerator.TILE_SIZE * 11, 0))
 	var monster: GiveMonster = _spawn_monster(Vector2.ZERO)
 	await get_tree().create_timer(0.15).timeout
-	var passed: bool = not monster.has_attack_intent() and _player.health == 10
+	var passed: bool = (
+		not monster.has_player_aggro() and not monster.has_attack_intent()
+		and _player.health == 10
+	)
 	_remove_node(monster)
 	print("OUTSIDE_AGGRO_RESULT=", passed)
 	if not passed:
 		push_error("Monster became aggressive beyond ten tiles")
+	return passed
+
+
+func _check_initial_sight_gate(monster: GiveMonster) -> bool:
+	var original_player_position: Vector2 = _player.global_position
+	var original_monster_position: Vector2 = monster.global_position
+	for _frame: int in 8:
+		await get_tree().physics_frame
+	var idle_behind_wall: bool = (
+		not monster.has_player_aggro() and not monster.has_attack_intent()
+		and monster.global_position.is_equal_approx(original_monster_position)
+		and monster._path.is_empty() and _player.health == 10
+	)
+
+	# 玩家先沿墙同侧露面；冷却只用于避免这一阶段发动攻击。
+	monster._attack_cooldown = 10.0
+	_player.global_position = WorldGenerator.tile_to_world(Vector2i(0, 6))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var acquired_when_visible: bool = monster.has_player_aggro()
+	_player.global_position = original_player_position
+	monster._attack_cooldown = 0.0
+	var passed: bool = idle_behind_wall and acquired_when_visible
+	print("INITIAL_SIGHT_GATE_RESULT=", passed)
+	if not passed:
+		push_error("Unseen player triggered pursuit, or visible player failed to acquire aggro")
 	return passed
 
 
@@ -183,6 +220,7 @@ func _test_wall_pathfinding() -> bool:
 	monster.add_child(stone)
 	stone.position = Vector2(8.0, 0.0)
 
+	var initial_sight_gate_passed: bool = await _check_initial_sight_gate(monster)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var did_not_lock_through_wall: bool = not monster.has_attack_intent()
@@ -199,7 +237,9 @@ func _test_wall_pathfinding() -> bool:
 			break
 
 	var passed: bool = (
-		did_not_lock_through_wall
+		initial_sight_gate_passed
+		and did_not_lock_through_wall
+		and monster.has_player_aggro()
 		and not crossed_wall
 		and moved_around_wall
 		and _player.health == 9
@@ -239,6 +279,7 @@ func _test_physics_wall_pathfinding() -> bool:
 	var stone := MockThrowableStone.new()
 	monster.add_child(stone)
 	stone.position = Vector2(8.0, 0.0)
+	var initial_sight_gate_passed: bool = await _check_initial_sight_gate(monster)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var did_not_lock_through_wall: bool = not monster.has_attack_intent()
@@ -251,7 +292,8 @@ func _test_physics_wall_pathfinding() -> bool:
 			break
 
 	var passed: bool = (
-		did_not_lock_through_wall and moved_around_wall and _player.health == 9
+		initial_sight_gate_passed and did_not_lock_through_wall
+		and monster.has_player_aggro() and moved_around_wall and _player.health == 9
 	)
 	print(
 		"PHYSICS_WALL_RESULT=", passed,

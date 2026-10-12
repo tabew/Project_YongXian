@@ -8,7 +8,7 @@ const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.
 @export var spawn_training_dummy: bool = true
 
 @onready var chunk_manager: ChunkManager = $ChunkManager
-@onready var monster_spawner: RainforestMonsterSpawner = $MonsterSpawner
+@onready var monster_spawner: MonsterSpawner = $MonsterSpawner
 @onready var player: PlayerCharacter = $Player
 @onready var hud: Control = $GameHUD/HUD
 @onready var camera: Camera2D = $Player/Camera2D

@@ -1,0 +1,153 @@
+class_name MonsterSpawner
+extends Node2D
+
+## 通用区块怪物生成器。
+## 新怪物只需新增 MonsterSpawnData，无需修改本脚本。
+
+@export var spawn_definitions: Array[MonsterSpawnData] = []
+@export_range(0, 16, 1) var despawn_margin_chunks: int = 2
+
+## 当前仍有效的全部怪物；怪物退出场景树时自动移除引用。
+var monsters: Array[BaseMonster] = []
+
+var _generator: WorldGenerator = null
+var _chunk_manager: ChunkManager = null
+var _player: PlayerCharacter = null
+var _monsters_by_chunk: Dictionary = {}
+
+
+func setup(
+	generator: WorldGenerator,
+	chunk_manager: ChunkManager,
+	player: PlayerCharacter
+) -> void:
+	clear_monsters()
+	_generator = generator
+	_player = player
+	if _chunk_manager != null and _chunk_manager.chunk_applied.is_connected(_on_chunk_applied):
+		_chunk_manager.chunk_applied.disconnect(_on_chunk_applied)
+	_chunk_manager = chunk_manager
+	if not _chunk_manager.chunk_applied.is_connected(_on_chunk_applied):
+		_chunk_manager.chunk_applied.connect(_on_chunk_applied)
+
+	for coords: Vector2i in _chunk_manager.loaded_chunks():
+		_on_chunk_applied(coords)
+
+
+func _process(_delta: float) -> void:
+	if _chunk_manager == null or not is_instance_valid(_player):
+		return
+	var player_chunk: Vector2i = WorldGenerator.tile_to_chunk(
+		WorldGenerator.world_to_tile(_player.global_position)
+	)
+	var limit: int = _chunk_manager.unload_radius + despawn_margin_chunks
+	for coords: Vector2i in _monsters_by_chunk.keys():
+		var distance: Vector2i = (coords - player_chunk).abs()
+		if maxi(distance.x, distance.y) > limit:
+			_remove_chunk_monsters(coords)
+
+
+func _on_chunk_applied(coords: Vector2i) -> void:
+	if _generator == null or _monsters_by_chunk.has(coords):
+		return
+	var chunk_monsters: Array[BaseMonster] = []
+	_monsters_by_chunk[coords] = chunk_monsters
+	var occupied: Dictionary = {}
+
+	for definition: MonsterSpawnData in spawn_definitions:
+		_spawn_definition_in_chunk(definition, coords, occupied)
+
+
+func _spawn_definition_in_chunk(
+	definition: MonsterSpawnData,
+	coords: Vector2i,
+	occupied: Dictionary
+) -> void:
+	if definition == null or definition.monster_scene == null:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([
+		_generator.world_seed,
+		coords.x,
+		coords.y,
+		definition.monster_id,
+	])
+	if rng.randf() > definition.chunk_spawn_chance:
+		return
+
+	var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
+	var spawned: int = 0
+	for _attempt: int in definition.candidate_attempts:
+		if spawned >= definition.max_per_chunk:
+			break
+		var tile := origin + Vector2i(
+			rng.randi_range(0, WorldGenerator.CHUNK_SIZE - 1),
+			rng.randi_range(0, WorldGenerator.CHUNK_SIZE - 1)
+		)
+		if occupied.has(tile) or not definition.can_spawn_at(_generator, tile):
+			continue
+		var monster: BaseMonster = spawn_monster(definition, tile, coords)
+		if monster == null:
+			continue
+		occupied[tile] = true
+		spawned += 1
+
+
+func spawn_monster(
+	definition: MonsterSpawnData,
+	tile: Vector2i,
+	chunk_coords: Vector2i = WorldGenerator.tile_to_chunk(tile)
+) -> BaseMonster:
+	if definition == null or definition.monster_scene == null:
+		return null
+	var monster := definition.monster_scene.instantiate() as BaseMonster
+	if monster == null:
+		push_warning("Monster scene '%s' must inherit BaseMonster" % definition.monster_id)
+		return null
+
+	add_child(monster)
+	monster.global_position = WorldGenerator.tile_to_world(tile)
+	monsters.append(monster)
+	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk.get(chunk_coords, [])
+	if not _monsters_by_chunk.has(chunk_coords):
+		_monsters_by_chunk[chunk_coords] = chunk_monsters
+	chunk_monsters.append(monster)
+	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
+
+	monster.configure(_player, _generator, chunk_coords)
+	return monster
+
+
+func clear_monsters() -> void:
+	for monster: BaseMonster in monsters.duplicate():
+		if is_instance_valid(monster):
+			if monster.get_parent() == self:
+				remove_child(monster)
+			monster.queue_free()
+	monsters.clear()
+	_monsters_by_chunk.clear()
+
+
+func get_spawned_monster_count() -> int:
+	return monsters.size()
+
+
+func _remove_chunk_monsters(coords: Vector2i) -> void:
+	var chunk_monsters: Array = _monsters_by_chunk.get(coords, [])
+	_monsters_by_chunk.erase(coords)
+	for monster: BaseMonster in chunk_monsters:
+		monsters.erase(monster)
+		if is_instance_valid(monster):
+			if monster.get_parent() == self:
+				remove_child(monster)
+			monster.queue_free()
+
+
+func _on_monster_exited(monster: BaseMonster, chunk_coords: Vector2i) -> void:
+	monsters.erase(monster)
+	if not _monsters_by_chunk.has(chunk_coords):
+		return
+	var chunk_monsters: Array = _monsters_by_chunk[chunk_coords]
+	chunk_monsters.erase(monster)
+	if chunk_monsters.is_empty():
+		_monsters_by_chunk.erase(chunk_coords)

@@ -206,21 +206,40 @@ python tools/generate_art.py
 
 ---
 
-## 热带雨林怪物“给”
+## 林地怪物“给”
 
 箱庭切换沿用原 `RainforestMonsterSpawner`，按当前地图已加载区块刷新怪物，并裁剪共享边界的刷新范围；隐藏预加载邻图不会刷新可见怪物。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
 
-“给”只会随已加载区块生成在热带雨林的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
+“给”只会随已加载区块生成在森林、针叶林、热带雨林群系的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
 
-所有怪物应继承 `scripts/monsters/base_monster.gd`。该模板使用场景中的 `TargetRayCast`（`RayCast2D`）检测 `StaticBody2D` 等物理墙体，同时逐格检查程序化地形的可通行性；视线受阻时通过 `AStarGrid2D` 绕行，不能隔墙锁定、投掷或跳跃穿墙。基类不定义索敌范围，各怪物自行定义感知与追踪距离。“给”只限制刷新位置必须是热带雨林，生成后可以追逐玩家进入其他群系。
+所有怪物应继承 `scripts/monsters/base_monster.gd`。该模板使用场景中的 `TargetRayCast`（`RayCast2D`）检测 `StaticBody2D` 等物理墙体，同时逐格检查程序化地形的可通行性；首次发现玩家时必须通过 `try_acquire_player_aggro()` 的无遮挡视线检查，否则既不获得仇恨也不寻路追击；已有仇恨后视线受阻时通过 `AStarGrid2D` 绕行，攻击仍不能穿墙。子类通过 `has_player_aggro()` 查询状态，通过 `clear_player_aggro()` 在丢失目标时清除仇恨。基类不定义索敌范围，各怪物自行定义感知与追踪距离。“给”只限制刷新位置属于森林、针叶林或热带雨林群系，生成后可以追逐玩家进入其他群系。
+
+通用生成器位于 `scripts/monsters/monster_spawner.gd`，生成配置类型位于 `monster_spawn_data.gd`。新增怪物时右键 `scenes/monsters/base_monster.tscn` 创建继承场景，再新建一份 `MonsterSpawnData` 资源并加入 `GameWorld/MonsterSpawner` 的 `spawn_definitions` 数组即可。生成器通过公开的 `monsters: Array[BaseMonster]` 保存存活怪物，怪物死亡时自动移除引用，并在区块卸载或更换世界时遍历释放。`resources/monsters/give_spawn_data.tres` 是“给”的首份配置示例。
 
 统一道具基础层来自 `inventory` 分支：`scripts/items/item_data.gd`、`scripts/items/ingredients/ingredient_data.gd`、`ingredients_model.gd` 以及炼金/物理属性基类保持原路径和原 UID，供背包、合成和世界物品共同使用。
 
 当前地图尚无正式石子，上传版本不生成临时石子，因此“给”在远程范围内找不到石子时会停止本次攻击。地图团队接入正式石子时，应继续使用同一套 `IngredientData` / `IngredientModel`，加入 `throwable_stones` 组并实现 `throw_at(target, damage)` 方法；怪物代码不依赖具体石子类型。
 
+“给”的动作由场景内 `AnimationPlayer` 和 `AnimationTree` 管理，状态包括 `Idle`、`Move`、`Leap`、`Throw`、`Hurt`、`Death`。在编辑器打开 `scenes/monsters/give_monster.tscn`，选中 `AnimationTree` 可查看状态图，选中 `AnimationPlayer` 可编辑占位动作轨道。动画库为 `resources/monsters/give_animation_library.tres`，状态图为 `resources/monsters/monster_animation_state_machine.tres`；脚本通过通用模板的 `play_monster_animation()` 切换状态。投石和受击完成后自动返回待机，跳跃高度由动画轨道驱动，落点位移与伤害仍由物理逻辑处理。死亡状态会立即进入，但当前击杀仍直接清理节点，不等待死亡动画播完。
+
+通用模板默认提供受击击退和全身闪红。击退强度按加算叠加：`武器击退强度 + 模板基础击退速度`，方向沿用 `CombatHit.knockback` 的方向，不使用强度乘算。例如武器180、模板40，最终强度为220像素/秒；没有武器击退向量时按攻击来源位置确定方向，仅使用模板基础强度。模板基础速度默认40像素/秒，击退持续0.10秒并逐渐减速，基础位移约2像素；强度180的武器叠加后位移约11像素。`Hurt` 动作在0.10秒内快速左右抖动，初始幅度4像素，再逐渐归零，强化短促冲击感。全身鲜红闪烁持续0.06秒。连续受击会重置反馈时间，材质参数在每只怪物之间独立。击退通过身体碰撞与地形检查阻挡，不会穿过墙体；受击会打断跳跃，进入 `Hurt` 并归零视觉高度。可在根节点“受击反馈”分组调整参数。
+
+外形统一放在 `Visual`（`CanvasGroup`）下面，闪红会作用于全部身体部件、眼睛和轮廓，名字与血条保持原色。“给”的占位绘制位于 `give_monster_visual.gd`。自定义 `_physics_process(delta)` 时先调用 `super._physics_process(delta)`，再在 `is_receiving_knockback()` 为真时跳过自己的移动与攻击，避免覆盖击退位移。
+
+新增怪物的场景流程：
+
+1. 在 Godot 文件系统中右键 `scenes/monsters/base_monster.tscn`，选择“新建继承场景”，保存为新的怪物场景。“给”已经按此方式继承。
+2. 修改 `NameLabel.text`、`Health.max_health` 和碰撞形状；在 `Visual` 下隐藏 `Placeholder` 并添加自己的精灵。名字、血条、索敌射线、受击组件、动画节点与信号连接均自动继承。
+3. 在 `AnimationPlayer` 的 Libraries 中为新怪物创建或复制独立动画库，保持 `Idle`、`Move`、`Attack`、`Hurt`、`Death` 这些状态对应的动画名；需要特殊技能时可使用 `Leap`、`Throw`。若要修改状态图，先将 `AnimationTree.tree_root` 设为独立资源，避免修改公共状态图影响其他怪物。
+4. 为根节点绑定 `extends BaseMonster` 的专属脚本，只实现自己的索敌范围、技能和攻击判定；覆盖 `_ready()` 或 `_physics_process(delta)` 时调用对应 `super` 方法。模板已提供生成器初始化、动画推进、寻路动作切换、血条更新与受击/死亡动画连接，无需重复编写。动画库默认使用 `base_animation_library.tres` 的占位动作。
+5. 创建 `MonsterSpawnData` 资源，指定新场景和生成群系，再加入生成器的 `spawn_definitions` 数组。
+
 回归测试：
 
 ```
+godot --headless --path . res://tests/test_monster_hit_effects.tscn
+godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
+godot --headless --path . res://tests/test_monster_animations.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn
 ```
