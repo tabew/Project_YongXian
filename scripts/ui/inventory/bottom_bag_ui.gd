@@ -1,4 +1,7 @@
 extends Control
+##物品栏(快捷栏)ui，同步物品栏数据并显示和提供交互
+##与背包的区别：背包同种物品只有一格(不能分开)，物品栏按格子管理，
+##同一个物品可以同时放在不同格子里，物品归谁管只看格子本身
 
 @onready var handy_slot_container:HBoxContainer = $PanelContainer/MarginContainer/HBoxContainer
 
@@ -21,28 +24,70 @@ func init_button() -> void:
 	for child in handy_slot_container.get_children():
 		item_buttons.append(child)
 
-##背包更新函数，同步背包数据
+	if item_buttons.size() != Inventory.HANDY_SLOT_COUNT: 
+		push_warning("物品栏格子数 %d 与 Inventory.HANDY_SLOT_COUNT %d 不一致" % [item_buttons.size(),Inventory.HANDY_SLOT_COUNT])
+
+	for pos in item_buttons.size():
+		var button:SlotButton = item_buttons[pos]
+		button.is_handy_button = true
+		button.handy_slot = pos #快捷栏交换：告诉目标格子本格是从哪一格拖出来的
+		button.take_item_signal.connect(_on_slot_take.bind(pos))
+		button.put_item_signal.connect(_on_slot_put.bind(pos)) 
+		button.swap_item_signal.connect(_on_slot_swap.bind(pos)) #快捷栏交换：有别的物品要放进本格
+
+##物品栏更新函数，同步物品栏数据
 func bag_update() ->void:
 
-	#加载背包内物品
-	for item in inventory.handy_items_pos:
-		var pos = inventory.handy_items_pos[item]
+	for pos in item_buttons.size():
+		_slot_update(pos)
 
-		var slot_item_:SlotItem = slot_item.instantiate()
+##把某一格的显示和物品栏数据对齐
+func _slot_update(pos:int) ->void:
+	var button:SlotButton = item_buttons[pos]
 
-		slot_item_.item = item
-		slot_item_.count = inventory.items[item]
+	var item_id:int = inventory.get_handy_slot_id(pos)
+	var count:int = inventory.get_handy_slot_count(pos)
 
-		if item_buttons[pos].slot_item != null:
-			if item_buttons[pos].slot_item.item.id != slot_item_.item.id:
-				item_buttons[pos].queue_free()
-			else :
-				item_buttons[pos].slot_item.count = slot_item_.count
-				continue
+	if item_id < 0 or count <= 0:
+		button.clear_slot()
+		return
 
-		item_buttons[pos].slot_insert(slot_item_)
-		
-		
+	#同一种物品只改数量
+	if button.slot_item != null and is_instance_valid(button.slot_item) and button.slot_item.item_id == item_id:
+		button.set_count(count)
+		return
+
+	#换了物品整格重建显示
+	button.clear_slot()
+
+	var slot_item_:SlotItem = slot_item.instantiate()
+	slot_item_.set_item_id(item_id)
+	slot_item_.count = count
+
+	button.slot_insert(slot_item_)
+
+##本格的东西被拿走
+func _on_slot_take(_item_id:int,num:int,pos:int) ->void:
+	inventory.remove_handy_slot(pos,num)
+
+##有东西放进本格
+func _on_slot_put(item_id:int,num:int,pos:int) ->void:
+	if inventory.add_handy_slot(pos,item_id,num):
+		return
+
+	inventory.add_item(item_id,num)
+
+# ==============================================================================
+# ↓↓↓↓ 快捷栏交换：本格放着别的物品时，和拖来的那一格整堆互换 ↓↓↓↓
+# ==============================================================================
+##from_pos是拖出来的那一格，to_pos是本格(由信号绑定，只看格子本身)
+func _on_slot_swap(item_id:int,num:int,from_pos:int,to_pos:int) ->void:
+	inventory.swap_handy_slot(from_pos,to_pos,item_id,num)
+# ==============================================================================
+# ↑↑↑↑ 快捷栏交换（结束）↑↑↑↑
+# ==============================================================================
+
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		if Input.is_action_just_pressed("alchemy_menu"):
