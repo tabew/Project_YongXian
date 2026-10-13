@@ -44,12 +44,51 @@ func _test_template() -> bool:
 	return passed
 
 
+func _test_terminal_graph() -> bool:
+	var machine := load("res://resources/monsters/monster_animation_state_machine.tres") as AnimationNodeStateMachine
+	var passed: bool = machine.get_transition_count() == 12
+	var recoveries: int = 0
+	for index: int in machine.get_transition_count():
+		var from: StringName = machine.get_transition_from(index)
+		var to: StringName = machine.get_transition_to(index)
+		passed = passed and from != &"Death"
+		if from in [&"Attack", &"Throw", &"Hurt"] and to == &"Idle":
+			var transition: AnimationNodeStateMachineTransition = machine.get_transition(index)
+			passed = passed and transition.advance_mode == AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
+			passed = passed and transition.switch_mode == AnimationNodeStateMachineTransition.SWITCH_MODE_AT_END
+			recoveries += 1
+	passed = passed and recoveries == 3
+	var monster := BASE_SCENE.instantiate() as BaseMonster
+	add_child(monster)
+	monster.set_physics_process(false)
+	# 非直连动作要立即进入目标动画，不能绕经 Idle。
+	monster.play_monster_animation(&"Move")
+	monster.play_monster_animation(&"Leap")
+	monster.advance_monster_animation(0.21)
+	passed = passed and monster.monster_animation_state() == &"Leap"
+	passed = passed and is_equal_approx(monster._visual_height, 24.0)
+	monster.play_monster_animation(&"Hurt")
+	passed = passed and monster.monster_animation_state() == &"Hurt" and is_zero_approx(monster._visual_height)
+	monster.play_monster_animation(&"Death")
+	for state: StringName in [&"Idle", &"Move", &"Attack", &"Leap", &"Throw", &"Hurt"]:
+		monster.play_monster_animation(state)
+		passed = passed and monster.monster_animation_state() == &"Death"
+		monster.play_monster_animation(state, true)
+		passed = passed and monster.monster_animation_state() == &"Death"
+	monster.advance_monster_animation(1.0)
+	passed = passed and monster.monster_animation_state() == &"Death"
+	monster.queue_free()
+	print("TERMINAL_ANIMATION_GRAPH_RESULT=", passed, " transitions=", machine.get_transition_count())
+	return passed
+
+
 func _run() -> void:
+	var graph_passed: bool = _test_terminal_graph()
 	var template_passed: bool = await _test_template()
 	var monster := MONSTER_SCENE.instantiate() as GiveMonster
 	add_child(monster)
 	monster.set_physics_process(false)
-	var passed: bool = template_passed and monster.monster_animation_state() == &"Idle"
+	var passed: bool = graph_passed and template_passed and monster.monster_animation_state() == &"Idle"
 	monster.advance_monster_animation(0.5)
 	passed = passed and monster.visual_pose.y < 0.0
 

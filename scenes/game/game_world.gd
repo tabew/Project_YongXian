@@ -218,7 +218,7 @@ func _sync_training_dummy() -> void:
 	_training_dummy.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
 
 
-## 原 spawner 保留全部生成/战斗功能；切图重建实体，避免旧区域怪物继续攻击。
+## 切图重建存活实体，生成器保留本局击杀记录；旧区域怪物不会继续攻击。
 func _setup_map_monsters() -> void:
 	if chunk_manager.chunk_applied.is_connected(_on_monster_chunk_applied):
 		chunk_manager.chunk_applied.disconnect(_on_monster_chunk_applied)
