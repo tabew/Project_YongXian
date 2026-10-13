@@ -183,6 +183,7 @@ func _test_outside_aggro() -> bool:
 
 
 func _check_initial_sight_gate(monster: GiveMonster) -> bool:
+	_use_frame_by_frame_ai(monster)
 	var original_player_position: Vector2 = _player.global_position
 	var original_monster_position: Vector2 = monster.global_position
 	for _frame: int in 8:
@@ -190,17 +191,17 @@ func _check_initial_sight_gate(monster: GiveMonster) -> bool:
 	var idle_behind_wall: bool = (
 		not monster.has_player_aggro() and not monster.has_attack_intent()
 		and monster.global_position.is_equal_approx(original_monster_position)
-		and monster._path.is_empty() and _player.health == 10
+		and monster.is_path_empty() and _player.health == 10
 	)
 
 	# 玩家先沿墙同侧露面；冷却只用于避免这一阶段发动攻击。
-	monster._attack_cooldown = 10.0
+	monster.set_attack_cooldown(10.0)
 	_player.global_position = WorldGenerator.tile_to_world(Vector2i(0, 6))
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var acquired_when_visible: bool = monster.has_player_aggro()
 	_player.global_position = original_player_position
-	monster._attack_cooldown = 0.0
+	monster.set_attack_cooldown(0.0)
 	var passed: bool = idle_behind_wall and acquired_when_visible
 	print("INITIAL_SIGHT_GATE_RESULT=", passed)
 	if not passed:
@@ -379,7 +380,7 @@ func _test_ranged_without_stone() -> bool:
 	var passed: bool = (
 		_player.health == 10
 		and not monster.has_attack_intent()
-		and is_zero_approx(monster._attack_cooldown)
+		and is_zero_approx(monster.get_attack_cooldown())
 	)
 	_remove_node(monster)
 	print("NO_STONE_RESULT=", passed, " health=", _player.health)
@@ -420,3 +421,13 @@ func _remove_node(node: Variant) -> void:
 		if node.get_parent() != null:
 			node.get_parent().remove_child(node)
 		node.queue_free()
+
+
+## 让 AI 每个物理帧都做感知与决策，并把怪物钉在锚点上，
+## 便于断言"看不到玩家时既不获得仇恨、也不离开原地"。
+func _use_frame_by_frame_ai(monster: GiveMonster) -> void:
+	var config: EnemyAIConfig = monster.get_ai_config()
+	config.update_interval = 0.0
+	config.perception_interval = 0.0
+	config.patrol_radius_tiles = 0.0
+	config.patrol_start_delay = 60.0

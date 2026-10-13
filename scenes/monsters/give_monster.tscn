@@ -1,12 +1,14 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/monsters/base_monster.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scripts/monsters/give_monster.gd" id="2_monster"]
 [ext_resource type="AnimationLibrary" path="res://resources/monsters/give_animation_library.tres" id="3_animations"]
 [ext_resource type="Script" path="res://scripts/monsters/give_monster_visual.gd" id="4_visual"]
+[ext_resource type="Resource" path="res://resources/monsters/give_ai_config.tres" id="5_ai_config"]
 
 [node name="GiveMonster" instance=ExtResource("1_base")]
 script = ExtResource("2_monster")
+ai_config = ExtResource("5_ai_config")
 
 [node name="Placeholder" parent="Visual" index="0"]
 visible = false

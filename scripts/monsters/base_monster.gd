@@ -1,13 +1,15 @@
 class_name BaseMonster
 extends CharacterBody2D
 
-## 所有怪物共用的视线与寻路模板。
-## RayCast2D 负责物理墙体，地形采样负责当前没有物理层的程序化阻挡格。
+## 所有怪物共用的模板：生命、受击、动画、感知/寻路原语，以及通用四状态 AI 的装配。
+##
+## AI 本体（状态机、配置、黑板、攻击接口）都在 scripts/monsters/ai/ 下，所有怪物共享同一套
+## 逻辑：怪物只需要提供 EnemyAIConfig，并按需实现 EnemyAttack，不需要复制粘贴 AI 代码。
+## 视线检测复用 RayCast2D（物理墙体）与程序化地形采样（当前没有物理层的阻挡格）。
 
-@export_group("寻路")
-@export var navigation_speed: float = 72.0
-@export var path_refresh_interval: float = 2.0
-@export var path_margin_tiles: int = 6
+@export_group("AI")
+## 怪物类型的 AI 数据配置；留空时使用通用默认值。
+@export var ai_config: EnemyAIConfig
 
 @export_group("受击反馈")
 ## 基础反馈只产生约2像素位移；武器击退仍按强度加算，形成更明显的推开。
@@ -25,7 +27,31 @@ var _hit_flash_remaining: float = 0.0
 var player: PlayerCharacter = null
 var world_generator: WorldGenerator = null
 var spawn_chunk: Vector2i = Vector2i.ZERO
-var _has_player_aggro: bool = false
+
+## 每个怪物独立的 AI 组件；共享的只有配置、感知服务、路径调度与事件总线。
+var blackboard: EnemyBlackboard = null
+var perception: EnemyPerception = null
+var navigator: EnemyNavigator = null
+var attack: EnemyAttack = null
+var brain: EnemyBrain = null
+
+var _pending_navigation_speed: float = -1.0
+var _ai_config_owned: bool = false
+var _animation_accumulator: float = 0.0
+var _last_line_blocked_by_physics: bool = false
+var _last_physics_collider: CollisionObject2D = null
+
+## 移动速度统一存放在 ai_config.move_speed，保留 navigation_speed 作为兼容别名。
+var navigation_speed: float:
+	get:
+		if ai_config != null:
+			return ai_config.move_speed
+		return _pending_navigation_speed if _pending_navigation_speed >= 0.0 else 72.0
+	set(value):
+		if ai_config != null:
+			ai_config.move_speed = value
+		else:
+			_pending_navigation_speed = value
 
 ## 共享占位动画轨道；子类可替换动画库和 Visual 下的外形。
 var _visual_height: float = 0.0:
@@ -46,33 +72,22 @@ var health_bar: ProgressBar = null
 var animation_tree: AnimationTree = null
 var animation_playback: AnimationNodeStateMachinePlayback = null
 
-var _path: Array[Vector2i] = []
-var _path_index: int = 0
-var _path_refresh_timer: float = 0.0
-var _last_path_target: Vector2i = Vector2i(2147483647, 2147483647)
-var _last_line_blocked_by_physics: bool = false
-var _last_physics_collider: CollisionObject2D = null
-
 
 func _ready() -> void:
 	add_to_group("monsters")
 	target_raycast.add_exception(self)
 	_setup_health_bar()
-	animation_tree = get_node_or_null("AnimationTree") as AnimationTree
-	if animation_tree != null:
-		animation_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
-		animation_tree.active = true
-		animation_playback = animation_tree.get("parameters/playback")
-		animation_playback.start(&"Idle")
-		animation_tree.advance(0.0)
+	_setup_animation()
 	var health_component := get_node_or_null("Health") as HealthComponent
 	if health_component != null:
 		health_component.damaged.connect(_on_monster_damaged)
 		health_component.died.connect(_on_monster_died)
+	_ensure_ai_config()
+	_build_ai()
 
 
 func _physics_process(delta: float) -> void:
-	advance_monster_animation(delta)
+	advance_frame_animation(delta)
 	_hit_flash_remaining = maxf(_hit_flash_remaining - delta, 0.0)
 	_update_hit_flash()
 	_knockback_applied_this_frame = _knockback_remaining > 0.0
@@ -81,13 +96,187 @@ func _physics_process(delta: float) -> void:
 		var strength: float = maxf(_knockback_remaining - step_time * 0.5, 0.0) / knockback_duration
 		_move_knockback(_knockback_impulse * strength * step_time)
 		_knockback_remaining = maxf(_knockback_remaining - delta, 0.0)
-		_path_refresh_timer = 0.0
+		# 击退期间不驱动 AI，避免覆盖位移；击退结束后重新寻路。
+		if navigator != null:
+			navigator.clear()
+		return
+	if brain != null:
+		brain.tick(delta)
+
+
+func _setup_animation() -> void:
+	animation_tree = get_node_or_null("AnimationTree") as AnimationTree
+	if animation_tree == null:
+		return
+	animation_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	animation_tree.active = true
+	animation_playback = animation_tree.get("parameters/playback")
+	animation_playback.start(&"Idle")
+	animation_tree.advance(0.0)
+
+
+# --- AI 装配 ----------------------------------------------------------------
+
+## 复制一份配置，避免多只怪物共享同一个 .tres 时互相污染运行时改动。
+func _ensure_ai_config() -> void:
+	if _ai_config_owned:
+		return
+	ai_config = ai_config.duplicate() as EnemyAIConfig if ai_config != null else EnemyAIConfig.new()
+	if _pending_navigation_speed >= 0.0:
+		ai_config.move_speed = _pending_navigation_speed
+	_ai_config_owned = true
+
+
+## 装配（或按最终位置重建）本怪物的 AI 组件。
+func _build_ai() -> void:
+	_ensure_ai_config()
+	blackboard = EnemyBlackboard.new()
+	blackboard.patrol_anchor = _resolve_patrol_anchor()
+	perception = EnemyPerception.new()
+	perception.setup(self, ai_config, blackboard)
+	navigator = EnemyNavigator.new()
+	navigator.setup(self, ai_config)
+	attack = _create_attack()
+	if attack != null:
+		attack.setup(self, ai_config)
+	brain = EnemyBrain.new()
+	brain.setup(self, ai_config, blackboard, perception, navigator, attack, _ai_seed())
+
+
+## 子类返回自己的攻击实现；默认没有攻击，怪物只会巡逻与追击。
+func _create_attack() -> EnemyAttack:
+	return null
+
+
+## 初始巡逻锚点：场景中的 PatrolAnchor 节点，否则用出生点。
+func _resolve_patrol_anchor() -> Vector2:
+	var marker := get_node_or_null("PatrolAnchor") as Node2D
+	if marker != null:
+		return marker.global_position
+	return global_position
+
+
+## 用世界种子 + 生成位置做种，保证同一局存档/回放的巡逻与搜索点一致。
+## 种子取自所在世界的生成器，避免直接引用 GameState 单例标识符。
+func _ai_seed() -> int:
+	var world_seed: int = world_generator.world_seed if world_generator != null else 0
+	var tile: Vector2i = WorldGenerator.world_to_tile(global_position)
+	return hash([
+		world_seed,
+		tile.x,
+		tile.y,
+		ai_config.ai_id,
+		spawn_chunk.x,
+		spawn_chunk.y,
+	])
+
+
+func get_ai_state() -> EnemyState.State:
+	return brain.current_state() if brain != null else EnemyState.State.PATROL
+
+
+func get_ai_state_name() -> String:
+	return EnemyState.describe(get_ai_state())
+
+
+func get_ai_config() -> EnemyAIConfig:
+	return ai_config
+
+
+func get_blackboard() -> EnemyBlackboard:
+	return blackboard
+
+
+func get_attack() -> EnemyAttack:
+	return attack
+
+
+func get_navigator() -> EnemyNavigator:
+	return navigator
+
+
+func get_attack_cooldown() -> float:
+	return blackboard.attack_cooldown if blackboard != null else 0.0
+
+
+func set_attack_cooldown(seconds: float) -> void:
+	if blackboard != null:
+		blackboard.attack_cooldown = maxf(seconds, 0.0)
+
+
+func is_path_empty() -> bool:
+	return navigator == null or not navigator.has_path()
+
+
+## 兼容旧接口：现在的"仇恨"等价于状态机处于 Chase 或 Attack。
+func has_player_aggro() -> bool:
+	if blackboard == null:
+		return false
+	return (
+		blackboard.state == EnemyState.State.CHASE
+		or blackboard.state == EnemyState.State.ATTACK
+	)
+
+
+## 兼容旧接口：外部脚本可强制放弃目标，怪物以当前位置为锚点回到巡逻。
+func clear_player_aggro() -> void:
+	if brain != null:
+		brain.abandon_target()
+
+
+## 通过 /root 路径取共享的自动加载服务。不直接写单例标识符，
+## 保证怪物脚本在 `--script` 模式下也能编译（那时自动加载标识符不可解析）。
+func shared_service(service_name: StringName) -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null(NodePath("/root/%s" % service_name))
+
+
+## PerceptionManager 调用的统一感知入口。
+func evaluate_perception() -> void:
+	if perception == null or blackboard == null:
+		return
+	blackboard.can_see_target = perception.can_see(player)
+	blackboard.target = player if blackboard.can_see_target else null
+	if not is_instance_valid(player):
+		blackboard.target_distance = 0.0
+		return
+	blackboard.target_distance = global_position.distance_to(player.global_position)
+	if blackboard.can_see_target:
+		blackboard.last_known_position = player.global_position
+		blackboard.has_last_known_position = true
+		blackboard.lose_sight_elapsed = 0.0
+
+
+## PerceptionManager 广播噪音/警报时调用。
+func report_suspicious(position: Vector2) -> void:
+	if perception != null:
+		perception.report_suspicious(position)
+
+
+func ai_hearing_radius() -> float:
+	return perception.hearing_radius() if perception != null else 0.0
+
+
+## 最近一次视线检测被物理墙体挡住时，把它转换成 AStar 的格阻挡。
+func blocked_physics_tiles() -> Dictionary:
+	if _last_line_blocked_by_physics and is_instance_valid(_last_physics_collider):
+		return EnemyPathfinder.physics_collider_tiles(_last_physics_collider)
+	return {}
+
+
+## PathRequestScheduler 的异步回调入口。
+func _on_ai_path_ready(result: Array[Vector2i], request_generation: int) -> void:
+	if navigator != null:
+		navigator.apply_path(request_generation, result)
 
 
 ## 子类调用 super._physics_process() 后应优先处理这一状态，避免 AI 覆盖击退。
 func is_receiving_knockback() -> bool:
 	return _knockback_remaining > 0.0 or _knockback_applied_this_frame
 
+
+# --- 受击反馈 ---------------------------------------------------------------
 
 func _update_hit_flash() -> void:
 	var visual := get_node_or_null("Visual") as CanvasItem
@@ -137,18 +326,32 @@ func _on_monster_damaged(hit: CombatHit, _actual_damage: float) -> void:
 	_hit_flash_remaining = hit_flash_duration
 	_update_hit_flash()
 	var health_component := get_node_or_null("Health") as HealthComponent
-	if not health_component.is_alive():
+	if health_component == null or not health_component.is_alive():
 		return
 	stop_navigation()
 	_knockback_impulse = _resolve_knockback(hit)
 	_knockback_remaining = knockback_duration if not _knockback_impulse.is_zero_approx() else 0.0
 	# 受击打断动作，包括跳跃；Hurt 的高度轨道会立即落地归零。
 	play_monster_animation(&"Hurt", true)
+	if brain != null:
+		brain.interrupt_attack()
+	# 被打了却看不到攻击者：记为可疑信息，让 AI 去搜索而不是直接回家。
+	# 这里用感知判定而不是单纯的视线，因为"看不到"既包括视线被挡，也包括超出视野距离。
+	if perception == null or not perception.can_see(player):
+		report_suspicious(_hit_source_position(hit))
+
+
+func _hit_source_position(hit: CombatHit) -> Vector2:
+	if is_instance_valid(hit.source) and hit.source is Node2D:
+		return (hit.source as Node2D).global_position
+	return hit.position
 
 
 func _on_monster_died(_hit: CombatHit) -> void:
 	kill()
 
+
+# --- 动画 -------------------------------------------------------------------
 
 func play_monster_animation(state: StringName, restart: bool = false) -> void:
 	if animation_playback == null:
@@ -171,6 +374,28 @@ func monster_animation_state() -> StringName:
 func advance_monster_animation(delta: float) -> void:
 	if animation_tree != null:
 		animation_tree.advance(delta)
+
+
+## 物理帧驱动的动画推进；远处怪物按 LOD 降频，但累计时间不变。
+func advance_frame_animation(delta: float) -> void:
+	if animation_tree == null:
+		return
+	if not _should_use_animation_lod():
+		_animation_accumulator = 0.0
+		animation_tree.advance(delta)
+		return
+	_animation_accumulator += delta
+	var interval: float = 1.0 / maxf(ai_config.lod_animation_hz, 1.0)
+	if _animation_accumulator < interval:
+		return
+	animation_tree.advance(_animation_accumulator)
+	_animation_accumulator = 0.0
+
+
+func _should_use_animation_lod() -> bool:
+	if ai_config == null or not ai_config.lod_enabled or brain == null:
+		return false
+	return brain.is_lod_active()
 
 
 func _setup_health_bar() -> void:
@@ -222,14 +447,16 @@ func kill() -> void:
 	queue_free()
 
 
+# --- 配置与感知原语 ---------------------------------------------------------
+
 ## MonsterSpawner 的统一初始化接口；子类需要扩展时调用 super.configure()。
 func configure(
 	target_player: PlayerCharacter,
 	generator: WorldGenerator,
 	chunk_coords: Vector2i
 ) -> void:
-	configure_target(target_player, generator)
 	spawn_chunk = chunk_coords
+	configure_target(target_player, generator)
 
 
 func configure_target(target_player: PlayerCharacter, generator: WorldGenerator) -> void:
@@ -239,33 +466,11 @@ func configure_target(target_player: PlayerCharacter, generator: WorldGenerator)
 	_knockback_remaining = 0.0
 	_knockback_applied_this_frame = false
 	_hit_flash_remaining = 0.0
+	_last_line_blocked_by_physics = false
+	_last_physics_collider = null
 	_update_hit_flash()
-	clear_player_aggro()
-	_path.clear()
-	_path_index = 0
-	_path_refresh_timer = 0.0
-	_last_path_target = Vector2i(2147483647, 2147483647)
-
-
-## 子类传入自身的索敌范围判断；首次仇恨只能在视线无遮挡时建立。
-func try_acquire_player_aggro(within_detection_range: bool) -> bool:
-	if _has_player_aggro:
-		return true
-	if within_detection_range and has_clear_line_to_player():
-		_has_player_aggro = true
-	return _has_player_aggro
-
-
-func has_player_aggro() -> bool:
-	return _has_player_aggro
-
-
-func clear_player_aggro() -> void:
-	_has_player_aggro = false
-	_path.clear()
-	_path_index = 0
-	_path_refresh_timer = 0.0
-	stop_navigation()
+	# 位置已确定，用最终坐标重建 AI：随机种子与初始巡逻锚点都依赖它。
+	_build_ai()
 
 
 func has_clear_line_to_player() -> bool:
@@ -296,6 +501,11 @@ func has_clear_line_to_position(
 	return _terrain_line_is_clear(global_position, world_target)
 
 
+## 两点之间是否没有程序化地形阻挡（不含物理墙体），供 AI 选点使用。
+func is_terrain_line_clear(from: Vector2, to: Vector2) -> bool:
+	return _terrain_line_is_clear(from, to)
+
+
 ## 沿线密集采样，弥补当前 TileSet 没有物理碰撞层、RayCast2D 看不到地形的问题。
 func _terrain_line_is_clear(from: Vector2, to: Vector2) -> bool:
 	var distance: float = from.distance_to(to)
@@ -309,46 +519,60 @@ func _terrain_line_is_clear(from: Vector2, to: Vector2) -> bool:
 	return true
 
 
+## 整段直线位移的严格地形检查：枚举线段扫过的所有格子，含只擦过一角的格子。
+## 跳跃等“一次性位移”用它判断会不会穿墙；视线检测仍走 _terrain_line_is_clear。
+func is_terrain_segment_clear(from: Vector2, to: Vector2) -> bool:
+	var direction: Vector2 = to - from
+	if direction.is_zero_approx():
+		return true
+	var tile_size: float = float(WorldGenerator.TILE_SIZE)
+	var current: Vector2i = WorldGenerator.world_to_tile(from)
+	var end_tile: Vector2i = WorldGenerator.world_to_tile(to)
+	if not is_navigation_tile_allowed(current) or not is_navigation_tile_allowed(end_tile):
+		return false
+	if current == end_tile:
+		return true
+
+	var step_x: int = signi(end_tile.x - current.x)
+	var step_y: int = signi(end_tile.y - current.y)
+	var t_delta_x: float = absf(tile_size / direction.x) if step_x != 0 else INF
+	var t_delta_y: float = absf(tile_size / direction.y) if step_y != 0 else INF
+	var t_max_x: float = INF
+	var t_max_y: float = INF
+	if step_x != 0:
+		t_max_x = (float(current.x + maxi(step_x, 0)) * tile_size - from.x) / direction.x
+	if step_y != 0:
+		t_max_y = (float(current.y + maxi(step_y, 0)) * tile_size - from.y) / direction.y
+
+	var guard: int = absi(end_tile.x - current.x) + absi(end_tile.y - current.y) + 2
+	while guard > 0:
+		guard -= 1
+		if is_equal_approx(t_max_x, t_max_y):
+			# 正好穿过格点：supercover 规则要求同时检查两个对角邻格。
+			if not is_navigation_tile_allowed(Vector2i(current.x + step_x, current.y)):
+				return false
+			if not is_navigation_tile_allowed(Vector2i(current.x, current.y + step_y)):
+				return false
+			current.x += step_x
+			current.y += step_y
+			t_max_x += t_delta_x
+			t_max_y += t_delta_y
+		elif t_max_x < t_max_y:
+			current.x += step_x
+			t_max_x += t_delta_x
+		else:
+			current.y += step_y
+			t_max_y += t_delta_y
+		if not is_navigation_tile_allowed(current):
+			return false
+		if current == end_tile:
+			return true
+	return true
+
+
 ## 子类可追加自己的移动限制；默认仅检查地形可通行性。
 func is_navigation_tile_allowed(tile: Vector2i) -> bool:
 	return world_generator != null and world_generator.is_walkable(tile)
-
-
-func navigate_toward_player(delta: float) -> bool:
-	if is_receiving_knockback():
-		return false
-	if not has_player_aggro() or not is_instance_valid(player) or world_generator == null:
-		stop_navigation()
-		return false
-
-	_path_refresh_timer = maxf(_path_refresh_timer - delta, 0.0)
-	var target_tile: Vector2i = WorldGenerator.world_to_tile(player.global_position)
-	if target_tile != _last_path_target or _path_refresh_timer <= 0.0:
-		_rebuild_path(target_tile)
-
-	while _path_index < _path.size():
-		var waypoint: Vector2 = WorldGenerator.tile_to_world(_path[_path_index])
-		if global_position.distance_to(waypoint) > 3.0:
-			break
-		_path_index += 1
-
-	if _path_index >= _path.size():
-		stop_navigation()
-		return false
-
-	var next_tile: Vector2i = _path[_path_index]
-	if not is_navigation_tile_allowed(next_tile):
-		_path_refresh_timer = 0.0
-		stop_navigation()
-		return false
-
-	var next_position: Vector2 = WorldGenerator.tile_to_world(next_tile)
-	velocity = global_position.direction_to(next_position) * navigation_speed
-	move_and_slide()
-	if get_slide_collision_count() > 0:
-		_path_refresh_timer = 0.0
-	play_monster_animation(&"Move")
-	return true
 
 
 func stop_navigation() -> void:
@@ -356,124 +580,3 @@ func stop_navigation() -> void:
 	match monster_animation_state():
 		&"Idle", &"Move":
 			play_monster_animation(&"Idle")
-
-
-func _rebuild_path(target_tile: Vector2i) -> void:
-	_path.clear()
-	_path_index = 0
-	_last_path_target = target_tile
-	_path_refresh_timer = path_refresh_interval
-
-	var start_tile: Vector2i = WorldGenerator.world_to_tile(global_position)
-	var margin := Vector2i(path_margin_tiles, path_margin_tiles)
-	var min_tile := Vector2i(
-		mini(start_tile.x, target_tile.x),
-		mini(start_tile.y, target_tile.y)
-	) - margin
-	var max_tile := Vector2i(
-		maxi(start_tile.x, target_tile.x),
-		maxi(start_tile.y, target_tile.y)
-	) + margin
-
-	var grid := AStarGrid2D.new()
-	grid.region = Rect2i(min_tile, max_tile - min_tile + Vector2i.ONE)
-	grid.cell_size = Vector2.ONE
-	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
-	grid.update()
-
-	var physics_solids: Dictionary = {}
-	if _last_line_blocked_by_physics and is_instance_valid(_last_physics_collider):
-		physics_solids = _physics_collider_tiles(_last_physics_collider)
-	for y: int in range(min_tile.y, max_tile.y + 1):
-		for x: int in range(min_tile.x, max_tile.x + 1):
-			var tile := Vector2i(x, y)
-			var blocked: bool = not is_navigation_tile_allowed(tile)
-			if not blocked:
-				blocked = physics_solids.has(tile)
-			if blocked:
-				grid.set_point_solid(tile, true)
-
-	# 怪物当前格与玩家目标格必须能够作为路径端点。
-	grid.set_point_solid(start_tile, false)
-	if not is_navigation_tile_allowed(target_tile):
-		return
-	grid.set_point_solid(target_tile, false)
-
-	var calculated: Array[Vector2i] = grid.get_id_path(start_tile, target_tile)
-	if calculated.size() <= 1:
-		return
-	_path = calculated
-	_path_index = 1
-
-
-## 把 RayCast2D 命中的墙体形状一次转换为格子包围盒，供 AStar 标记阻挡。
-func _physics_collider_tiles(collider: CollisionObject2D) -> Dictionary:
-	var result: Dictionary = {}
-	for child: Node in collider.get_children():
-		if child is CollisionShape2D:
-			var collision_shape := child as CollisionShape2D
-			if collision_shape.disabled or collision_shape.shape == null:
-				continue
-			var points: PackedVector2Array = _shape_bounds_points(collision_shape.shape)
-			_mark_bounds_tiles(result, collision_shape.global_transform, points)
-		elif child is CollisionPolygon2D:
-			var collision_polygon := child as CollisionPolygon2D
-			if collision_polygon.disabled:
-				continue
-			_mark_bounds_tiles(
-				result, collision_polygon.global_transform, collision_polygon.polygon
-			)
-
-	if result.is_empty() and collider is Node2D:
-		result[WorldGenerator.world_to_tile((collider as Node2D).global_position)] = true
-	return result
-
-
-func _shape_bounds_points(shape: Shape2D) -> PackedVector2Array:
-	if shape is RectangleShape2D:
-		var half: Vector2 = (shape as RectangleShape2D).size * 0.5
-		return PackedVector2Array([
-			Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-			Vector2(half.x, half.y), Vector2(-half.x, half.y),
-		])
-	if shape is CircleShape2D:
-		var radius: float = (shape as CircleShape2D).radius
-		return PackedVector2Array([
-			Vector2(-radius, -radius), Vector2(radius, -radius),
-			Vector2(radius, radius), Vector2(-radius, radius),
-		])
-	if shape is CapsuleShape2D:
-		var capsule := shape as CapsuleShape2D
-		var capsule_half := Vector2(capsule.radius, capsule.height * 0.5)
-		return PackedVector2Array([
-			Vector2(-capsule_half.x, -capsule_half.y),
-			Vector2(capsule_half.x, -capsule_half.y),
-			Vector2(capsule_half.x, capsule_half.y),
-			Vector2(-capsule_half.x, capsule_half.y),
-		])
-	if shape is ConvexPolygonShape2D:
-		return (shape as ConvexPolygonShape2D).points
-	if shape is SegmentShape2D:
-		var segment := shape as SegmentShape2D
-		return PackedVector2Array([segment.a, segment.b])
-	return PackedVector2Array()
-
-
-func _mark_bounds_tiles(
-	result: Dictionary,
-	shape_transform: Transform2D,
-	local_points: PackedVector2Array
-) -> void:
-	if local_points.is_empty():
-		return
-	var first: Vector2 = shape_transform * local_points[0]
-	var bounds := Rect2(first, Vector2.ZERO)
-	for index: int in range(1, local_points.size()):
-		bounds = bounds.expand(shape_transform * local_points[index])
-
-	var epsilon := Vector2(0.01, 0.01)
-	var min_tile: Vector2i = WorldGenerator.world_to_tile(bounds.position + epsilon)
-	var max_tile: Vector2i = WorldGenerator.world_to_tile(bounds.end - epsilon)
-	for y: int in range(min_tile.y, max_tile.y + 1):
-		for x: int in range(min_tile.x, max_tile.x + 1):
-			result[Vector2i(x, y)] = true

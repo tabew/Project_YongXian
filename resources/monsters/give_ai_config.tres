@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EnemyAIConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/monsters/ai/enemy_ai_config.gd" id="1_ai_config"]
+
+[resource]
+script = ExtResource("1_ai_config")
+ai_id = &"give"
+patrol_radius_tiles = 4.0
+patrol_wait_time = 1.2
+patrol_start_delay = 0.6
+patrol_point_attempts = 12
+patrol_scan_speed_degrees = 45.0
+vision_distance_tiles = 10.0
+vision_angle_degrees = 360.0
+perception_interval = 0.15
+hearing_radius_tiles = 8.0
+suspicious_event_lifetime = 5.0
+attack_range_tiles = 10.0
+attack_cooldown = 1.0
+lose_sight_grace = 2.5
+search_on_lost_sight = false
+search_duration = 6.0
+search_radius_tiles = 4.0
+search_point_count = 4
+search_point_dwell_time = 0.9
+move_speed = 72.0
+path_refresh_interval = 0.4
+path_failure_retry_delay = 1.0
+path_margin_tiles = 6
+update_interval = 0.1
+lod_enabled = true
+lod_distance_tiles = 14.0
+lod_interval_scale = 3.0
+lod_animation_hz = 10.0

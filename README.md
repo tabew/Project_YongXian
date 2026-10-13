@@ -63,6 +63,8 @@ Project_YongXian/
 
 [RunGraph](resources/world/run_graph.gd) 将一局组织为 **8 层、14 个区域**：首尾层各一个主干区域，中间六层各有主干和岔路。主干可以向下一层主干或岔路推进，岔路汇回下一层主干；区域之间以出入口连接，可以沿对应入口返回。
 
+关卡骨架现在带**房间类型与节奏**：`RoomGraph` 在既有拓扑上标注起点 / 战斗 / 奖励 / 商店 / 休息 / 事件 / Boss，主路径按节奏模板分配，关键房间由配置强制校正；生成后再过一遍硬约束校验与软约束评分，不合格就在同一主种子下换布局变体重试。全部随机走统一的 `MapRng` 种子系统，同种子必然同图。架构、配置与调试命令见 [地图生成架构](docs/map_generation.md)。
+
 [MapSpec](resources/world/map_spec.gd) 按种子分别随机箱庭宽高，通常各为 **112–224 格**。六类轮廓为宽阔原野、狭长山谷、林间空地、折返山径、阶梯台地和双庭丘陵；每类由随机重叠庭室组成主庭与可探索侧庭，并用内部道路连成可返回的回路。地图以陆地为主，少量池塘或河带点缀，外围由不可通行的山地、森林或针叶林围合。
 
 **道路只存在于箱庭内部**，连接主庭、侧庭及出入口；主路用石板、支线用土路，跨水处显示木桥。路面与空地仍可通行，森林、针叶林、雨林现在会阻挡移动。区域之间的间隙没有实体道路，角色不能步行穿越箱庭之间。
@@ -208,11 +210,13 @@ python tools/generate_art.py
 
 ## 林地怪物“给”
 
+完整怪物架构、生成配置与扩展说明见 [docs/monsters.md](docs/monsters.md)。
+
 箱庭切换沿用原 `RainforestMonsterSpawner`，按当前地图已加载区块刷新怪物，并裁剪共享边界的刷新范围；隐藏预加载邻图不会刷新可见怪物。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
 
 “给”只会随已加载区块生成在森林、针叶林、热带雨林群系的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
 
-所有怪物应继承 `scripts/monsters/base_monster.gd`。该模板使用场景中的 `TargetRayCast`（`RayCast2D`）检测 `StaticBody2D` 等物理墙体，同时逐格检查程序化地形的可通行性；首次发现玩家时必须通过 `try_acquire_player_aggro()` 的无遮挡视线检查，否则既不获得仇恨也不寻路追击；已有仇恨后视线受阻时通过 `AStarGrid2D` 绕行，攻击仍不能穿墙。子类通过 `has_player_aggro()` 查询状态，通过 `clear_player_aggro()` 在丢失目标时清除仇恨。基类不定义索敌范围，各怪物自行定义感知与追踪距离。“给”只限制刷新位置属于森林、针叶林或热带雨林群系，生成后可以追逐玩家进入其他群系。
+所有怪物应继承 `scripts/monsters/base_monster.gd`，AI 本体在 `scripts/monsters/ai/`：`EnemyBrain` 是通用四状态机（`Patrol` / `Chase` / `Attack` / `Search`），每只怪物各有一份黑板、感知、导航与攻击实现，共享 `EnemyAIConfig` 数据配置、`PerceptionManager` 与 `PathRequestScheduler` 两个自动加载服务以及 `EventBus`。丢失玩家视野超过 `lose_sight_grace` 后，怪物会把 `PatrolAnchor` 改写成自己当时所在的位置，并在原地附近继续巡逻，绝不回到出生点或原巡逻点，所以状态集合里没有 Return / GoHome / Flee。感知复用场景中的 `TargetRayCast`（`RayCast2D`）检测物理墙体，并逐格检查程序化地形的可通行性；寻路复用 `AStarGrid2D`，攻击由各怪物自己的 `EnemyAttack` 实现（“给”是 6~10 格投石、6 格内跳跃近战），投石与跳跃都不能穿墙。子类通过 `has_player_aggro()` 查询是否处于 Chase / Attack，通过 `clear_player_aggro()` 立刻放弃目标并以当前位置为锚点回到巡逻。“给”只限制刷新位置属于森林、针叶林或热带雨林群系，生成后可以追逐玩家进入其他群系。
 
 通用生成器位于 `scripts/monsters/monster_spawner.gd`，生成配置类型位于 `monster_spawn_data.gd`。新增怪物时右键 `scenes/monsters/base_monster.tscn` 创建继承场景，再新建一份 `MonsterSpawnData` 资源并加入 `GameWorld/MonsterSpawner` 的 `spawn_definitions` 数组即可。生成器通过公开的 `monsters: Array[BaseMonster]` 保存存活怪物，怪物死亡时自动移除引用，并在区块卸载或更换世界时遍历释放。`resources/monsters/give_spawn_data.tres` 是“给”的首份配置示例。
 
@@ -231,7 +235,7 @@ python tools/generate_art.py
 1. 在 Godot 文件系统中右键 `scenes/monsters/base_monster.tscn`，选择“新建继承场景”，保存为新的怪物场景。“给”已经按此方式继承。
 2. 修改 `NameLabel.text`、`Health.max_health` 和碰撞形状；在 `Visual` 下隐藏 `Placeholder` 并添加自己的精灵。名字、血条、索敌射线、受击组件、动画节点与信号连接均自动继承。
 3. 在 `AnimationPlayer` 的 Libraries 中为新怪物创建或复制独立动画库，保持 `Idle`、`Move`、`Attack`、`Hurt`、`Death` 这些状态对应的动画名；需要特殊技能时可使用 `Leap`、`Throw`。若要修改状态图，先将 `AnimationTree.tree_root` 设为独立资源，避免修改公共状态图影响其他怪物。
-4. 为根节点绑定 `extends BaseMonster` 的专属脚本，只实现自己的索敌范围、技能和攻击判定；覆盖 `_ready()` 或 `_physics_process(delta)` 时调用对应 `super` 方法。模板已提供生成器初始化、动画推进、寻路动作切换、血条更新与受击/死亡动画连接，无需重复编写。动画库默认使用 `base_animation_library.tres` 的占位动作。
+4. 为根节点绑定 `extends BaseMonster` 的专属脚本，并指定一份 `EnemyAIConfig`（`resources/monsters/give_ai_config.tres` 是示例）：巡逻半径、视野、攻击距离、搜索时长、LOD 等全部走配置，不需要复制 AI 代码；只有新的攻击方式才需要覆写 `_create_attack()` 返回自己的 `EnemyAttack`。覆盖 `_ready()` 或 `_physics_process(delta)` 时调用对应 `super` 方法。模板已提供生成器初始化、动画推进、寻路动作切换、血条更新与受击/死亡动画连接，无需重复编写。动画库默认使用 `base_animation_library.tres` 的占位动作。
 5. 创建 `MonsterSpawnData` 资源，指定新场景和生成群系，再加入生成器的 `spawn_definitions` 数组。
 
 回归测试：
@@ -240,6 +244,7 @@ python tools/generate_art.py
 godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
+godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn
 ```

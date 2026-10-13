@@ -105,15 +105,14 @@ func _run() -> void:
 	_check(physical_monster.global_position.x > 8.0 and physical_monster.global_position.x < 31.0, "cannot_cross_physical_wall")
 
 	var give := _monster(GIVE, Vector2(200, 200), terrain) as GiveMonster
-	give._leap_start = give.global_position
-	give._leap_target = Vector2(1000, 200)
-	give.play_monster_animation(&"Leap", true)
+	var give_attack := give.get_attack() as GiveMonsterAttack
+	give_attack.start_leap(give, Vector2(1000, 200))
 	give.advance_monster_animation(0.21)
 	_hit(give, Vector2(-200, 0))
 	_check(give.monster_animation_state() == &"Hurt" and is_zero_approx(give._visual_height) and _flash(give) == 1.0, "airborne_hit_interrupts_and_flashes")
 	give._physics_process(0.05)
 	give._physics_process(0.25)
-	_check(give.global_position.x < 200.0 and is_zero_approx(give._leap_elapsed), "old_leap_cannot_overwrite_knockback")
+	_check(give.global_position.x < 200.0 and is_zero_approx(give_attack.leap_elapsed()), "old_leap_cannot_overwrite_knockback")
 
 	print("MONSTER_HIT_EFFECTS_RESULT=", passed)
 	get_tree().quit(0 if passed else 1)
