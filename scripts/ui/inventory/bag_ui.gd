@@ -88,6 +88,7 @@ func _input(event: InputEvent) -> void:
 		if Input.is_action_just_pressed("open_inventory"):
 			visible = !visible
 			_input_update()
+			return
 
 		if Input.is_action_just_pressed("alchemy_menu"):
 			visible = false

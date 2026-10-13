@@ -1,11 +1,8 @@
 extends RigidBody2D
 
-class_name IngredientModel
+class_name ItemModel
 ##材料互动脚本
 
 @export var data:ItemData;
-
-func _ready() -> void:
-	add_to_group("ingredients")
 
 

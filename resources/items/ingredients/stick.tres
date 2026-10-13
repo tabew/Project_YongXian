@@ -1,15 +1,15 @@
-[gd_resource type="Resource" script_class="IngredientData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://d3tftbwgj0hti"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="2_attribute"]
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="2_attribute"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_38tcd"]
 [ext_resource type="Resource" path="res://resources/alchemical_attribute/woody.tres" id="3_woody"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/stick.png" id="4_icon"]
+[ext_resource type="Texture2D" uid="uid://dqo4mb8xwwoy7" path="res://assets/items/ingredients/stick.png" id="4_icon"]
 
 [resource]
 script = ExtResource("1_data")
 id = 3
 name = "木棍"
 texture = ExtResource("4_icon")
-max_stack = 999
 alchemical_attribute = Array[ExtResource("2_attribute")]([ExtResource("3_woody")])
-item_scene_path = "res://scenes/items/ingredients/stick.tscn"
+item_scene_path = "uid://2jins0go35b2"

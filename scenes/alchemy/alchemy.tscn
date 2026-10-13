@@ -28,13 +28,23 @@ scale = Vector2(1.36, 1.28)
 [node name="Cauldon" parent="." unique_id=1136608732 instance=ExtResource("1_0gm81")]
 position = Vector2(492, 454)
 
-[node name="Button" type="Button" parent="Cauldon" unique_id=1883543845]
-offset_left = -436.0
-offset_top = -297.0
-offset_right = -226.0
-offset_bottom = -212.0
+[node name="Start" type="Button" parent="Cauldon" unique_id=1883543845]
+offset_left = -428.0
+offset_top = -312.0
+offset_right = -218.0
+offset_bottom = -227.0
+tooltip_text = "开始反应"
 theme_override_font_sizes/font_size = 53
 text = "Start!"
+
+[node name="Finish" type="Button" parent="Cauldon" unique_id=2036524929]
+offset_left = -428.0
+offset_top = -172.0
+offset_right = -218.0
+offset_bottom = -87.0
+tooltip_text = "把锅里反应完的属性装成一瓶药水，放进背包"
+theme_override_font_sizes/font_size = 53
+text = "Finish!"
 
 [node name="AttributesText" parent="Cauldon" unique_id=326303259 instance=ExtResource("2_p2eye")]
 offset_left = -129.0
@@ -71,4 +81,5 @@ offset_right = 1223.0
 offset_bottom = 681.0
 scale = Vector2(1, 1)
 
-[connection signal="button_up" from="Cauldon/Button" to="Cauldon" method="start_transform"]
+[connection signal="button_up" from="Cauldon/Start" to="Cauldon" method="start_transform"]
+[connection signal="button_up" from="Cauldon/Finish" to="Cauldon" method="finish_transform"]

@@ -6,9 +6,6 @@ extends Control
 func _ready() -> void:
 	spawn_pos = get_parent().get_parent().get_node("SpawnedItems")
 
-# ==============================================================================
-# ↓↓↓↓ item_list 注册表重构段：拖拽载荷只带物品id，实例从注册表取 ↓↓↓↓
-# ==============================================================================
 ##从拖拽载荷里取回物品模板实例
 func _get_dragged_item(data: Variant) -> ItemData:
 
@@ -17,7 +14,7 @@ func _get_dragged_item(data: Variant) -> ItemData:
 
 	var item_id:int = int((data as Dictionary).get("item_id", -1))
 
-	#不是物品载荷(没有id/没注册)就直接当没有，别去注册表问不存在的id
+	#不是物品载荷就直接当没有，别去注册表问不存在的id
 	if item_id < 0 or !ItemListGlobal.has_template(item_id):
 		return null
 
@@ -25,12 +22,11 @@ func _get_dragged_item(data: Variant) -> ItemData:
 
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	var ingredient := _get_dragged_item(data) as IngredientData
+	var ingredient := _get_dragged_item(data) as ItemData
 
 	if ingredient == null:
 		return false
 
-	# 只检查资源，鼠标拖动期间不要反复创建无人释放的刚体模型。
 	return ingredient.get_item_scene() != null
 
 
@@ -40,10 +36,7 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	if !(data is Dictionary):
 		return
 
-	var ingredient := _get_dragged_item(data) as IngredientData
-# ==============================================================================
-# ↑↑↑↑ item_list 注册表重构段（结束）↑↑↑↑
-# ==============================================================================
+	var ingredient := _get_dragged_item(data) as ItemData
 
 	if ingredient == null:
 		return

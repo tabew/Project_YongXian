@@ -27,12 +27,12 @@ func get_item_scene() -> PackedScene:
 
 	return load(item_scene_path) as PackedScene
 
-func create_model() -> IngredientModel:
+func create_model() -> ItemModel:
 	var scene:PackedScene = get_item_scene()
 	if !scene:
-		return null
+		return null 
 
-	var model :IngredientModel = scene.instantiate() as IngredientModel
+	var model :ItemModel = scene.instantiate() as ItemModel
 	if !model:
 		return null
 

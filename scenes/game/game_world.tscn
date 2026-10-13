@@ -32,13 +32,13 @@ layer = 2
 
 [node name="HUD" parent="GameHUD" unique_id=330524913 instance=ExtResource("4_hud")]
 
+[node name="BottomBagUi" parent="GameHUD" unique_id=69592941 node_paths=PackedStringArray("player") instance=ExtResource("12_nms8r")]
+mouse_filter = 2
+player = NodePath("../../Player")
+
 [node name="BagUi" parent="GameHUD" unique_id=258613748 node_paths=PackedStringArray("player") instance=ExtResource("7_jmprd")]
 visible = false
 player = NodePath("../../Player")
 
 [node name="Alchemy" parent="GameHUD" unique_id=389668861 instance=ExtResource("8_lsk7w")]
 visible = false
-
-[node name="BottomBagUi" parent="GameHUD" unique_id=69592941 node_paths=PackedStringArray("player") instance=ExtResource("12_nms8r")]
-mouse_filter = 2
-player = NodePath("../../Player")

@@ -2,9 +2,6 @@ extends Node
 
 ##材料注册表
 ##id -> 模板资源。其它脚本要造材料实例时走这里，不要各自 new。
-##结构仿照 alchemical_attribute_list.gd：物品种类一律用 id 判断。
-
-
 
 ##模板清单
 #用资源引用(preload)而不是字符串路径：字符串路径不被导出器跟踪，
@@ -12,24 +9,33 @@ extends Node
 	preload("res://resources/items/ingredients/herb.tres"),
 	preload("res://resources/items/ingredients/testherb.tres"),
 	preload("res://resources/items/ingredients/stone.tres"),
-	preload("res://resources/items/ingredients/stick.tres")
+	preload("res://resources/items/ingredients/stick.tres"),
+
+	#药水模板始终保持在最后一个
+	preload("res://resources/items/potions/potion_model.tres")
 ]
 
 ##id -> 模板
 var table: Dictionary[int, ItemData] = {}
 
+const POTION_ID_STRAT:int = 300
 
 func _ready() -> void:
 	_build_table()
 
 ##是否注册过该id
 func has_template(id: int) -> bool:
+	if id>=POTION_ID_STRAT:
+		return true
 
 	return table.has(id)
 
 
 ##取模板
 func get_template(id: int) -> ItemData:
+
+	if id >=POTION_ID_STRAT:
+		return table[POTION_ID_STRAT]
 
 	if !table.has(id):
 		push_warning("ItemList: 物品id %d 未注册" % id)

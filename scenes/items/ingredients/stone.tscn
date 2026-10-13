@@ -1,20 +1,21 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://dawtgequ585u0"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/material_model.gd" id="1_model"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/stone.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ingredients/material_model.gd" id="1_model"]
+[ext_resource type="Texture2D" uid="uid://bka18jvrf0wa8" path="res://assets/items/ingredients/stone.png" id="2_icon"]
 [ext_resource type="Resource" path="res://resources/items/ingredients/stone.tres" id="3_data"]
 
 [sub_resource type="ConvexPolygonShape2D" id="Shape_stone"]
 points = PackedVector2Array(-6, -1, -3, -6, 2, -6, 6, -2, 6, 3, 2, 5, -5, 4)
 
-[node name="StoneModel" type="RigidBody2D"]
+[node name="StoneModel" type="RigidBody2D" unique_id=1265288621]
 texture_filter = 1
-gravity_scale = 1.0
 script = ExtResource("1_model")
 data = ExtResource("3_data")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1112087291]
+scale = Vector2(3, 3)
 texture = ExtResource("2_icon")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=32701442]
+scale = Vector2(3, 3)
 shape = SubResource("Shape_stone")
