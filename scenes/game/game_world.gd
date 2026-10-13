@@ -96,7 +96,7 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 func build_world(seed_value: int) -> void:
 	_hud_bound = false
 	_clear_map_entities()
-	_generator = MapScorer.build_best(seed_value)
+	_generator = MapScorer.build_best(seed_value, _map_config_for_monsters())
 	GameState.world_seed = _generator.world_seed
 	MapRng.set_shared_master(GameState.world_seed)
 	# 房间类型决定内容池：只有战斗 / Boss 区域刷怪。
@@ -112,6 +112,23 @@ func build_world(seed_value: int) -> void:
 	if debug_map_report:
 		print(MapDebug.report(_generator))
 	EventBus.world_ready.emit(_generator.world_seed)
+
+
+## 从当前怪物定义取群系并集；新增怪物后地图会自动支持其战斗主题。
+func _map_config_for_monsters() -> MapConfig:
+	var result := MapConfig.new()
+	for definition: MonsterSpawnData in monster_spawner.spawn_definitions:
+		if definition == null or definition.monster_scene == null or definition.max_per_chunk <= 0 or definition.chunk_spawn_chance <= 0.0:
+			continue
+		# 空白白名单代表不限群系，地图也无需限制。
+		if definition.allowed_biomes.is_empty():
+			result.combat_biomes.clear()
+			return result
+		for biome: int in definition.allowed_biomes:
+			if not result.combat_biomes.has(biome):
+				result.combat_biomes.append(biome)
+	result.combat_biomes.sort()
+	return result
 
 
 ## 一次同步完成入口落位、相机跳转与可见地图替换，不播放淡入淡出。
@@ -275,7 +292,7 @@ func _refresh_pickup() -> void:
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
-	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or $GameHUD/Alchemy.visible:
+	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or $GameHUD/Alchemy.visible or get_viewport().gui_is_dragging():
 		hud.show_pickup(null)
 		return
 	var entity_root: Node2D = _map_entity_roots.get(_current_node)

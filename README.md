@@ -122,8 +122,11 @@ Project_YongXian/
 
 [地形过渡与材料验收](tools/test_transitions_materials.gd) 已在 Godot 4.6 通过：带截图 7,388 项检查、四个种子共 2,374 个材料点位，包含跨区块邻格、入口色调、确定性生成、实际 E 键拾取、返回不补刷、背包保留及投放区与坩埚反应。连续通路、26 项切图状态与小地图模式回归同时通过。
 
+[协作者功能兼容验收](tools/test_inventory_material_compatibility.gd) 通过 225 项检查：保留原材料与配方，验证快捷栏整堆交换、同类分格、返还背包、真实 GUI 拖拽的 E 键旋转和拾取隔离；四种子两变体的全部战斗/Boss 房均匹配现有怪物池，新增怪物群系自动纳入地图主题，独立采样与正式游戏一致。
+
 ```sh
 godot --headless --path . --script res://tools/test_transitions_materials.gd
+godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
 godot --headless --path . --script res://tools/test_map_integration.gd
@@ -135,7 +138,7 @@ godot --headless --path . --script res://tests/test_weapons.gd
 
 ## 生物群系
 
-保留 14 种群系与 16 种地形数据定义。**每张区域严格只有一个 `MapSpec.biome_id`**：其完整矩形内的所有格子，包括围合边缘、室内和池塘，`sample_biome()` 都返回这一群系。区域主题按世界种子打乱分配，初图固定为森林，并保证至少一个战斗或 Boss 区域为热带雨林，供“给”怪物刷新。下表说明数据定义中的主要地形对应关系；实际区域按主题配置可走地面、阻挡地形和边界。
+保留 14 种群系与 16 种地形数据定义。**每张区域严格只有一个 `MapSpec.biome_id`**：其完整矩形内的所有格子，包括围合边缘、室内和池塘，`sample_biome()` 都返回这一群系。区域主题按世界种子打乱分配，初图固定为森林。正式游戏从现有怪物定义自动取可用群系，所有战斗与 Boss 区域都选择怪物池支持的主题；目前为森林、针叶林或热带雨林，并保留至少一个雨林战斗区域。其他房型保留多样主题，新增怪物配置后自动扩展战斗群系。下表说明数据定义中的主要地形对应关系；实际区域按主题配置可走地面、阻挡地形和边界。
 
 | 群系 | 主要地形 | 群系 | 主要地形 |
 |------|----------|------|----------|

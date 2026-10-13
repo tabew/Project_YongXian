@@ -109,9 +109,10 @@ func spawn_monster(
 	add_child(monster)
 	monster.global_position = WorldGenerator.tile_to_world(tile)
 	monsters.append(monster)
-	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk.get(chunk_coords, [])
 	if not _monsters_by_chunk.has(chunk_coords):
-		_monsters_by_chunk[chunk_coords] = chunk_monsters
+		var created: Array[BaseMonster] = []
+		_monsters_by_chunk[chunk_coords] = created
+	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk[chunk_coords]
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
 

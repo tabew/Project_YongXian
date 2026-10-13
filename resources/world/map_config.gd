@@ -34,6 +34,10 @@ extends Resource
 ## 岔路房间的类型权重（战斗 / 奖励）。
 @export_range(0.0, 1.0, 0.01) var branch_reward_chance: float = 0.45
 
+## 战斗/Boss 箱庭可用的群系；留空时不限制。
+## GameWorld 从现有 MonsterSpawnData 派生，避免区域主题令怪物池全部失效。
+@export var combat_biomes: PackedInt32Array = PackedInt32Array()
+
 ## 硬校验失败时的重生成次数上限。
 @export_range(0, 200, 1) var max_retries: int = 20
 ## 软评分挑选的候选数量。

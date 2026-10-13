@@ -211,12 +211,15 @@ func _assign_region_biomes() -> void:
 		if spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST and rainforest == null:
 			rainforest = spec
 		if kind == RoomType.Kind.COMBAT or kind == RoomType.Kind.BOSS:
+			if not config.combat_biomes.is_empty() and not config.combat_biomes.has(spec.biome_id):
+				spec.biome_id = config.combat_biomes[posmod(spec.node_id - 2, config.combat_biomes.size())]
 			if combat == null:
 				combat = spec
 			if spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST:
 				has_rainforest_combat = true
-	# 现有怪物池有雨林约束，确保主题分配不会让整局失去可用的战斗区域。
-	if not has_rainforest_combat and combat != null:
+	# 允许雨林时保留至少一个雨林战斗区域；其他怪物池不强制加入不支持的群系。
+	var allows_rainforest: bool = config.combat_biomes.is_empty() or config.combat_biomes.has(Biome.Kind.TROPICAL_RAINFOREST)
+	if allows_rainforest and not has_rainforest_combat and combat != null:
 		if rainforest != null:
 			rainforest.biome_id = combat.biome_id
 		combat.biome_id = Biome.Kind.TROPICAL_RAINFOREST
