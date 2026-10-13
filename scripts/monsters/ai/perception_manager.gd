@@ -39,8 +39,12 @@ func request_evaluation(host: BaseMonster) -> bool:
 
 func _process(_delta: float) -> void:
 	while _budget_used < max_evaluations_per_frame and not _queue.is_empty():
-		var host: BaseMonster = _queue.pop_front()
-		if not is_instance_valid(host):
+		# 切图会释放排队中的怪物，先检查 Variant 再赋值为节点类型。
+		var pending: Variant = _queue.pop_front()
+		if not is_instance_valid(pending):
+			continue
+		var host: BaseMonster = pending as BaseMonster
+		if host.is_queued_for_deletion() or not host.is_inside_tree() or not host.can_process():
 			continue
 		_budget_used += 1
 		host.evaluate_perception()

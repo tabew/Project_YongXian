@@ -78,12 +78,13 @@ func _configure_noise() -> void:
 
 	_variation.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_variation.seed = rng.noise_seed(2)
-	_variation.frequency = 0.085
+	# 细节尺度拉大：一个噪声簇占几十格，避免彩色小碎片铺满箱庭。
+	_variation.frequency = 0.007
 	_variation.fractal_octaves = 1
 
 	_groves.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_groves.seed = rng.noise_seed(3)
-	_groves.frequency = 0.045
+	_groves.frequency = 0.009
 	_groves.fractal_octaves = 2
 	_ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_ridges.seed = rng.noise_seed(4)
@@ -91,7 +92,7 @@ func _configure_noise() -> void:
 	_ridges.fractal_octaves = 2
 	_edges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_edges.seed = rng.noise_seed(5)
-	_edges.frequency = 0.060
+	_edges.frequency = 0.018
 	_edges.fractal_octaves = 2
 
 
@@ -158,6 +159,7 @@ func _build_layout() -> void:
 			width = maxi(width, spec.extent.x)
 		floor_widths.append(width)
 
+	_assign_region_biomes()
 	var cursor_x: int = 0
 	var main_y: int = 0
 	for floor_index: int in run.floors.size():
@@ -195,6 +197,31 @@ func _build_layout() -> void:
 
 	for spec: MapSpec in _specs:
 		_index_bounds(_map_bins, Rect2(Vector2(spec.origin), Vector2(spec.extent)), spec)
+
+
+## 群系是区域属性，树林、河岸和屋内都保留该箱庭的主题身份。
+func _assign_region_biomes() -> void:
+	var themes: PackedInt32Array = RegionBiomes.sequence(world_seed, variant)
+	var rainforest: MapSpec = null
+	var combat: MapSpec = null
+	var has_rainforest_combat: bool = false
+	for spec: MapSpec in _specs:
+		var kind: int = run.type_of(spec.node_id)
+		spec.biome_id = Biome.Kind.FOREST if kind == RoomType.Kind.START else themes[posmod(spec.node_id - 2, themes.size())]
+		if spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST and rainforest == null:
+			rainforest = spec
+		if kind == RoomType.Kind.COMBAT or kind == RoomType.Kind.BOSS:
+			if combat == null:
+				combat = spec
+			if spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST:
+				has_rainforest_combat = true
+	# 现有怪物池有雨林约束，确保主题分配不会让整局失去可用的战斗区域。
+	if not has_rainforest_combat and combat != null:
+		if rainforest != null:
+			rainforest.biome_id = combat.biome_id
+		combat.biome_id = Biome.Kind.TROPICAL_RAINFOREST
+	for spec: MapSpec in _specs:
+		spec.boundary_kind = RegionBiomes.boundary_for(spec.biome_id)
 
 
 func _index_bounds(bins: Dictionary, bounds: Rect2, item: Variant) -> void:
@@ -407,90 +434,61 @@ func _classify(tile_x: int, tile_y: int) -> void:
 		_last_terrain = Terrain.Kind.MOUNTAIN
 		_last_biome = Biome.Kind.MOUNTAIN
 		return
+	_last_biome = spec.biome_id
+	var local: Vector2i = tile - spec.origin
+	# 木墙和家具先于道路判定，保证小屋只有门洞能进出。
+	if spec.cottage != null:
+		var cottage_terrain: int = spec.cottage.terrain_at(local)
+		if cottage_terrain >= 0:
+			_last_terrain = cottage_terrain
+			return
 	var world_point := Vector2(float(tile_x) + 0.5, float(tile_y) + 0.5)
 	var point: Vector2 = world_point - Vector2(spec.origin)
 	var road_distance: float = _road_distance(point, spec)
 	var edge_noise: float = _edges.get_noise_2d(float(tile_x), float(tile_y))
-	var room_depth: float = spec.clearance(point) + edge_noise * 4.0
+	var room_depth: float = spec.clearance(point) + edge_noise * 1.5
 	var passage_depth: float = spec.pass_half_width - road_distance
 	var open_depth: float = maxf(room_depth, passage_depth)
-	var ridge: float = _ridges.get_noise_2d(float(tile_x), float(tile_y))
 	var grove: float = _groves.get_noise_2d(float(tile_x), float(tile_y))
 	var variation: float = (_variation.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5
 
 	# 箱庭外仍是连贯的陆地；山壁和密林构成边界，出口开在自然山口。
 	if open_depth <= 0.0:
-		var boundary: int = spec.boundary_kind if spec != null else Terrain.Kind.MOUNTAIN
-		if spec == null and grove > -0.10 and ridge < 0.18:
-			boundary = Terrain.Kind.FOREST
-		_last_terrain = boundary
-		_last_biome = Biome.Kind.MOUNTAIN if boundary == Terrain.Kind.MOUNTAIN else (Biome.Kind.TAIGA if boundary == Terrain.Kind.TAIGA else Biome.Kind.FOREST)
+		_last_terrain = spec.boundary_kind
 		return
 
-	var climate_spec: MapSpec = spec
-	var bias: Vector2 = spec.climate_bias
-	var temperature: float = clampf(_sharpen((_temperature.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5, CLIMATE_CONTRAST) + bias.x, 0.0, 1.0)
-	var humidity: float = clampf(_sharpen((_humidity.get_noise_2d(float(tile_x), float(tile_y)) + 1.0) * 0.5, CLIMATE_CONTRAST) + bias.y, 0.0, 1.0)
-	# 地面起伏来自山脊，不再把每片区域的中心变成圆锥雪峰。
-	var altitude: float = maxf(0.0, ridge) * 0.85
-	temperature = clampf(temperature - altitude * ALTITUDE_COOLING, 0.0, 1.0)
-	_last_biome = _pick_biome(altitude, temperature, humidity)
-	_last_terrain = _open_land_terrain(_last_biome, variation, temperature, grove)
+	_last_terrain = RegionBiomes.terrain_for(spec.biome_id, variation, grove)
 
 	var nearest_road: float = road_distance
 	if nearest_road < MapSpec.ROAD_HALF_WIDTH:
 		_last_route = Route.Kind.DIRT
-		if climate_spec != null and climate_spec.shape == 4:
+		if spec.shape == 4 and spec.cottage == null:
 			_last_route = Route.Kind.STONE
 	# 道路旁留出空地，区域内也能离开道路探索，而非只能沿一条细线走。
 	if nearest_road < 7.0 and not Terrain.is_walkable(_last_terrain):
 		_last_terrain = _ground_cover(_last_biome)
 	if open_depth < WALL_FOOT_WIDTH and not Terrain.is_water(_last_terrain):
-		_last_terrain = Terrain.Kind.STONE if ridge > 0.0 else _ground_cover(_last_biome)
+		_last_terrain = _ground_cover(_last_biome)
 
 	# 水域是局部河流 / 池塘，控制在箱庭内部；道路遇水生成桥。
 	if spec != null and room_depth > 5.0 and point.distance_to(spec.center) > 10.0:
 		var water: float = spec.water_depth(point)
 		if water > 0.0:
 			_last_terrain = Terrain.Kind.WATER
-			_last_biome = Biome.Kind.OCEAN
 			if _last_route != Route.Kind.NONE:
 				_last_route = Route.Kind.BRIDGE
 		elif water > -WATER_BANK_WIDTH and nearest_road >= 7.0:
-			_last_terrain = Terrain.Kind.SAND
-	if spec != null:
-		var local: Vector2i = tile - spec.origin
-		_check_gate(local.x, local.y, spec)
+			_last_terrain = Terrain.Kind.SAND if spec.biome_id == Biome.Kind.DESERT else _ground_cover(spec.biome_id)
+	_check_gate(local.x, local.y, spec)
 
 
 func _ground_cover(biome: int) -> int:
-	match biome:
-		Biome.Kind.DESERT:
-			return Terrain.Kind.DESERT
-		Biome.Kind.SAVANNA:
-			return Terrain.Kind.SAVANNA
-		Biome.Kind.TUNDRA:
-			return Terrain.Kind.TUNDRA
-		Biome.Kind.SNOWY_PLAINS, Biome.Kind.TAIGA, Biome.Kind.ALPINE:
-			return Terrain.Kind.SNOW
-		Biome.Kind.MOUNTAIN:
-			return Terrain.Kind.STONE
-	return Terrain.Kind.GRASS
+	return RegionBiomes.ground_for(biome)
 
 
-func _open_land_terrain(biome: int, variation: float, temperature: float, grove: float) -> int:
-	var terrain: int = _pick_terrain(biome, variation, temperature)
-	# 树林成片分布，林地群系仍保留大量可探索的草地与空地。
-	if terrain == Terrain.Kind.FOREST or terrain == Terrain.Kind.TAIGA or terrain == Terrain.Kind.RAINFOREST:
-		return terrain if grove > 0.14 else _ground_cover(biome)
-	if terrain == Terrain.Kind.MOUNTAIN or terrain == Terrain.Kind.SNOW_PEAK:
-		return terrain if grove > 0.24 else _ground_cover(biome)
-	# 沼泽使用湿地，不通过零散噪声把大面积陆地变成水面。
-	if Terrain.is_water(terrain):
-		return Terrain.Kind.SWAMP
-	if terrain == Terrain.Kind.ICE:
-		return Terrain.Kind.SNOW
-	return terrain
+func _open_land_terrain(biome: int, variation: float, _temperature_value: float, grove: float) -> int:
+	# 保留旧查询签名，地形规则与新单群系路径一致。
+	return RegionBiomes.terrain_for(biome, variation, grove)
 
 
 ## 兼容的边缘路口标记；完整双向切换由 gate_links 提供每个入口的目标。

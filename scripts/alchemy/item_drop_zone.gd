@@ -30,7 +30,8 @@ func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if ingredient == null:
 		return false
 
-	return ingredient.create_model() != null
+	# 只检查资源，鼠标拖动期间不要反复创建无人释放的刚体模型。
+	return ingredient.get_item_scene() != null
 
 
 ##放下材料

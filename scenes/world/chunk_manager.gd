@@ -91,6 +91,7 @@ func _exit_tree() -> void:
 ## 重建世界：旧任务结束前不能替换种子或生成器，也不能清空生成器池。
 func setup(generator: WorldGenerator, focus: Node2D) -> void:
 	_wait_for_tasks()
+	TerrainTransitions.install(tile_set)
 	_epoch += 1
 	_free_all_layers()
 	_cache.clear()
@@ -575,6 +576,7 @@ func _paint_chunk(data: ChunkData, map_id: int = -1) -> void:
 		data.coords.y * WorldGenerator.CHUNK_SIZE * WorldGenerator.TILE_SIZE
 	)
 
+	var samples: PackedByteArray = TerrainTransitions.halo(_generator, data, spec)
 	var index: int = 0
 	for local_y: int in WorldGenerator.CHUNK_SIZE:
 		for local_x: int in WorldGenerator.CHUNK_SIZE:
@@ -583,7 +585,12 @@ func _paint_chunk(data: ChunkData, map_id: int = -1) -> void:
 				index += 1
 				continue
 			var road: int = data.route[index]
-			if road == Route.Kind.NONE:
+			var edge: Vector2i = TerrainTransitions.edge_at(samples, cell)
+			if edge == TerrainTransitions.NO_BLEND:
+				edge = TerrainTransitions.gate_at(_generator, spec, tile_origin + cell, TerrainTransitions.display_kind(data.terrain[index], road))
+			if edge != TerrainTransitions.NO_BLEND:
+				layer.set_cell(cell, TerrainTransitions.SOURCE_ID, edge)
+			elif road == Route.Kind.NONE:
 				layer.set_cell(
 					cell,
 					TERRAIN_SOURCE_ID,

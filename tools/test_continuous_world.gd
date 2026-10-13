@@ -187,7 +187,12 @@ func _check_path(generator: WorldGenerator, a: Vector2, b: Vector2, phase: float
 		var tile := Vector2i(point.floor())
 		_path_samples += 1
 		_check(generator.is_walkable(tile), "道路断口 seed=%d tile=%s" % [generator.world_seed, tile])
-		_check(generator.sample_route(tile) != Route.Kind.NONE, "路面断口 seed=%d tile=%s" % [generator.world_seed, tile])
+		var spec: MapSpec = generator.sample_map(tile)
+		var indoor: bool = spec != null and spec.cottage != null and spec.cottage.bounds.has_point(tile - spec.origin)
+		if indoor:
+			_check(generator.sample_terrain(tile) == Terrain.Kind.STONE and generator.sample_route(tile) == Route.Kind.NONE, "屋内通路应保持木地板 seed=%d tile=%s" % [generator.world_seed, tile])
+		else:
+			_check(generator.sample_route(tile) != Route.Kind.NONE, "路面断口 seed=%d tile=%s" % [generator.world_seed, tile])
 
 
 func _map_chunks(spec: MapSpec) -> Array[Vector2i]:

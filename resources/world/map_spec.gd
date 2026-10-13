@@ -37,6 +37,9 @@ var chamber_corners: PackedFloat32Array = PackedFloat32Array()
 var side_centers: PackedVector2Array = PackedVector2Array()
 var pass_half_width: float = 20.0
 var boundary_kind: int = Terrain.Kind.FOREST
+## 整个世界使用的群系由布局构建方赋值；起始屋使用独立碰撞覆盖。
+var biome_id: int = Biome.Kind.FOREST
+var cottage: CottageLayout = null
 ## 生成这张区域时选中的模板 id。
 var template_id: StringName = &""
 ## 池塘每四个浮点数记录本地 x、y、半轴 rx、ry。
@@ -81,9 +84,14 @@ static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_
 	spec.pass_half_width = rng.randf_range(16.0, 26.0)
 	var boundary_kinds: PackedInt32Array = template.boundary_kinds if not template.boundary_kinds.is_empty() else PackedInt32Array([Terrain.Kind.FOREST, Terrain.Kind.TAIGA, Terrain.Kind.MOUNTAIN])
 	spec.boundary_kind = boundary_kinds[rng.randi_range(0, boundary_kinds.size() - 1)]
-	spec._build_chambers(rng)
-	# 主庭中心始终在轮廓内；不依赖矩形区域中点是否落在凹口。
-	spec.center = spec.chambers[0].get_center()
+	if room_kind == RoomType.Kind.START:
+		spec._build_start_chambers()
+		spec.cottage = CottageLayout.create(world_seed, map_node_id, variant, spec.chambers[0])
+		spec.center = Vector2(spec.cottage.spawn_tile)
+	else:
+		spec._build_chambers(rng)
+		# 主庭中心始终在轮廓内；不依赖矩形区域中点是否落在凹口。
+		spec.center = spec.chambers[0].get_center()
 	for index: int in range(1, spec.chambers.size()):
 		spec.side_centers.append(spec.chambers[index].get_center())
 	if has_west_gate:
@@ -94,8 +102,18 @@ static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_
 		spec.east_gates.append(clampi(int(gate_y), GATE_HALF_HEIGHT + 1, height - GATE_HALF_HEIGHT - 2))
 	for index: int in 32:
 		spec.road_phases.append(rng.randf())
-	spec._build_water(rng)
+	if spec.cottage == null:
+		spec._build_water(rng)
 	return spec
+
+
+func _build_start_chambers() -> void:
+	# 大主庭与东侧上下两庭连续重叠，屋外支路不会跨过西侧屋墙。
+	var dimensions := Vector2(extent)
+	var rooms: Array[Rect2] = [Rect2(0.08, 0.12, 0.80, 0.76), Rect2(0.65, 0.07, 0.27, 0.38), Rect2(0.65, 0.55, 0.27, 0.38)]
+	for room: Rect2 in rooms:
+		chambers.append(Rect2(room.position * dimensions, room.size * dimensions))
+		chamber_corners.append(8.0)
 
 
 func _build_chambers(rng: RandomNumberGenerator) -> void:
@@ -171,7 +189,7 @@ func contains_local(local_x: int, local_y: int) -> bool:
 
 
 func shape_name() -> String:
-	return SHAPE_NAMES[shape]
+	return "起始小屋" if cottage != null else SHAPE_NAMES[shape]
 
 
 ## 圆角矩形的 signed clearance 联合：内部正值、边界零、外部负值。
@@ -209,6 +227,25 @@ func water_depth(point: Vector2) -> float:
 ## 连接所有门、主庭与侧庭；侧庭互连和主庭支路组成可返回的回路。
 func build_roads() -> PackedFloat32Array:
 	var data := PackedFloat32Array()
+	if cottage != null:
+		var porch := Vector2(cottage.porch_tile) + Vector2.ONE * 0.5
+		_append(data, Vector2(cottage.spawn_tile) + Vector2.ONE * 0.5, porch, -1.0)
+		for gate_y: int in west_gates:
+			# START 通常无西门；兼容调用通过屋外北侧折线绕到平台。
+			var detour_y: float = float(cottage.bounds.position.y - 5) + 0.5
+			var west := Vector2(0.5, float(gate_y) + 0.5)
+			var north_west := Vector2(west.x, detour_y)
+			var north_east := Vector2(porch.x, detour_y)
+			_append(data, west, north_west, -1.0)
+			_append(data, north_west, north_east, -1.0)
+			_append(data, north_east, porch, -1.0)
+		for gate_y: int in east_gates:
+			_append(data, porch, Vector2(float(extent.x) - 0.5, float(gate_y) + 0.5), -1.0)
+		for side_center: Vector2 in side_centers:
+			_append(data, porch, side_center, -1.0)
+		for side_index: int in range(1, side_centers.size()):
+			_append(data, side_centers[side_index - 1], side_centers[side_index], -1.0)
+		return data
 	var index: int = 0
 	for gate_y: int in west_gates:
 		_append(data, Vector2(0.5, float(gate_y) + 0.5), center, _road_phase(index))
@@ -238,6 +275,8 @@ static func node_seed(world_seed: int, map_node_id: int) -> int:
 
 
 static func road_offset(t: float, phase: float) -> float:
+	if phase < 0.0:
+		return 0.0
 	return ROAD_WOBBLE * sin((t * ROAD_WOBBLE_WAVES + phase) * TAU) * sin(t * PI)
 
 

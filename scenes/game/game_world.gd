@@ -15,6 +15,7 @@ const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.
 @onready var hud: Control = $GameHUD/HUD
 @onready var camera: Camera2D = $Player/Camera2D
 
+var _cottage_view: CottageView = null
 var _training_dummy: TrainingDummy
 var _training_dummy_map: int = -1
 var _generator: WorldGenerator = null
@@ -24,6 +25,10 @@ var _hud_bound: bool = false
 var _monster_map: int = -1
 ## 怪物已释放到地上的道具按地图保存，离图暂停，回图继续。
 var _map_entity_roots: Dictionary = {}
+## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
+var _material_maps: Dictionary = {}
+var _nearby_pickup: GroundPickup = null
+const PICKUP_RADIUS: float = 36.0
 
 
 func _ready() -> void:
@@ -40,6 +45,7 @@ func _process(_delta: float) -> void:
 		return
 	_sync_training_dummy()
 	_confine_map_monsters()
+	_refresh_pickup()
 	if player.health <= 0:
 		return
 	var spec: MapSpec = player.active_map
@@ -64,6 +70,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		regenerate_world()
 	elif event.is_action_pressed("kill_all_monsters"):
 		kill_all_monsters()
+	elif event.is_action_pressed("pickup_item") and not event.is_echo():
+		_refresh_pickup()
+		if is_instance_valid(_nearby_pickup):
+			var material_name: String = _nearby_pickup.data.name
+			var quantity: int = _nearby_pickup.amount
+			if _nearby_pickup.collect(player):
+				EventBus.notification.emit("获得 %s ×%d" % [material_name, quantity])
+			_refresh_pickup()
+		get_viewport().set_input_as_handled()
 
 
 ## 隐藏调试指令：只调用怪物死亡接口，不操作道具或其他世界实体。
@@ -105,9 +120,18 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
+	if _cottage_view == null:
+		_cottage_view = CottageView.new()
+		_cottage_view.name = "CottageView"
+		add_child(_cottage_view)
+		# 地形之上、角色之下，避免木地板遮住出生玩家。
+		move_child(_cottage_view, chunk_manager.get_index() + 1)
+	_cottage_view.bind(spec)
 	player.spawn_on(_generator, _generator.entry_position(map_node_id, side, gate_y), spec, reset_health)
 	_limit_camera(spec)
 	chunk_manager.load_map(map_node_id)
+	_setup_ground_materials(spec)
+	_refresh_pickup()
 	if _hud_bound:
 		_sync_training_dummy()
 		_setup_map_monsters()
@@ -207,11 +231,16 @@ func _map_entity_root(map_node_id: int) -> Node2D:
 		var root := Node2D.new()
 		root.name = "MapEntities_%d" % map_node_id
 		add_child(root)
+		move_child(root, player.get_index())
 		_map_entity_roots[map_node_id] = root
 	return _map_entity_roots[map_node_id]
 
 
 func _clear_map_entities() -> void:
+	if is_instance_valid(_nearby_pickup):
+		_nearby_pickup.set_highlighted(false)
+	_nearby_pickup = null
+	_material_maps.clear()
 	for root: Node2D in _map_entity_roots.values():
 		remove_child(root)
 		root.queue_free()
@@ -221,6 +250,57 @@ func _clear_map_entities() -> void:
 			monster_spawner.remove_child(child)
 			child.queue_free()
 	_monster_map = -1
+
+
+func _setup_ground_materials(spec: MapSpec) -> void:
+	var entity_root: Node2D = _map_entity_root(spec.node_id)
+	if not _material_maps.has(spec.node_id):
+		for entry: Dictionary in GroundMaterials.plan(_generator, spec):
+			var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
+			if data == null:
+				continue
+			var pickup := GroundPickup.new()
+			pickup.name = "Material_%d_%d" % [entry["tile"].x, entry["tile"].y]
+			pickup.bind(data, int(entry["amount"]))
+			pickup.position = WorldGenerator.tile_to_world(entry["tile"])
+			entity_root.add_child(pickup)
+		_material_maps[spec.node_id] = true
+	for id: int in _map_entity_roots:
+		var map_root: Node2D = _map_entity_roots[id]
+		map_root.visible = id == _current_node
+		map_root.process_mode = Node.PROCESS_MODE_INHERIT if id == _current_node else Node.PROCESS_MODE_DISABLED
+
+
+func _refresh_pickup() -> void:
+	if is_instance_valid(_nearby_pickup):
+		_nearby_pickup.set_highlighted(false)
+	_nearby_pickup = null
+	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or $GameHUD/Alchemy.visible:
+		hud.show_pickup(null)
+		return
+	var entity_root: Node2D = _map_entity_roots.get(_current_node)
+	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
+	if entity_root != null:
+		for child: Node in entity_root.get_children():
+			if not child is GroundPickup or child.is_queued_for_deletion():
+				continue
+			var pickup := child as GroundPickup
+			var distance: float = player.global_position.distance_squared_to(pickup.global_position)
+			if distance < closest and _can_reach_pickup(pickup.global_position):
+				closest = distance
+				_nearby_pickup = pickup
+	if is_instance_valid(_nearby_pickup):
+		_nearby_pickup.set_highlighted(true)
+	hud.show_pickup(_nearby_pickup)
+
+
+func _can_reach_pickup(target: Vector2) -> bool:
+	var steps: int = maxi(1, ceili(player.global_position.distance_to(target) / 4.0))
+	for step: int in range(1, steps + 1):
+		var tile: Vector2i = WorldGenerator.world_to_tile(player.global_position.lerp(target, float(step) / steps))
+		if not _generator.is_walkable(tile):
+			return false
+	return true
 
 
 func _on_monster_chunk_applied(_coords: Vector2i) -> void:

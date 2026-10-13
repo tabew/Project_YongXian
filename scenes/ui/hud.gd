@@ -17,10 +17,26 @@ var _world: ChunkManager = null
 var _player: Node2D = null
 var _refresh_timer: float = 0.0
 var _toast_tween: Tween = null
+var _pickup_label: Label = null
 
 
 func _ready() -> void:
-	hint_label.text = "WASD / 方向键 移动　·　走到出口立即切换箱庭　·　M 展开地图　·　R 换个世界　·　F3 性能面板"
+	hint_label.text = "WASD 移动　·　E 拾取　·　左键 攻击　·　Q 换武器　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
+	_pickup_label = Label.new()
+	_pickup_label.name = "PickupHint"
+	_pickup_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pickup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pickup_label.add_theme_color_override("font_color", Color("f3dbab"))
+	_pickup_label.add_theme_color_override("font_shadow_color", Color("29251c"))
+	_pickup_label.add_theme_constant_override("shadow_offset_x", 2)
+	_pickup_label.add_theme_constant_override("shadow_offset_y", 2)
+	add_child(_pickup_label)
+	_pickup_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_pickup_label.offset_left = -200
+	_pickup_label.offset_right = 200
+	_pickup_label.offset_top = -128
+	_pickup_label.offset_bottom = -100
+	_pickup_label.visible = false
 	toast_label.modulate.a = 0.0
 	EventBus.notification.connect(_on_notification)
 	EventBus.world_ready.connect(_on_world_ready)
@@ -40,6 +56,14 @@ func bind_world(manager: ChunkManager, player: Node2D) -> void:
 		_on_weapon_changed(controller.equipped_weapon)
 	minimap.bind(manager, player)
 	_refresh_timer = 0.0
+
+
+func show_pickup(pickup: GroundPickup) -> void:
+	if _pickup_label == null:
+		return
+	_pickup_label.visible = pickup != null
+	if pickup != null:
+		_pickup_label.text = "E · 拾取 %s ×%d" % [pickup.data.name, pickup.amount]
 
 
 func _on_weapon_changed(weapon: WeaponDefinition) -> void:
@@ -86,8 +110,13 @@ func _refresh() -> void:
 		var character := _player as PlayerCharacter
 		lines.append("生命 %d/%d" % [character.health, character.max_health])
 	lines.append("坐标 %d, %d　区块 %d, %d" % [tile.x, tile.y, chunk.x, chunk.y])
+	var terrain_name: String = Terrain.name_of(_world.get_terrain_at(position))
+	if spec != null and spec.cottage != null:
+		var cottage_label: String = spec.cottage.label_at(tile - spec.origin)
+		if not cottage_label.is_empty():
+			terrain_name = cottage_label
 	lines.append("地形 %s　群系 %s" % [
-		Terrain.name_of(_world.get_terrain_at(position)),
+		terrain_name,
 		Biome.name_of(_world.get_biome_at(position)),
 	])
 

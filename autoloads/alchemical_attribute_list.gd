@@ -8,6 +8,9 @@ enum ATTRIBUTE
     HEAL = 0,
 	HOLY = 1,
 	CONTINUOUS_HEAL = 2,
+	MINERAL = 3,
+	WOODY = 4,
+	BINDING = 5,
 }
 
 
@@ -17,7 +20,10 @@ enum ATTRIBUTE
 @export var templates: Array[AlchemicalData] = [
 	preload("res://resources/alchemical_attribute/heal.tres"),
 	preload("res://resources/alchemical_attribute/holy.tres"),
-	preload("res://resources/alchemical_attribute/continuous_heal.tres")
+	preload("res://resources/alchemical_attribute/continuous_heal.tres"),
+	preload("res://resources/alchemical_attribute/mineral.tres"),
+	preload("res://resources/alchemical_attribute/woody.tres"),
+	preload("res://resources/alchemical_attribute/binding.tres")
 ]
 
 ##id -> 模板

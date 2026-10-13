@@ -10,7 +10,9 @@ extends Node
 #用资源引用(preload)而不是字符串路径：字符串路径不被导出器跟踪，
 @export var templates: Array[ItemData] = [
 	preload("res://resources/items/ingredients/herb.tres"),
-	preload("res://resources/items/ingredients/testherb.tres")
+	preload("res://resources/items/ingredients/testherb.tres"),
+	preload("res://resources/items/ingredients/stone.tres"),
+	preload("res://resources/items/ingredients/stick.tres")
 ]
 
 ##id -> 模板
