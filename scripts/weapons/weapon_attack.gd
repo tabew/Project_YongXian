@@ -76,7 +76,7 @@ func _try_hit(hurtbox: CombatHurtbox) -> void:
 	var hit: CombatHit = CombatHit.new()
 	hit.source = wielder
 	hit.weapon_id = definition.id
-	hit.critical = randf() < definition.critical_chance
+	hit.critical = MapRng.shared(MapRng.Stream.COMBAT).randf() < definition.critical_chance
 	hit.damage = definition.damage * (definition.critical_multiplier if hit.critical else 1.0)
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()

@@ -37,6 +37,8 @@ var chamber_corners: PackedFloat32Array = PackedFloat32Array()
 var side_centers: PackedVector2Array = PackedVector2Array()
 var pass_half_width: float = 20.0
 var boundary_kind: int = Terrain.Kind.FOREST
+## 生成这张区域时选中的模板 id。
+var template_id: StringName = &""
 ## 池塘每四个浮点数记录本地 x、y、半轴 rx、ry。
 var ponds: PackedFloat32Array = PackedFloat32Array()
 var river_width: float = 0.0
@@ -45,23 +47,29 @@ var river_phase: float = 0.0
 var river_amplitude: float = 0.0
 
 
-static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_gate_count: int) -> MapSpec:
+static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_gate_count: int, room_kind: int = RoomType.Kind.COMBAT, variant: int = 0) -> MapSpec:
 	var spec := MapSpec.new()
 	spec.node_id = map_node_id
-	var rng := RandomNumberGenerator.new()
-	rng.seed = node_seed(world_seed, map_node_id)
+	var rng: RandomNumberGenerator = MapRng.node_rng(world_seed, map_node_id)
 	spec.shape = posmod(world_seed + map_node_id, SHAPE_NAMES.size())
-	# 所有尺寸都从可调上下限派生，宽高分别抽样。
-	var width: int = rng.randi_range(MIN_SIZE, MAX_SIZE)
-	var height: int = rng.randi_range(MIN_SIZE, MAX_SIZE)
+	# 按房间类型与门朝向挑选区域模板；挑模板用独立随机源，不影响主序列。
+	var doors: int = (RegionTemplate.DOOR_WEST if has_west_gate else 0) | (RegionTemplate.DOOR_EAST if east_gate_count > 0 else 0)
+	var pick_rng: RandomNumberGenerator = MapRng.new(world_seed).rng(MapRng.Stream.ROOM, 2 + map_node_id + variant * 97)
+	var template: RegionTemplate = RegionTemplates.pick(room_kind, doors, spec.shape, pick_rng)
+	spec.template_id = template.id
+	# 所有尺寸都从模板的上下限派生，宽高分别抽样。
+	var low: int = template.min_extent
+	var high: int = template.max_extent
+	var width: int = rng.randi_range(low, high)
+	var height: int = rng.randi_range(low, high)
 	if spec.shape == 0 or spec.shape == 3:
-		width = rng.randi_range(int(lerpf(MIN_SIZE, MAX_SIZE, 0.65)), MAX_SIZE)
-		height = rng.randi_range(MIN_SIZE, int(lerpf(MIN_SIZE, MAX_SIZE, 0.65)))
+		width = rng.randi_range(int(lerpf(low, high, 0.65)), high)
+		height = rng.randi_range(low, int(lerpf(low, high, 0.65)))
 	elif spec.shape == 1:
-		width = rng.randi_range(MIN_SIZE, int(lerpf(MIN_SIZE, MAX_SIZE, 0.45)))
-		height = rng.randi_range(int(lerpf(MIN_SIZE, MAX_SIZE, 0.65)), MAX_SIZE)
-	if width == height and MAX_SIZE > MIN_SIZE:
-		height = height + 1 if height < MAX_SIZE else height - 1
+		width = rng.randi_range(low, int(lerpf(low, high, 0.45)))
+		height = rng.randi_range(int(lerpf(low, high, 0.65)), high)
+	if width == height and high > low:
+		height = height + 1 if height < high else height - 1
 	spec.extent = Vector2i(width, height)
 	spec.size = maxi(width, height)
 	spec.axes = Vector2(spec.extent) * 0.4
@@ -71,7 +79,7 @@ static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_
 	spec.phase_a = rng.randf_range(0.0, TAU)
 	spec.phase_b = rng.randf_range(0.0, TAU)
 	spec.pass_half_width = rng.randf_range(16.0, 26.0)
-	var boundary_kinds: PackedInt32Array = [Terrain.Kind.FOREST, Terrain.Kind.TAIGA, Terrain.Kind.MOUNTAIN]
+	var boundary_kinds: PackedInt32Array = template.boundary_kinds if not template.boundary_kinds.is_empty() else PackedInt32Array([Terrain.Kind.FOREST, Terrain.Kind.TAIGA, Terrain.Kind.MOUNTAIN])
 	spec.boundary_kind = boundary_kinds[rng.randi_range(0, boundary_kinds.size() - 1)]
 	spec._build_chambers(rng)
 	# 主庭中心始终在轮廓内；不依赖矩形区域中点是否落在凹口。
@@ -226,9 +234,7 @@ func _append(data: PackedFloat32Array, a: Vector2, b: Vector2, phase: float) -> 
 
 
 static func node_seed(world_seed: int, map_node_id: int) -> int:
-	var value: int = world_seed * 6364136223846793005 + 1442695040888963407
-	value = (value ^ (map_node_id * 73856093)) * 6364136223846793005
-	return value ^ (value >> 29)
+	return MapRng.node_seed(world_seed, map_node_id)
 
 
 static func road_offset(t: float, phase: float) -> float:

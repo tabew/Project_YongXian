@@ -137,7 +137,7 @@ func _sync_generator() -> bool:
 		_source_generator = generator
 		_seed = generator.world_seed
 		# 不共享管理器的可变分类缓冲，也不把采样结果记为已探索。
-		_sampler = WorldGenerator.new(_seed)
+		_sampler = WorldGenerator.new(_seed, generator.config, generator.variant)
 		_specs = generator.map_specs().duplicate()
 	return true
 

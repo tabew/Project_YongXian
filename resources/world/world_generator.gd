@@ -23,7 +23,13 @@ const WALL_FOOT_WIDTH: float = 3.0
 const WATER_BANK_WIDTH: float = 1.4
 
 var world_seed: int = 0
-var run: RunGraph = null
+## 同一主种子下的布局变体；不改变世界身份，只改变房间图与模板的抽样。
+var variant: int = 0
+var run: RoomGraph = null
+## 骨架参数；留空用默认值。
+var config: MapConfig = null
+## 本世界的统一随机源；所有地图随机都从这里派生。
+var rng: MapRng = null
 
 var _temperature := FastNoiseLite.new()
 var _humidity := FastNoiseLite.new()
@@ -49,47 +55,48 @@ var _last_map: MapSpec = null
 var _last_gate: int = -1
 
 
-func _init(seed_value: int = 0) -> void:
+func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0) -> void:
 	world_seed = seed_value if seed_value != 0 else random_seed()
-	run = RunGraph.create()
+	config = map_config if map_config != null else MapConfig.new()
+	variant = variant_index
+	rng = MapRng.new(world_seed)
+	run = RoomGraph.plan(world_seed, config, variant)
 	_build_layout()
 	_configure_noise()
 
 
 func _configure_noise() -> void:
 	_temperature.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_temperature.seed = world_seed + 8191
+	_temperature.seed = rng.noise_seed(0)
 	_temperature.frequency = 0.0035
 	_temperature.fractal_octaves = 2
 
 	_humidity.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_humidity.seed = world_seed + 15731
+	_humidity.seed = rng.noise_seed(1)
 	_humidity.frequency = 0.0042
 	_humidity.fractal_octaves = 2
 
 	_variation.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_variation.seed = world_seed + 32749
+	_variation.seed = rng.noise_seed(2)
 	_variation.frequency = 0.085
 	_variation.fractal_octaves = 1
 
 	_groves.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_groves.seed = world_seed + 65537
+	_groves.seed = rng.noise_seed(3)
 	_groves.frequency = 0.045
 	_groves.fractal_octaves = 2
 	_ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_ridges.seed = world_seed + 104729
+	_ridges.seed = rng.noise_seed(4)
 	_ridges.frequency = 0.013
 	_ridges.fractal_octaves = 2
 	_edges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_edges.seed = world_seed + 130363
+	_edges.seed = rng.noise_seed(5)
 	_edges.frequency = 0.060
 	_edges.fractal_octaves = 2
 
 
 static func random_seed() -> int:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	return rng.randi_range(1, 2147483646)
+	return MapRng.random_seed()
 
 
 # ------------------------------------------------------------ 坐标换算
@@ -133,12 +140,11 @@ func connections() -> Array[Dictionary]:
 func _build_layout() -> void:
 	var used_extents: Dictionary = {}
 	var floor_widths: PackedInt32Array = PackedInt32Array()
-	var layout_rng := RandomNumberGenerator.new()
-	layout_rng.seed = MapSpec.node_seed(world_seed, 7919)
+	var layout_rng: RandomNumberGenerator = rng.layout_rng()
 	for floor_ids: PackedInt32Array in run.floors:
 		var width: int = 0
 		for id: int in floor_ids:
-			var spec: MapSpec = MapSpec.create(world_seed, id, run.has_entrance(id), run.exit_count(id))
+			var spec: MapSpec = MapSpec.create(world_seed, id, run.has_entrance(id), run.exit_count(id), run.type_of(id), variant)
 			while used_extents.has(spec.extent):
 				# 只扩展包围范围；主庭中心和已经生成的庭室保持一致。
 				spec.extent.x += 1

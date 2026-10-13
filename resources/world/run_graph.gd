@@ -30,17 +30,37 @@ static func variant_of(map_node_id: int) -> int:
 
 static func create() -> RunGraph:
 	var graph := RunGraph.new()
+	graph.build_topology(FLOOR_COUNT, default_branch_floors(FLOOR_COUNT))
+	return graph
 
-	for floor_index: int in FLOOR_COUNT:
+
+## 默认岔路层：首尾层不开岔路，与旧实现一致。
+static func default_branch_floors(floor_count: int) -> Array[int]:
+	var result: Array[int] = []
+	for floor_index: int in range(1, maxi(floor_count - 1, 1)):
+		result.append(floor_index)
+	return result
+
+
+## 按配置重建拓扑：每层一个主干，branch_floors 里的层再挂一个岔路。
+## 主干可以走主路或拐进同层岔路，岔路汇回下一层主干，所以每条岔路都构成一个环。
+func build_topology(floor_count: int, branch_floors: Array[int]) -> void:
+	floors.clear()
+	next_nodes.clear()
+	var branch_set: Dictionary = {}
+	for floor_index: int in branch_floors:
+		branch_set[floor_index] = true
+
+	for floor_index: int in floor_count:
 		var ids := PackedInt32Array()
 		ids.append(node_id(floor_index, MAIN_VARIANT))
-		if floor_index > 0 and floor_index < FLOOR_COUNT - 1:
+		if branch_set.has(floor_index):
 			ids.append(node_id(floor_index, BRANCH_VARIANT))
-		graph.floors.append(ids)
+		floors.append(ids)
 
-	for floor_index: int in FLOOR_COUNT - 1:
-		var upcoming: PackedInt32Array = graph.floors[floor_index + 1]
-		for current: int in graph.floors[floor_index]:
+	for floor_index: int in maxi(floor_count - 1, 0):
+		var upcoming: PackedInt32Array = floors[floor_index + 1]
+		for current: int in floors[floor_index]:
 			var targets := PackedInt32Array()
 			if variant_of(current) == MAIN_VARIANT:
 				# 主干：既可以直接往前走，也可以拐进下一层的岔路
@@ -49,9 +69,7 @@ static func create() -> RunGraph:
 			else:
 				# 岔路：只汇回下一层的主干
 				targets.append(upcoming[0])
-			graph.next_nodes[current] = targets
-
-	return graph
+			next_nodes[current] = targets
 
 
 ## 这个节点有几条向前的出口（决定地图右侧开几个路口）。
@@ -70,7 +88,7 @@ func start_node() -> int:
 
 
 func final_node() -> int:
-	return node_id(FLOOR_COUNT - 1, MAIN_VARIANT)
+	return node_id(floors.size() - 1, MAIN_VARIANT)
 
 
 ## 某个出口通向哪个节点。

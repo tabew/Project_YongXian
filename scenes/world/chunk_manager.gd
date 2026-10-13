@@ -46,6 +46,9 @@ var version: int = 0
 
 var _generator: WorldGenerator = null
 var _world_seed: int = 0
+## 工作线程必须沿用主生成器的布局变体与配置，否则会生成另一张地图。
+var _variant: int = 0
+var _config: MapConfig = null
 var _epoch: int = 0
 var _spec: MapSpec = null
 var _focus_chunk: Vector2i = Vector2i.ZERO
@@ -97,6 +100,8 @@ func setup(generator: WorldGenerator, focus: Node2D) -> void:
 	_generator_mutex.unlock()
 	_generator = generator
 	_world_seed = generator.world_seed
+	_variant = generator.variant
+	_config = generator.config
 	focus_node = focus
 	_spec = null
 	_focus_chunk = Vector2i.ZERO
@@ -533,7 +538,7 @@ func _acquire_generator() -> WorldGenerator:
 
 	if worker != null:
 		return worker
-	return WorldGenerator.new(_world_seed)
+	return WorldGenerator.new(_world_seed, _config, _variant)
 
 
 func _release_generator(worker: WorldGenerator) -> void:

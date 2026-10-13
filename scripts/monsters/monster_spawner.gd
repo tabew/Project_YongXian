@@ -10,6 +10,9 @@ extends Node2D
 ## 当前仍有效的全部怪物；怪物退出场景树时自动移除引用。
 var monsters: Array[BaseMonster] = []
 
+## 内容层：房间类型决定内容池。为空时保持旧的按群系刷新行为。
+var content: MapContent = null
+
 var _generator: WorldGenerator = null
 var _chunk_manager: ChunkManager = null
 var _player: PlayerCharacter = null
@@ -65,13 +68,9 @@ func _spawn_definition_in_chunk(
 ) -> void:
 	if definition == null or definition.monster_scene == null:
 		return
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash([
-		_generator.world_seed,
-		coords.x,
-		coords.y,
-		definition.monster_id,
-	])
+	var rng: RandomNumberGenerator = MapRng.enemy_chunk_rng(
+		_generator.world_seed, coords, definition.monster_id
+	)
 	if rng.randf() > definition.chunk_spawn_chance:
 		return
 
@@ -85,6 +84,8 @@ func _spawn_definition_in_chunk(
 			rng.randi_range(0, WorldGenerator.CHUNK_SIZE - 1)
 		)
 		if occupied.has(tile) or not definition.can_spawn_at(_generator, tile):
+			continue
+		if not allows_spawn_at(tile):
 			continue
 		var monster: BaseMonster = spawn_monster(definition, tile, coords)
 		if monster == null:
@@ -116,6 +117,17 @@ func spawn_monster(
 
 	monster.configure(_player, _generator, chunk_coords)
 	return monster
+
+
+## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。
+## 未接入内容层时一律允许，行为与改造前一致。
+func allows_spawn_at(tile: Vector2i) -> bool:
+	if content == null or _generator == null:
+		return true
+	var spec: MapSpec = _generator.sample_map(tile)
+	if spec == null:
+		return false
+	return content.budget_of(spec.node_id, MapContent.ENEMY) > 0
 
 
 func clear_monsters() -> void:

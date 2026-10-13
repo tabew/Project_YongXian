@@ -6,6 +6,8 @@ extends Node2D
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
 @export var spawn_training_dummy: bool = true
+## 打开后每次生成世界都会打印完整地图报告（调试用）。
+@export var debug_map_report: bool = false
 
 @onready var chunk_manager: ChunkManager = $ChunkManager
 @onready var monster_spawner: MonsterSpawner = $MonsterSpawner
@@ -79,8 +81,11 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 func build_world(seed_value: int) -> void:
 	_hud_bound = false
 	_clear_map_entities()
-	_generator = WorldGenerator.new(seed_value)
+	_generator = MapScorer.build_best(seed_value)
 	GameState.world_seed = _generator.world_seed
+	MapRng.set_shared_master(GameState.world_seed)
+	# 房间类型决定内容池：只有战斗 / Boss 区域刷怪。
+	monster_spawner.content = MapContent.build(_generator)
 	chunk_manager.setup(_generator, player)
 	_enter_map(_generator.run.start_node(), 0, -1, true)
 	_place_training_dummy(_generator, WorldGenerator.world_to_tile(player.global_position))
@@ -89,6 +94,8 @@ func build_world(seed_value: int) -> void:
 	hud.bind_world(chunk_manager, player)
 	_hud_bound = true
 	_sync_minimap()
+	if debug_map_report:
+		print(MapDebug.report(_generator))
 	EventBus.world_ready.emit(_generator.world_seed)
 
 
