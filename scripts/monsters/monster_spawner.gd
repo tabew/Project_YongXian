@@ -17,6 +17,8 @@ var _generator: WorldGenerator = null
 var _chunk_manager: ChunkManager = null
 var _player: PlayerCharacter = null
 var _monsters_by_chunk: Dictionary = {}
+## 本局死亡记录按原始生成位置保存，巡逻/追击后的位置不影响身份。
+var _defeated_spawn_ids: Dictionary = {}
 
 
 func setup(
@@ -24,6 +26,9 @@ func setup(
 	chunk_manager: ChunkManager,
 	player: PlayerCharacter
 ) -> void:
+	# 同一生成器代表同一局；切换箱庭保留记录，新开世界（包括相同种子）重置。
+	if generator != _generator:
+		_defeated_spawn_ids.clear()
 	clear_monsters()
 	_generator = generator
 	_player = player
@@ -87,6 +92,11 @@ func _spawn_definition_in_chunk(
 			continue
 		if not allows_spawn_at(tile):
 			continue
+		if _defeated_spawn_ids.has(_spawn_id(definition, tile)):
+			# 死怪仍占用原来的生成名额，不能继续掷随机数补刷一只替代怪物。
+			occupied[tile] = true
+			spawned += 1
+			continue
 		var monster: BaseMonster = spawn_monster(definition, tile, coords)
 		if monster == null:
 			continue
@@ -100,6 +110,9 @@ func spawn_monster(
 	chunk_coords: Vector2i = WorldGenerator.tile_to_chunk(tile)
 ) -> BaseMonster:
 	if definition == null or definition.monster_scene == null:
+		return null
+	var spawn_id: String = _spawn_id(definition, tile)
+	if _defeated_spawn_ids.has(spawn_id):
 		return null
 	var monster := definition.monster_scene.instantiate() as BaseMonster
 	if monster == null:
@@ -115,9 +128,19 @@ func spawn_monster(
 	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk[chunk_coords]
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
+	monster.killed.connect(_on_monster_killed.bind(spawn_id), CONNECT_ONE_SHOT)
 
 	monster.configure(_player, _generator, chunk_coords)
 	return monster
+
+
+## 使用原始生成格和怪物类型，不使用会随着移动改变的当前位置。
+func _spawn_id(definition: MonsterSpawnData, tile: Vector2i) -> String:
+	return "%s:%d:%d" % [definition.monster_id, tile.x, tile.y]
+
+
+func _on_monster_killed(spawn_id: String) -> void:
+	_defeated_spawn_ids[spawn_id] = true
 
 
 ## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。

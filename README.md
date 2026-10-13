@@ -225,7 +225,7 @@ python tools/generate_art.py
 
 完整怪物架构、生成配置与扩展说明见 [docs/monsters.md](docs/monsters.md)。
 
-箱庭切换沿用原 `RainforestMonsterSpawner`，按当前地图已加载区块刷新怪物，并裁剪共享边界的刷新范围；隐藏预加载邻图不会刷新可见怪物。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
+箱庭切换使用通用 `MonsterSpawner`，按当前地图已加载区块生成怪物，并裁剪共享边界的生成范围；隐藏预加载邻图不会刷新可见怪物。本局击杀按怪物类型与原始生成格记录，返回旧箱庭或重载区块时不会复活，也不会补刷替代怪物；只有新开世界才清空记录。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
 
 “给”只会随已加载区块生成在森林、针叶林、热带雨林群系的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
 
@@ -237,7 +237,7 @@ python tools/generate_art.py
 
 当前地图尚无正式石子，上传版本不生成临时石子，因此“给”在远程范围内找不到石子时会停止本次攻击。地图团队接入正式石子时，应继续使用同一套 `IngredientData` / `IngredientModel`，加入 `throwable_stones` 组并实现 `throw_at(target, damage)` 方法；怪物代码不依赖具体石子类型。
 
-“给”的动作由场景内 `AnimationPlayer` 和 `AnimationTree` 管理，状态包括 `Idle`、`Move`、`Leap`、`Throw`、`Hurt`、`Death`。在编辑器打开 `scenes/monsters/give_monster.tscn`，选中 `AnimationTree` 可查看状态图，选中 `AnimationPlayer` 可编辑占位动作轨道。动画库为 `resources/monsters/give_animation_library.tres`，状态图为 `resources/monsters/monster_animation_state_machine.tres`；脚本通过通用模板的 `play_monster_animation()` 切换状态。投石和受击完成后自动返回待机，跳跃高度由动画轨道驱动，落点位移与伤害仍由物理逻辑处理。死亡状态会立即进入，但当前击杀仍直接清理节点，不等待死亡动画播完。
+“给”的动作由场景内 `AnimationPlayer` 和 `AnimationTree` 管理，状态包括 `Idle`、`Move`、`Leap`、`Throw`、`Hurt`、`Death`。在编辑器打开 `scenes/monsters/give_monster.tscn`，选中 `AnimationTree` 可查看状态图，选中 `AnimationPlayer` 可编辑占位动作轨道。动画库为 `resources/monsters/give_animation_library.tres`，状态图为 `resources/monsters/monster_animation_state_machine.tres`；脚本通过通用模板的 `play_monster_animation()` 切换状态。投石和受击完成后自动返回待机，跳跃高度由动画轨道驱动，落点位移与伤害仍由物理逻辑处理。状态图只保留12条转换，以 `Idle` 为中心连接移动与动作；受击和死亡由脚本直接打断。`Death` 没有任何出边，脚本禁止从死亡切回其他状态。死亡状态会立即进入，当前击杀仍直接清理节点，不等待死亡动画播完。
 
 通用模板默认提供受击击退和全身闪红。击退强度按加算叠加：`武器击退强度 + 模板基础击退速度`，方向沿用 `CombatHit.knockback` 的方向，不使用强度乘算。例如武器180、模板40，最终强度为220像素/秒；没有武器击退向量时按攻击来源位置确定方向，仅使用模板基础强度。模板基础速度默认40像素/秒，击退持续0.10秒并逐渐减速，基础位移约2像素；强度180的武器叠加后位移约11像素。`Hurt` 动作在0.10秒内快速左右抖动，初始幅度4像素，再逐渐归零，强化短促冲击感。全身鲜红闪烁持续0.06秒。连续受击会重置反馈时间，材质参数在每只怪物之间独立。击退通过身体碰撞与地形检查阻挡，不会穿过墙体；受击会打断跳跃，进入 `Hurt` 并归零视觉高度。可在根节点“受击反馈”分组调整参数。
 
@@ -257,6 +257,7 @@ python tools/generate_art.py
 godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
+godot --headless --path . res://tests/test_monster_persistence.tscn
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn

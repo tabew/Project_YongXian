@@ -74,7 +74,9 @@ BaseMonster (CharacterBody2D)
 5. 生成成功时把怪物加入 spawner 子节点、`monsters` 存活数组和 `_monsters_by_chunk` 字典，并调用 `monster.configure(player, generator, chunk_coords)`。
 6. `tree_exited` 一次性连接会从存活数组与区块字典移除怪物；死亡或外部清理后不会留下失效引用。
 
-当前 `GameWorld` 会让整张地图长期加载，所以切图时直接调用 `setup()` 替换当前地图怪物，并关闭 `MonsterSpawner._process()` 里的距离回收逻辑。生成器自带按 `unload_radius + despawn_margin_chunks` 回收怪物的设计，仍可用于未来的动态世界或独立测试。
+当前 `GameWorld` 会让整张地图长期加载，所以切图时调用 `setup()` 替换当前地图的存活怪物，并关闭 `MonsterSpawner._process()` 里的距离回收逻辑。生成器自带按 `unload_radius + despawn_margin_chunks` 回收怪物的设计，仍可用于未来的动态世界或独立测试。
+
+本局击杀记录保存在 `MonsterSpawner._defeated_spawn_ids`，身份为 `monster_id + 原始生成格坐标`，巡逻或追击后的位置不会改变身份。`BaseMonster.kill()` 只在真正死亡时发出一次 `killed`；正常伤害死亡和 K 调试击杀都会记录，切图清理、距离回收、隐藏邻图裁剪则不会记录。重放区块的确定性生成序列时，死怪仍占用原有名额，所以返回旧箱庭既不会复活，也不会在另一个位置补刷替代怪物；未击杀的生成名额仍正常出现。连续调用 `setup()` 且使用同一生成器时保留记录，`build_world()` 创建新生成器时清空，包括使用相同种子重开一局。记录目前仅在本局内存中保存。
 
 地图切换时，非怪物掉落物会保存到所属地图的 `MapEntities_<map_id>` 根节点；离开当前箱庭后隐藏并暂停，返回后恢复。每帧 `GameWorld._confine_map_monsters()` 会把怪物位置限制在当前地图矩形内，已加载的隐藏邻图也不会留下跨图怪物。
 
@@ -151,7 +153,24 @@ BaseMonster (CharacterBody2D)
 
 ## 动画
 
-状态图包含 `Idle`、`Move`、`Attack`、`Leap`、`Throw`、`Hurt`、`Death`，起始状态进入 `Idle`。`Idle` 和 `Move` 循环；`Attack`、`Throw`、`Hurt` 播放结束后自动回到 `Idle`；`Leap` 由“给”在逻辑落地后切回 `Idle`。
+状态图包含 `Idle`、`Move`、`Attack`、`Leap`、`Throw`、`Hurt`、`Death`，仅保留12条转换：`Start → Idle`；`Idle ↔ Move/Attack/Leap/Throw`；`Idle → Hurt → Idle`；`Idle → Death`。`Death` 没有出边，脚本也拒绝从它切回其他状态。`Idle` 和 `Move` 循环；`Attack`、`Throw`、`Hurt` 播放结束后自动回到 `Idle`；`Leap` 由“给”在逻辑落地后切回 `Idle`。
+
+```mermaid
+flowchart LR
+    Start --> Idle
+    Idle <--> Move
+    Idle --> Attack
+    Attack -->|播放结束| Idle
+    Idle --> Leap
+    Leap -->|落地| Idle
+    Idle --> Throw
+    Throw -->|播放结束| Idle
+    Idle --> Hurt
+    Hurt -->|播放结束| Idle
+    Idle --> Death
+```
+
+`play_monster_animation()` 对存在直连的普通状态使用 `travel()`；受击、死亡、重启动作或没有直连的目标使用 `start()` 立即切换，避免经由 `Idle` 间接应用其他动画轨道。受击和死亡因此可以打断任意存活动作，无需在图上再增加交叉连线。
 
 占位动画只用三个根节点属性驱动外观：
 
@@ -159,7 +178,7 @@ BaseMonster (CharacterBody2D)
 - `_visual_height`：跳跃高度，用于把整个 `Visual` 抬离落点。
 - `visual_tint`：受击颜色乘算，播放后恢复白色。
 
-所有动画都在 `AnimationTree` 上切换，由 `BaseMonster.advance_monster_animation()` 手动推进，确保物理帧、AI 和动画处于同一节奏。修改占位动画或使用 `--hurt-only` 批量替换受击动画时，可运行 `tools/build_monster_animations.gd` 重新生成或更新动画资源。
+所有动画都在 `AnimationTree` 上切换，由 `BaseMonster.advance_monster_animation()` 手动推进，确保物理帧、AI 和动画处于同一节奏。`tools/build_monster_animations.gd` 可完整生成默认资源，使用 `--hurt-only` 仅替换受击动画，使用 `--state-machine-only` 仅更新精简状态图并保留原UID，不覆盖怪物已经编辑的动画库。
 
 ## 添加新怪物
 
@@ -180,6 +199,7 @@ BaseMonster (CharacterBody2D)
 godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
+godot --headless --path . res://tests/test_monster_persistence.tscn
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn

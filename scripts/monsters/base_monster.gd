@@ -1,6 +1,11 @@
 class_name BaseMonster
 extends CharacterBody2D
 
+## 只在真正死亡（含调试击杀）时发出；地图卸载不算击杀。
+signal killed
+
+var _death_committed: bool = false
+
 ## 所有怪物共用的模板：生命、受击、动画、感知/寻路原语，以及通用四状态 AI 的装配。
 ##
 ## AI 本体（状态机、配置、黑板、攻击接口）都在 scripts/monsters/ai/ 下，所有怪物共享同一套
@@ -356,12 +361,24 @@ func _on_monster_died(_hit: CombatHit) -> void:
 func play_monster_animation(state: StringName, restart: bool = false) -> void:
 	if animation_playback == null:
 		return
-	if restart:
-		animation_playback.start(state)
-	elif animation_playback.get_current_node() != state:
-		animation_playback.travel(state)
-	else:
+	var current: StringName = animation_playback.get_current_node()
+	# Death 是终点，脚本也不能通过 start/restart 把死亡怪物切回存活动作。
+	if state != &"Death" and (_death_committed or current == &"Death"):
 		return
+	if current == state and not restart:
+		return
+	var machine := animation_tree.tree_root as AnimationNodeStateMachine
+	var has_direct_transition: bool = false
+	if machine != null:
+		for index: int in machine.get_transition_count():
+			if machine.get_transition_from(index) == current and machine.get_transition_to(index) == state:
+				has_direct_transition = true
+				break
+	# 受击/死亡立即打断；缺少直连的动作也直接切换，避免 travel 绕经 Idle。
+	if restart or state in [&"Hurt", &"Death"] or not has_direct_transition:
+		animation_playback.start(state)
+	else:
+		animation_playback.travel(state)
 	animation_tree.advance(0.0)
 	# travel 首次求值处理状态切换，第二次应用新状态的初始轨道。
 	animation_tree.advance(0.0)
@@ -436,9 +453,11 @@ func _update_health_bar(current: float, maximum: float) -> void:
 
 ## 调试全灭与正常死亡共用；先释放怪物携带的道具，避免随父节点一起删除。
 func kill() -> void:
-	if is_queued_for_deletion():
+	if _death_committed or is_queued_for_deletion():
 		return
+	_death_committed = true
 	play_monster_animation(&"Death", true)
+	killed.emit()
 	var world_parent: Node = get_parent()
 	if world_parent != null:
 		for child: Node in get_children():
