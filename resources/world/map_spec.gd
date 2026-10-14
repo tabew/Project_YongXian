@@ -184,6 +184,25 @@ func _build_water(rng: RandomNumberGenerator) -> void:
 		river_y = center.y + direction * rng.randf_range(26.0, 32.0)
 
 
+## 沼泽主题至少有一处可游荡池塘，避免合法战斗箱庭完全没有鳄鱼栖地。
+func ensure_swamp_water() -> void:
+	if biome_id != Biome.Kind.SWAMP or cottage != null:
+		return
+	var best := Vector2.ZERO
+	var best_clearance: float = -INF
+	for y: int in range(16, extent.y - 16, 4):
+		for x: int in range(16, extent.x - 16, 4):
+			var point := Vector2(x + 0.5, y + 0.5)
+			if point.distance_to(center) < 24.0:
+				continue
+			var depth: float = clearance(point)
+			if depth > best_clearance:
+				best = point
+				best_clearance = depth
+	if best_clearance > 14.0:
+		ponds.append_array(PackedFloat32Array([best.x, best.y, 7.0, 7.0]))
+
+
 func contains_local(local_x: int, local_y: int) -> bool:
 	return local_x >= 0 and local_x < extent.x and local_y >= 0 and local_y < extent.y
 

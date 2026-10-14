@@ -3,7 +3,7 @@ extends RefCounted
 
 ## 仅规划点位；实例化、E 键交互与各地图拾取状态由 GameWorld 管理。
 const STONE_ID: int = 2
-const STICK_ID: int = 3
+const STICK_ID: int = 1
 const GRID_SIZE: int = 16
 const MIN_SPACING: int = 6
 const MIN_COUNT: int = 20

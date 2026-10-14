@@ -10,3 +10,4 @@ monster_scene = ExtResource("2_monster")
 allowed_biomes = Array[int]([4, 5, 6, 7])
 max_per_chunk = 2
 candidate_attempts = 32
+gate_encounter_count = 2

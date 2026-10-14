@@ -260,9 +260,16 @@ python tools/generate_art.py
 4. 为根节点绑定 `extends BaseMonster` 的专属脚本，并指定一份 `EnemyAIConfig`（`resources/monsters/give_ai_config.tres` 是示例）：巡逻半径、视野、攻击距离、搜索时长、LOD 等全部走配置，不需要复制 AI 代码；只有新的攻击方式才需要覆写 `_create_attack()` 返回自己的 `EnemyAttack`。覆盖 `_ready()` 或 `_physics_process(delta)` 时调用对应 `super` 方法。模板已提供生成器初始化、动画推进、寻路动作切换、血条更新与受击/死亡动画连接，无需重复编写。动画库默认使用 `base_animation_library.tres` 的占位动作。
 5. 创建 `MonsterSpawnData` 资源，指定新场景和生成群系，再加入生成器的 `spawn_definitions` 数组。
 
+“史”使用 `scenes/monsters/shi_monster.tscn` 继承怪物模板，并通过独立原始名额在沼泽战斗箱庭生成紧凑群体（10%区块生成概率，每群最多6只）。群体锚点与局部物品/同类索引复用缓存，避免全图数百只史同步扫描和重绘。单体低跳两次后停1秒；巡逻经过材料时吞入原物品节点，腹内物品按本局原始生成身份保存，卸载和返回不丢失；死亡在尸体位置释放相同数据和数量，可继续 E 拾取。三只组合为“团团史”，共享总生命、慢速旋转追击，每个成员转到面向玩家一侧发一次0.5伤害粘液弹，实际碰撞接触造成3伤害（持续重叠最多每秒一次）。合团保留三只死亡记录，死亡分别结算80%凝液、20%粘性球的二选一掉落；材料ID9/10，不加入自然材料池。独有机制全部在史专用脚本，专用 AnimationTree 包含 Idle/Hop/Rest/Form/Spin/Shoot/Hurt/Death，Death 无出边。玩家生命和HUD支持0.5的小数损伤。
+
+鳄鱼“饿”使用 `crocodile_monster.tscn` 继承模板，100生命，沼泽原始名额90%水中、10%水边5格内陆地。10格视野，水中巡逻、上岸追击，陆地速度为水中60%；1.5格内咬击造成2伤害，0.18秒前摇、0.4秒动作、1秒冷却。专用 AnimationTree 连接 Idle/Swim/Walk/Attack/Hurt/Death，水中摆尾与四足爬行动作分别驱动，身体和受击胶囊同外观一起转向。死亡单次三选一：鳄鱼眼睛10%、鳄鱼壳60%、锋利牙齿30%；返图不补刷。
+
 回归测试：
 
 ```
+godot --headless --path . --script res://tools/test_crocodile.gd
+godot --headless --path . --script res://tools/test_shi_monster.gd
+godot --headless --path . --script res://tools/test_swamp_performance.gd
 godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn

@@ -1,0 +1,35 @@
+[gd_resource type="AnimationNodeStateMachine" load_steps=11 format=3]
+[sub_resource type="AnimationNodeAnimation" id="Idle"]
+animation = &"Idle"
+[sub_resource type="AnimationNodeAnimation" id="Swim"]
+animation = &"Swim"
+[sub_resource type="AnimationNodeAnimation" id="Walk"]
+animation = &"Walk"
+[sub_resource type="AnimationNodeAnimation" id="Attack"]
+animation = &"Attack"
+[sub_resource type="AnimationNodeAnimation" id="Hurt"]
+animation = &"Hurt"
+[sub_resource type="AnimationNodeAnimation" id="Death"]
+animation = &"Death"
+[sub_resource type="AnimationNodeStateMachineTransition" id="Travel"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="Start"]
+advance_mode = 2
+[sub_resource type="AnimationNodeStateMachineTransition" id="Auto"]
+advance_mode = 2
+switch_mode = 2
+[sub_resource type="AnimationNodeStateMachineTransition" id="Terminal"]
+[resource]
+states/Start/position = Vector2(40,160)
+states/Idle/node = SubResource("Idle")
+states/Idle/position = Vector2(240,160)
+states/Swim/node = SubResource("Swim")
+states/Swim/position = Vector2(440,0)
+states/Walk/node = SubResource("Walk")
+states/Walk/position = Vector2(440,160)
+states/Attack/node = SubResource("Attack")
+states/Attack/position = Vector2(640,160)
+states/Hurt/node = SubResource("Hurt")
+states/Hurt/position = Vector2(440,320)
+states/Death/node = SubResource("Death")
+states/Death/position = Vector2(240,320)
+transitions = ["Start", "Idle", SubResource("Start"), "Idle", "Swim", SubResource("Travel"), "Swim", "Idle", SubResource("Travel"), "Idle", "Walk", SubResource("Travel"), "Walk", "Idle", SubResource("Travel"), "Swim", "Walk", SubResource("Travel"), "Walk", "Swim", SubResource("Travel"), "Idle", "Attack", SubResource("Travel"), "Swim", "Attack", SubResource("Travel"), "Walk", "Attack", SubResource("Travel"), "Attack", "Idle", SubResource("Auto"), "Idle", "Hurt", SubResource("Travel"), "Swim", "Hurt", SubResource("Travel"), "Walk", "Hurt", SubResource("Travel"), "Attack", "Hurt", SubResource("Travel"), "Hurt", "Idle", SubResource("Auto"), "Idle", "Death", SubResource("Terminal"), "Swim", "Death", SubResource("Terminal"), "Walk", "Death", SubResource("Terminal"), "Attack", "Death", SubResource("Terminal"), "Hurt", "Death", SubResource("Terminal")]

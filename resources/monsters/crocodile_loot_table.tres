@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="MonsterLootTable" load_steps=5 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/monster_loot_table.gd" id="1_table"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/crocodile_eye.tres" id="2_eye"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/crocodile_shell.tres" id="3_shell"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/sharp_tooth.tres" id="4_tooth"]
+[resource]
+script = ExtResource("1_table")
+items = Array[Resource]([ExtResource("2_eye"), ExtResource("3_shell"), ExtResource("4_tooth")])
+weights = PackedFloat32Array(10, 60, 30)

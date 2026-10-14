@@ -78,6 +78,8 @@ BaseMonster (CharacterBody2D)
 
 本局击杀记录保存在 `MonsterSpawner._defeated_spawn_ids`，身份为 `monster_id + 原始生成格坐标`，巡逻或追击后的位置不会改变身份。`BaseMonster.kill()` 只在真正死亡时发出一次 `killed`；正常伤害死亡和 K 调试击杀都会记录，切图清理、距离回收、隐藏邻图裁剪则不会记录。重放区块的确定性生成序列时，死怪仍占用原有名额，所以返回旧箱庭既不会复活，也不会在另一个位置补刷替代怪物；未击杀的生成名额仍正常出现。连续调用 `setup()` 且使用同一生成器时保留记录，`build_world()` 创建新生成器时清空，包括使用相同种子重开一局。记录目前仅在本局内存中保存。
 
+正式战斗箱庭可通过 `gate_encounter_count` 配置稳定入口遭遇：“给”为2只，“史”为3只，鳄鱼仍按水域栖地规则。锚点取真实弯曲道路的入口落位点，向地图内侧偏移10格，再在同一区块内挑可通行格。该区块使用入口组替代随机内部分布，仍受 `max_per_chunk` 上限约束，死亡格占用原名额；入口组不依赖内部区块的稀疏生成概率，非战斗预算0时不启用。用户种子1741004498的第六层沼泽原来26只均远离入口，最近约79格，入口画面0只；修正后两侧入口均有3只史，战斗雨林两侧有“给”。
+
 正式箱庭在生成前通过 `active_map` 剔除邻图候选格，避免两个区域共享一个区块时，邻图先占满 `max_per_chunk` 名额再被地图裁剪，导致当前入口无怪。未传此参数的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
 
 地图切换时，非怪物掉落物会保存到所属地图的 `MapEntities_<map_id>` 根节点；离开当前箱庭后隐藏并暂停，返回后恢复。每帧 `GameWorld._confine_map_monsters()` 会把怪物位置限制在当前地图矩形内，已加载的隐藏邻图也不会留下跨图怪物。
@@ -139,6 +141,26 @@ BaseMonster (CharacterBody2D)
 
 投石接口不依赖具体石子类型。正式地面石头使用 `IngredientData` / `GroundPickup`，仅 ID 2 的可用石头进入 `throwable_stones` 组并实现 `throw_at(target, damage)`；炼金界面的 `MaterialModel` 不参与地图投石。出手时固定瞄准位置，以320像素/秒飞行并绘制弧线；用扫掠圆检测目标、物理射线和逐格 supercover 检查阻挡，命中扣1点生命，移动目标可以躲开。飞行时立即移出弹药组并禁止 E 拾取，落地后恢复原材料与弹药资格，不复制或消耗材料；堆叠只分出一个石头。离开箱庭时飞行随物品根节点暂停，返回继续，空闲地面物品不执行物理轮询。
 
+## 沼泽鳄鱼“饿”
+
+`crocodile_monster.tscn` 继承怪物模板，100生命，通过 `CrocodileSpawnData` 的独立原始名额接入统一生成器。仅沼泽：每个名额90%选择水中、10%选择水边5格内可通行地面；找不到对应栖地不改刷另一种，桥上不生成。巡逻以水域为目标，在水中巡逻不抄陆地近路，岸上个体会返回水中；10格全向视野，水中追击速度160像素/秒，陆地为60%，巡逻在此基础上乘45%。失去玩家后沿用模板在最后看到玩家附近继续巡逻。
+
+专用 `crocodile_animation_state_machine.tres` 接入 AnimationTree：Idle、Swim、Walk、Attack、Hurt、Death。水陆转换实际切换 Swim/Walk，动画相位驱动水中摆尾和陆地四足交替爬行，咬击驱动张嘴、合嘴，受击中断攻击，Death 没有出边。身体胶囊为7像素半径、36像素长，受击胶囊为9像素半径、40像素长，二者与外形统一随朝向旋转，避免竖向鳄鱼仍使用横向碰撞箱。静止外形只在水陆状态或动画属性改变时重绘。
+
+1.5格内且无遮挡时咬击，前摇0.18秒、总长0.4秒、冷却1秒、一次造成2伤害，玩家移开可躲避，受击可打断。死亡一次按通用表三选一：鳄鱼眼睛10%（ID6）、鳄鱼壳60%（ID7）、锋利牙齿30%（ID8），提供图标和背包/炼金材料模型。沿用地图物品保存、E拾取与本局原始生成格死亡记录，返回不会补刷。
+
+## 沼泽怪物“史”与“团团史”
+
+`shi_monster.tscn` 继承通用模板；`ShiSpawnData` 通过现有生成器的独立原始名额创建沼泽紧凑群，区块群体生成概率10%，命中时最多6只，死亡名额不补刷。锚点按生成器、地图和区块缓存，各独立名额复用同一锚点；`ShiProximityCache` 同一物理帧每类只扫描一次分组并以64像素空间桶检索吞物与合团对象，单体外形只在形态变化时重绘，跳跃仍走动画变换。未指定的单体生命暂定60，移动速度48像素/秒。单体移动采用0.22秒低跳（5像素高），连续落地两次后停满1秒；攻击前至少找齐1至4格内无遮挡的两个同类，单只继续弹跳追击。
+
+吞物只由 `ShiMonster` 在 Patrol 状态处理：经过10像素内可用地面道具就把原 `GroundPickup` 移入隐藏且暂停的腹内容器，保留原数据、数量和节点身份。腹内容器位于对应地图实体根下，按生成器和原始生成格匹配，地图卸载不算死亡、不产生掉落，返图新建史重新接回同一容器。吞入物占用期间不可被 E 收取或用作投石弹药，死亡才在史当前死亡位置原样释放，恢复拾取和弹药资格。
+
+三只史合团时保留各自生成身份和死亡信号，隐藏两个成员，并把剩余生命、最大生命汇总到领头史的通用 HealthComponent；显示名为“团团史”，身体与受击区域扩大为18像素半径。团体以24像素/秒追击，旋转周期2秒，每个成员转到玩家方向一侧时发一枚可躲避的粘液弹（180像素/秒、0.5伤害），地形和物理墙均阻挡。团体碰撞箱与玩家实际碰撞箱重叠时造成3伤害，同一次持续重叠通过1秒冷却避免每帧扣血。受击沿用模板打断和击退；失去视线交回共享追击寻路，不隔墙射击。
+
+合团死亡会分别记录并结算三只原始史；每只二选一掉一件，凝液ID9权重80，粘性球ID10权重20。三个成员的腹内原物品均落在团体尸体位置。材料有各自图标、IngredientData 和 MaterialModel，不添加未指定的炼金属性或自然生成。专有吞物和合团逻辑没有放入 BaseMonster。
+
+专用 `shi_animation_state_machine.tres` 连接 Idle、Hop、Rest、Form、Spin、Shoot、Hurt、Death；移动/停顿、合团、旋转、发弹、受击实际调用 AnimationTree，Death 为终态。玩家生命与生命提示改用浮点，准确保留0.5伤害。
+
 ## 受击、击退与死亡
 
 受击链路为：武器/攻击生成 `CombatHit` -> `CombatHurtbox` 过滤阵营与存活状态 -> 同一个 `HealthComponent` 统一扣血 -> 血条与怪物回调：
@@ -153,7 +175,7 @@ BaseMonster (CharacterBody2D)
 
 调试输入 `K` 会调用 `GameWorld.kill_monsters_in_tree()`，只处理 `monsters` 组并调用 `kill()`，不直接操作掉落物或其他实体。
 
-“给”的 `_finalize_death()` 在 `_is_dead` 保护下只创建一个 `GroundPickup`：一次从 LOOT 随机流取样，`roll < 0.70` 为给毛（ID 4），否则为猴皮（ID 5），数量固定为1。普通致命伤害和 K 击杀均掉落，非致命受击、地图卸载和距离回收不掉落；重复死亡调用不会重复创建。新掉落先放在 spawner 下，`GameWorld._refresh_pickup()` 同时扫描它和当前地图物品根节点，死亡后即可按 E 收取。切图时沿用原有非怪物实体保存逻辑，未拾取掉落物随所属地图隐藏/恢复；已拾取物品不会重建。两件材料各有独立图标、`IngredientData` 和 `MaterialModel` 场景，注册在药水模板之前，不预设用户未指定的炼金/物理属性，也不加入自然地面材料生成。
+“给”的 `_finalize_death()` 在 `_is_dead` 保护下只创建一个 `GroundPickup`：一次从 LOOT 随机流取样，`roll < 0.70` 为给毛（ID 4），否则为猴皮（ID 3），数量固定为1。普通致命伤害和 K 击杀均掉落，非致命受击、地图卸载和距离回收不掉落；重复死亡调用不会重复创建。新掉落先放在 spawner 下，`GameWorld._refresh_pickup()` 同时扫描它和当前地图物品根节点，死亡后即可按 E 收取。切图时沿用原有非怪物实体保存逻辑，未拾取掉落物随所属地图隐藏/恢复；已拾取物品不会重建。两件材料各有独立图标、`IngredientData` 和 `MaterialModel` 场景，注册在药水模板之前，不预设用户未指定的炼金/物理属性，也不加入自然地面材料生成。
 
 ## 动画
 
@@ -200,6 +222,9 @@ flowchart LR
 怪物相关回归包括模板生命周期、四状态 AI、动画、受击反馈、闪红渲染、世界生成与“给”的完整行为：
 
 ```powershell
+godot --headless --path . --script res://tools/test_crocodile.gd
+godot --headless --path . --script res://tools/test_shi_monster.gd
+godot --headless --path . --script res://tools/test_swamp_performance.gd
 godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
@@ -207,6 +232,7 @@ godot --headless --path . res://tests/test_monster_persistence.tscn
 godot --headless --path . --script res://tools/test_give_loot.gd
 godot --headless --path . res://tests/test_monster_active_map.tscn
 godot --headless --path . --script res://tools/test_monster_region_entry.gd
+godot --headless --path . --script res://tools/test_gate_encounters.gd
 godot --headless --path . --script res://tools/test_give_ground_stone.gd
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
@@ -217,8 +243,7 @@ godot --headless --path . res://tests/test_rainforest_spawner.tscn
 
 ## 已知限制与后续建议
 
-- 当前只配置了“给”一种怪物，尚无掉落、经验、Boss、精英或按关卡配置的战斗内容。
-- 当前没有正式可拾取石子，“给”的远程分支依赖未来的 `throwable_stones` 实现。
+- 当前已接入“给”、“史”和工作区中的鳄鱼配置；通用掉落表与正式地面投石可用，经验、独立Boss及精英仍待设计。
 - 地形阻挡仍以代码判定为主，TileSet 未配置物理碰撞层；寻路会把最近一次的物理墙体转为格阻挡。
 - `GameWorld` 使用整图加载，因此关闭了生成器的距离回收；如果要做开放世界，需要重新评估 `MonsterSpawner._process()` 与地图预加载的配合。
 - 死亡动画只短暂进入后立即清理节点，后续播放完整死亡动画、掉落结算和移除碰撞需要继续实现。

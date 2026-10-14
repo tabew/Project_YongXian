@@ -53,6 +53,9 @@ var _last_biome: int = Biome.Kind.DEEP_OCEAN
 var _last_route: int = Route.Kind.NONE
 var _last_map: MapSpec = null
 var _last_gate: int = -1
+## 同一物理帧的只读采样共用结果；各线程持有自己的生成器实例。
+var _query_frame: int = -1
+var _query_tiles: Dictionary = {}
 
 
 func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0) -> void:
@@ -223,8 +226,20 @@ func _assign_region_biomes() -> void:
 		if rainforest != null:
 			rainforest.biome_id = combat.biome_id
 		combat.biome_id = Biome.Kind.TROPICAL_RAINFOREST
+	# 正式怪物池包含鳄鱼时保留沼泽战斗区域；起点和非战斗房型不改。
+	if config.combat_biomes.has(Biome.Kind.SWAMP):
+		var has_swamp_combat: bool = false
+		var swamp_target: MapSpec = null
+		for spec: MapSpec in _specs:
+			if run.type_of(spec.node_id) in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS]:
+				has_swamp_combat = has_swamp_combat or spec.biome_id == Biome.Kind.SWAMP
+				if spec.biome_id != Biome.Kind.TROPICAL_RAINFOREST:
+					swamp_target = spec
+		if not has_swamp_combat and swamp_target != null:
+			swamp_target.biome_id = Biome.Kind.SWAMP
 	for spec: MapSpec in _specs:
 		spec.boundary_kind = RegionBiomes.boundary_for(spec.biome_id)
+		spec.ensure_swamp_water()
 
 
 func _index_bounds(bins: Dictionary, bounds: Rect2, item: Variant) -> void:
@@ -392,24 +407,22 @@ func generate_chunk(chunk_coords: Vector2i, epoch: int = 0) -> ChunkData:
 
 
 func sample_terrain(tile: Vector2i) -> int:
-	_classify(tile.x, tile.y)
-	return _last_terrain
+	return _query_terrain_route(tile) & 255
 
 
 func sample_biome(tile: Vector2i) -> int:
-	_classify(tile.x, tile.y)
-	return _last_biome
+	# 群系是整张箱庭属性，查群系无需重新采样地形噪声和道路。
+	var spec: MapSpec = _spec_at(tile)
+	return spec.biome_id if spec != null else Biome.Kind.MOUNTAIN
 
 
 func sample_route(tile: Vector2i) -> int:
-	_classify(tile.x, tile.y)
-	return _last_route
+	return (_query_terrain_route(tile) >> 8) & 255
 
 
 ## 这一格是哪张地图的；地图之外返回 null。
 func sample_map(tile: Vector2i) -> MapSpec:
-	_classify(tile.x, tile.y)
-	return _last_map
+	return _spec_at(tile)
 
 
 ## 这一格是不是路口：-1 不是，0 西侧入口，1 起是东侧第 n 个出口。
@@ -421,8 +434,23 @@ func sample_gate(tile: Vector2i) -> int:
 ## 玩家能否站上这一格：地形本身可通行，或者这里是路。
 ## 箱庭外不可通行；跨区由 GameWorld 在出口触发瞬间切换。
 func is_walkable(tile: Vector2i) -> bool:
+	var packed: int = _query_terrain_route(tile)
+	return Terrain.is_walkable(packed & 255) or ((packed >> 8) & 255) != Route.Kind.NONE
+
+
+func _query_terrain_route(tile: Vector2i) -> int:
+	var frame: int = Engine.get_physics_frames()
+	if frame != _query_frame:
+		_query_frame = frame
+		_query_tiles.clear()
+	if _query_tiles.has(tile):
+		return _query_tiles[tile]
 	_classify(tile.x, tile.y)
-	return Terrain.is_walkable(_last_terrain) or _last_route != Route.Kind.NONE
+	var packed: int = _last_terrain | (_last_route << 8)
+	if _query_tiles.size() >= 8192:
+		_query_tiles.clear()
+	_query_tiles[tile] = packed
+	return packed
 
 
 ## 单个格子的完整判定：一次算完所在地图、地形、群系、路网与路口。

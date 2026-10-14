@@ -18,6 +18,7 @@ var _chunk_manager: ChunkManager = null
 var _player: PlayerCharacter = null
 ## 正式箱庭只为当前地图消耗生成名额；空值保留通用流式世界行为。
 var _active_map: MapSpec = null
+var _gate_encounter_anchors: Array[Vector2i] = []
 var _monsters_by_chunk: Dictionary = {}
 ## 本局死亡记录按原始生成位置保存，巡逻/追击后的位置不影响身份。
 var _defeated_spawn_ids: Dictionary = {}
@@ -36,6 +37,11 @@ func setup(
 	_generator = generator
 	_player = player
 	_active_map = active_map
+	_gate_encounter_anchors.clear()
+	if _active_map != null:
+		_gate_encounter_anchors.append(WorldGenerator.world_to_tile(_generator.entry_position(_active_map.node_id, -1, _active_map.west_gate_y)) + Vector2i(10, 0))
+		for gate_y: int in _active_map.east_gates:
+			_gate_encounter_anchors.append(WorldGenerator.world_to_tile(_generator.entry_position(_active_map.node_id, 1, gate_y)) + Vector2i(-10, 0))
 	if _chunk_manager != null and _chunk_manager.chunk_applied.is_connected(_on_chunk_applied):
 		_chunk_manager.chunk_applied.disconnect(_on_chunk_applied)
 	_chunk_manager = chunk_manager
@@ -77,12 +83,17 @@ func _spawn_definition_in_chunk(
 ) -> void:
 	if definition == null or definition.monster_scene == null:
 		return
+	if _spawn_gate_encounter(definition, coords, occupied):
+		return
 	var rng: RandomNumberGenerator = MapRng.enemy_chunk_rng(
 		_generator.world_seed, coords, definition.monster_id
 	)
 	if rng.randf() > definition.chunk_spawn_chance:
 		return
 
+	if definition.independent_spawn_slots:
+		_spawn_independent_slots(definition, coords, occupied)
+		return
 	var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
 	var spawned: int = 0
 	for _attempt: int in definition.candidate_attempts:
@@ -106,6 +117,62 @@ func _spawn_definition_in_chunk(
 			continue
 		occupied[tile] = true
 		spawned += 1
+
+
+## 入口内侧10格、道路附近的确定遭遇点，使用原生成身份且占用区块名额。
+func _spawn_gate_encounter(definition: MonsterSpawnData, coords: Vector2i, occupied: Dictionary) -> bool:
+	if _active_map == null or definition.gate_encounter_count <= 0:
+		return false
+	if not definition.allowed_biomes.is_empty() and not definition.allowed_biomes.has(_active_map.biome_id):
+		return false
+	if content != null and content.budget_of(_active_map.node_id, MapContent.ENEMY) <= 0:
+		return false
+	var handled: bool = false
+	var used: int = 0
+	for anchor: Vector2i in _gate_encounter_anchors:
+		if WorldGenerator.tile_to_chunk(anchor) != coords:
+			continue
+		handled = true
+		var placed: int = 0
+		for radius: int in range(1, 7):
+			for y: int in range(-radius, radius + 1):
+				for x: int in range(-radius, radius + 1):
+					if placed >= definition.gate_encounter_count or used >= definition.max_per_chunk:
+						break
+					var tile: Vector2i = anchor + Vector2i(x, y)
+					if occupied.has(tile) or WorldGenerator.tile_to_chunk(tile) != coords:
+						continue
+					if not allows_spawn_at(tile) or not definition.can_spawn_at(_generator, tile):
+						continue
+					occupied[tile] = true
+					used += 1
+					placed += 1
+					if not _defeated_spawn_ids.has(_spawn_id(definition, tile)):
+						spawn_monster(definition, tile, coords)
+				if placed >= definition.gate_encounter_count or used >= definition.max_per_chunk:
+					break
+			if placed >= definition.gate_encounter_count or used >= definition.max_per_chunk:
+				break
+	return handled
+
+
+func _spawn_independent_slots(definition: MonsterSpawnData, coords: Vector2i, occupied: Dictionary) -> void:
+	for slot: int in definition.max_per_chunk:
+		var slot_id := StringName("%s:slot:%d" % [definition.monster_id, slot])
+		var source: RandomNumberGenerator = MapRng.enemy_chunk_rng(_generator.world_seed, coords, slot_id)
+		# 一个原始名额只掷一次栖地概率；找不到该栖地不能改刷另一类。
+		var variant: int = definition.choose_spawn_variant(source)
+		for attempt: int in definition.candidate_attempts:
+			var tile: Vector2i = definition.select_spawn_tile(_generator, coords, source, variant, _active_map)
+			if tile == EnemyPathfinder.INVALID_TILE:
+				break
+			if occupied.has(tile) or not allows_spawn_at(tile) or not definition.can_spawn_variant_at(_generator, tile, variant):
+				continue
+			occupied[tile] = true
+			if not _defeated_spawn_ids.has(_spawn_id(definition, tile)):
+				spawn_monster(definition, tile, coords)
+			# 死亡的原始格也消耗本名额，切图后不会重新选择替代怪物。
+			break
 
 
 func spawn_monster(

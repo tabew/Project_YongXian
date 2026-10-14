@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShiSpawnData" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/shi_spawn_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://scenes/monsters/shi_monster.tscn" id="2_scene"]
+[resource]
+script = ExtResource("1_data")
+monster_id = &"shi"
+monster_scene = ExtResource("2_scene")
+allowed_biomes = Array[int]([8])
+chunk_spawn_chance = 0.10
+max_per_chunk = 6
+candidate_attempts = 64
+independent_spawn_slots = true
+gate_encounter_count = 3
