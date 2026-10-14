@@ -152,6 +152,43 @@ func _run() -> void:
 	_check(inventory.get_count(0) == old_herb and inventory.get_count(1) == old_testherb, "新材料操作改动了原材料库存")
 	game._enter_map(2)
 	_check(inventory.get_handy_slot_id(0) == 3 and inventory.get_handy_slot_count(0) == 4 and inventory.get_handy_slot_id(1) == 2 and inventory.get_handy_slot_count(1) == 1, "切图未保留快捷栏状态")
+	# shift+左键快捷移动：背包与快捷栏之间整堆挪动
+	var shift_click := InputEventMouseButton.new()
+	shift_click.button_index = MOUSE_BUTTON_LEFT
+	shift_click.pressed = true
+	shift_click.shift_pressed = true
+	var move_count: int = inventory.get_count(4)
+	var empty_pos: int = inventory.find_handy_slot_for(4)
+	var handy_slots_before: int = inventory.handy_items_pos.size()
+	inventory.add_item(4,3)
+	_check(bag.item_for_button.has(4), "背包UI未显示快捷移动用的测试材料")
+	bag.item_for_button[4]._on_gui_input(shift_click)
+	_check(inventory.get_count(4) == move_count, "shift+左键未从背包扣掉整堆材料")
+	_check(inventory.get_handy_slot_id(empty_pos) == 4 and inventory.get_handy_slot_count(empty_pos) == move_count + 3, "shift+左键未把整堆材料放进快捷栏空格")
+	_check(not bag.item_for_button.has(4), "shift+左键拿完后背包格子未收掉")
+	_check(inventory.handy_items_pos.size() == handy_slots_before + 1, "shift+左键改动了别的快捷栏格子")
+	hotbar.item_buttons[empty_pos]._on_gui_input(shift_click)
+	_check(inventory.get_count(4) == move_count + 3 and inventory.get_handy_slot_id(empty_pos) == -1, "shift+左键未把快捷栏整格挪回背包")
+	_check(bag.item_for_button.has(4), "挪回背包后背包未重建格子")
+	# 普通左键和shift+右键都不走快捷移动
+	var plain_click := InputEventMouseButton.new()
+	plain_click.button_index = MOUSE_BUTTON_LEFT
+	plain_click.pressed = true
+	bag.item_for_button[4]._on_gui_input(plain_click)
+	_check(inventory.get_count(4) == move_count + 3, "普通左键触发了快捷移动")
+	var shift_right_click := InputEventMouseButton.new()
+	shift_right_click.button_index = MOUSE_BUTTON_RIGHT
+	shift_right_click.pressed = true
+	shift_right_click.shift_pressed = true
+	bag.item_for_button[4]._on_gui_input(shift_right_click)
+	_check(inventory.get_count(4) == move_count + 3, "shift+右键触发了快捷移动")
+	# 快捷栏占满时整堆留在背包里
+	for pos in Inventory.HANDY_SLOT_COUNT:
+		inventory.clear_handy_slot(pos)
+	for pos in Inventory.HANDY_SLOT_COUNT:
+		inventory.add_handy_slot(pos,5,1)
+	bag.item_for_button[4]._on_gui_input(shift_click)
+	_check(inventory.get_count(4) == move_count + 3, "快捷栏占满时shift+左键弄丢了背包材料")
 	game.queue_free()
 	await process_frame
 	await process_frame

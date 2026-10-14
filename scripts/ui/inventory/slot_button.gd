@@ -10,6 +10,9 @@ signal put_item_signal(item_id:int, num:int)
 ##item_id/num是拿在手上的那份，from_pos是它原来所在的格子位置
 signal swap_item_signal(item_id:int, num:int, from_pos:int)
 
+##shift+左键快捷移动：把本格的整堆物品挪到另一边的容器(背包<->快捷栏)
+signal quick_move_signal(item_id:int, num:int)
+
 ##自己在快捷栏里的格子位置，不是快捷栏格子则为-1
 var handy_slot:int = -1
 
@@ -84,13 +87,31 @@ func put_item_by_id(item_id:int,num:int = 1) -> void:
 
 	put_item_signal.emit(item_id,num)
 
+##shift+左键：不拖拽，直接把本格的整堆物品挪到另一边
+##场景把 gui_input 信号接到这里：信号在按钮自带处理之前发出来，accept_event() 能挡住按下和后面的拖拽
+func _on_gui_input(event: InputEvent) ->void:
+	if slot_item == null or slot_item.item_id < 0:
+		return
+
+	if !(event is InputEventMouseButton):
+		return
+
+	var mouse_event:InputEventMouseButton = event as InputEventMouseButton
+
+	if !mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT or !mouse_event.shift_pressed:
+		return
+
+	accept_event()
+
+	quick_move_signal.emit(slot_item.item_id,slot_item.count)
 
 ##把物品放至光标
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	if slot_item == null or slot_item.item == null:
 		return null
 
-	"""还没写shift+全部拿取的操作"""
+	if Input.is_key_pressed(KEY_SHIFT):
+		return null #shift+左键是快捷移动，不走拖拽
 
 	var held: SlotItem = take_item()
 

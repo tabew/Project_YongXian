@@ -34,6 +34,7 @@ func init_button() -> void:
 		button.take_item_signal.connect(_on_slot_take.bind(pos))
 		button.put_item_signal.connect(_on_slot_put.bind(pos)) 
 		button.swap_item_signal.connect(_on_slot_swap.bind(pos)) #快捷栏交换：有别的物品要放进本格
+		button.quick_move_signal.connect(_on_slot_quick_move.bind(pos)) #shift+左键：整堆挪回背包
 
 ##物品栏更新函数，同步物品栏数据
 func bag_update() ->void:
@@ -85,6 +86,16 @@ func _on_slot_swap(item_id:int,num:int,from_pos:int,to_pos:int) ->void:
 	inventory.swap_handy_slot(from_pos,to_pos,item_id,num)
 # ==============================================================================
 # ↑↑↑↑ 快捷栏交换（结束）↑↑↑↑
+# ==============================================================================
+
+# ==============================================================================
+# ↓↓↓↓ shift+左键快捷移动：本格整堆挪回背包 ↓↓↓↓
+# ==============================================================================
+##pos是本格(由信号绑定，只看格子本身)
+func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
+	inventory.quick_move_to_bag(pos)
+# ==============================================================================
+# ↑↑↑↑ shift+左键快捷移动（结束）↑↑↑↑
 # ==============================================================================
 
 
