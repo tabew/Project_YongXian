@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://c2w8stt5pshog"]
+
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_bb1ci"]
+[ext_resource type="Texture2D" uid="uid://cftwkgvhuis3e" path="res://assets/weapons/long_staff.png" id="2_r777w"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wp5od"]
+size = Vector2(32, 4)
+
+[node name="LongStaff" type="RigidBody2D" unique_id=1312694687]
+script = ExtResource("1_bb1ci")
+metadata/_custom_type_script = "uid://dn8rwxlqagowl"
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1522200396]
+scale = Vector2(3, 3)
+texture = ExtResource("2_r777w")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=891534272]
+scale = Vector2(3, 3)
+shape = SubResource("RectangleShape2D_wp5od")

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dl5eend37uql3"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ingredients/material_model.gd" id="1_80wqk"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_80wqk"]
 [ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="1_cnamo"]
 
 [node name="Herb" type="RigidBody2D" unique_id=38936394]

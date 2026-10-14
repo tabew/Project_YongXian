@@ -35,7 +35,7 @@ func bag_update() ->void:
 			item_for_button[item_id].set_count(inventory.get_count(item_id))
 			continue
 
-		var item:ItemData = ItemListGlobal.get_template(item_id)
+		var item:ItemData = inventory.get_item_template(item_id)
 
 		if item == null:
 			continue
@@ -49,6 +49,7 @@ func bag_update() ->void:
 		bag_slot_container.add_child(slot_node)
 		slot_node.take_item_signal.connect(take_item)
 		slot_node.put_item_signal.connect(put_item)
+		slot_node.quick_move_signal.connect(_on_slot_quick_move) #shift+左键：整堆挪进快捷栏
 		slot_node.slot_insert(slot_item_)
 
 		item_for_button[item_id] = slot_node
@@ -73,6 +74,29 @@ func put_item(item_id:int,num:int) ->void:
 		return
 
 	item_for_button[item_id].set_count(inventory.get_count(item_id))
+
+#//////////////////////////快捷移动
+##shift+左键：本格整堆挪进物品栏(快捷栏)
+func _on_slot_quick_move(item_id:int,num:int) ->void:
+	if inventory.quick_move_to_handy(item_id,num) <= 0:
+		return
+
+	_refresh_slot(item_id)
+
+##背包里某种物品的数量变了就同步显示，整堆拿完就把格子收掉
+func _refresh_slot(item_id:int) ->void:
+	if !item_for_button.has(item_id):
+		return
+
+	var count:int = inventory.get_count(item_id)
+
+	if count > 0:
+		item_for_button[item_id].set_count(count)
+		return
+
+	item_for_button[item_id].queue_free()
+	item_for_button.erase(item_id)
+#///////////////////////////////////
 
 ## 背包区域放回
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:

@@ -181,7 +181,7 @@ func _check_runtime() -> void:
 	for id: int in [2, 3]:
 		var data: IngredientData = registry.get_template(id) as IngredientData
 		_check(data != null and not data.alchemical_attribute.is_empty(), "材料没有炼金属性")
-		var model: IngredientModel = data.create_model()
+		var model: ItemModel = data.create_model()
 		_check(model != null and model.data == data, "材料不能创建炼金投放模型")
 		if model != null:
 			model.free()
@@ -199,7 +199,7 @@ func _check_runtime() -> void:
 		var payload: Dictionary = {"item_id": id, "count": 1, "rotation": 0.2}
 		_check(zone._can_drop_data(Vector2.ZERO, payload), "炼金投放区拒绝新材料")
 		zone._drop_data(Vector2.ZERO, payload)
-		var model: IngredientModel = spawned.get_child(spawned.get_child_count() - 1) as IngredientModel
+		var model: ItemModel = spawned.get_child(spawned.get_child_count() - 1) as ItemModel
 		_check(model != null and model.data.id == id and is_equal_approx(model.global_rotation, 0.2), "实际投放模型/旋转错误")
 		cauldron._get_attributes(model)
 	_check(cauldron.attribute.size() == 2, "坩埚未接收两种材料的属性")

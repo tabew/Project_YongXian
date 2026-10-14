@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://5ty2wogp1et6"]
+
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_tt12p"]
+[ext_resource type="Script" uid="uid://bpk4eaaq2go1w" path="res://scripts/items/weapons/weapon_data.gd" id="1_weapon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_btcts"]
+[ext_resource type="Resource" uid="uid://d0ok0i810yr5f" path="res://resources/weapons/yoyo.tres" id="3_definition"]
+[ext_resource type="Texture2D" uid="uid://d37u43rlrhp3v" path="res://assets/weapons/yoyo.png" id="4_5ppxq"]
+
+[resource]
+script = ExtResource("1_weapon")
+weapon = ExtResource("3_definition")
+id = 202
+name = "yoyo"
+texture = ExtResource("4_5ppxq")
+max_stack = 1
+item_scene_path = "uid://bmrjkvxp5f8bf"
+metadata/_custom_type_script = "uid://bpk4eaaq2go1w"

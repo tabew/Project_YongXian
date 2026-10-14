@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/material_model.gd" id="1_model"]
+[ext_resource type="Script" path="res://scripts/items/ItemModel.gd" id="1_model"]
 [ext_resource type="Texture2D" path="res://assets/items/ingredients/slime_liquid.svg" id="2_icon"]
 [ext_resource type="Resource" path="res://resources/items/ingredients/slime_liquid.tres" id="3_data"]
 

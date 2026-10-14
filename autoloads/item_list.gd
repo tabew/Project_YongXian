@@ -7,7 +7,6 @@ extends Node
 #用资源引用(preload)而不是字符串路径：字符串路径不被导出器跟踪，
 @export var templates: Array[ItemData] = [
 	preload("res://resources/items/ingredients/herb.tres"),
-	preload("res://resources/items/ingredients/testherb.tres"),
 	preload("res://resources/items/ingredients/stone.tres"),
 	preload("res://resources/items/ingredients/stick.tres"),
 	preload("res://resources/items/ingredients/give_fur.tres"),
@@ -17,7 +16,9 @@ extends Node
 	preload("res://resources/items/ingredients/sharp_tooth.tres"),
 	preload("res://resources/items/ingredients/slime_liquid.tres"),
 	preload("res://resources/items/ingredients/sticky_ball.tres"),
-
+	preload("res://resources/items/weapons/longsword.tres"),
+	preload("res://resources/items/weapons/long_staff.tres"),
+	preload("res://resources/items/weapons/yoyo.tres"),
 	#药水模板始终保持在最后一个
 	preload("res://resources/items/potions/potion_model.tres")
 ]

@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://bmrjkvxp5f8bf"]
+
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_myx7r"]
+[ext_resource type="Texture2D" uid="uid://d37u43rlrhp3v" path="res://assets/weapons/yoyo.png" id="2_ta0kg"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_wp5od"]
+radius = 7.071068
+
+[node name="Yoyo" type="RigidBody2D" unique_id=1456734748]
+script = ExtResource("1_myx7r")
+metadata/_custom_type_script = "uid://dn8rwxlqagowl"
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=178616789]
+scale = Vector2(3, 3)
+texture = ExtResource("2_ta0kg")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=949528380]
+scale = Vector2(3, 3)
+shape = SubResource("CircleShape2D_wp5od")

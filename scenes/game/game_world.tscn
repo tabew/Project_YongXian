@@ -29,7 +29,7 @@ spawn_definitions = Array[ExtResource("7_spawn_data")]([ExtResource("8_give_spaw
 [node name="Player" parent="." unique_id=512090753 groups=["player"] instance=ExtResource("3_player")]
 inventory = ExtResource("8_bsk45")
 
-[node name="GameHUD" type="CanvasLayer" parent="." unique_id=115689404]
+[node name="GameHUD" type="CanvasLayer" parent="." unique_id=115689404 groups=["game_hud"]]
 layer = 2
 
 [node name="HUD" parent="GameHUD" unique_id=330524913 instance=ExtResource("4_hud")]

@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://dckedj8dhfhao"]
+
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_278ht"]
+[ext_resource type="Texture2D" uid="uid://c7h4a6c4e5ur5" path="res://assets/weapons/longsword.png" id="2_sc4qw"]
+
+[node name="Longsword" type="RigidBody2D" unique_id=1945683805]
+script = ExtResource("1_278ht")
+metadata/_custom_type_script = "uid://dn8rwxlqagowl"
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=942903415]
+scale = Vector2(3, 3)
+texture = ExtResource("2_sc4qw")
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=149868398]
+scale = Vector2(3, 3)
+polygon = PackedVector2Array(-21, -2, -21, 3, -13, 6, 14, 5, 22, 0, 14, -4, -9, -6, -13, -6)

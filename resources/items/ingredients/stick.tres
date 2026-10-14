@@ -8,7 +8,7 @@
 
 [resource]
 script = ExtResource("1_data")
-id = 3
+id = 1
 name = "木棍"
 texture = ExtResource("4_icon")
 alchemical_attribute = Array[ExtResource("2_attribute")]([ExtResource("3_woody")])

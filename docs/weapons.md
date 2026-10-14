@@ -2,9 +2,24 @@
 
 当前世界是俯视角，保留 WASD 移动。长剑参考泰拉瑞亚的挥砍节奏：鼠标决定本次攻击方向，左键挥剑，按住左键自动重复。攻击中仍能移动，但本次挥砍方向锁定；下一次攻击重新读取鼠标方向。
 
-开局自动装备长剑，出生点附近有一个训练靶，显示血条、伤害数字和暴击标记，击倒后 2 秒重生。`GameWorld.spawn_training_dummy` 可以关闭训练靶。R 重建世界时会取消正在进行的攻击并重建训练靶。
+开局不再自带武器，玩家空手出生；装备只能从物品栏来（见下一条）。出生点附近有一个训练靶，显示血条、伤害数字和暴击标记，击倒后 2 秒重生。`GameWorld.spawn_training_dummy` 可以关闭训练靶。R 重建世界时会取消正在进行的攻击并重建训练靶。
 
-按 Q 在长剑与长棍之间切换。长棍朝鼠标选定方向做 40° 小扇形挥舞，同时从远处较短、较暗的姿态过渡到近处较长、较亮的姿态，并带短弧形拖尾。攻击开始后锁定本次方向，按住左键可连续挥击。切换会取消当前攻击，松开并重新按左键即可使用新武器。
+## 武器只能从物品栏装备
+
+Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` 三个入口都已移除：玩家侧没有任何直接装备武器的路径，避免绕过物品栏。装备链路只有一条：
+
+```text
+快捷栏选中装武器的格子 → handy_selection_changed → WeaponData.weapon
+  → WeaponController.equip(weapon)
+```
+
+开局 `resources/inventory/inventory.tres` 在快捷栏第 1 格放长剑（id 200）、第 2 格放长棍（id 201），并把 `handy_selected` 设为 0，进游戏就已经握着长剑。`WeaponController.equip()` 的校验（数据合法性 + 攻击场景类型）仍然生效，失败时保留原武器。`WeaponController` 本身仍是通用组件，AI 和测试可以直接调 `equip()`，只是玩家不再有别的入口。
+
+实际实现是"选中即装备"：`PlayerCharacter.handy_item_changed()` 监听 `Inventory.handy_selection_changed`，选中 id 在 200–299 之间的 WeaponData 格子就直接 `equip()`，选中其它格子则 `equip(null)` 卸下武器；所以不用按左键，切到武器格就已经拿在手上。武器物品的 `use()` 返回 0，不会被消耗。
+
+左键按下去会先调用 `Inventory.use_handy_slot()` 使用选中格，再把这一下交给 `WeaponController` 起手攻击（当前没有"必须选中武器才挥"的判断）。
+
+长棍朝鼠标选定方向做 40° 小扇形挥舞，同时从远处较短、较暗的姿态过渡到近处较长、较亮的姿态，并带短弧形拖尾。攻击开始后锁定本次方向，按住左键可连续挥击。切换会取消当前攻击，松开并重新按左键即可使用新武器。
 
 ## 文件与职责
 
@@ -13,16 +28,21 @@
 | `resources/weapons/weapon_definition.gd` | 通用武器数据、数值校验、攻击场景引用 |
 | `resources/weapons/swing_weapon_definition.gd` | 挥砍类数据：长度、宽度、角度、握点、拖尾 |
 | `resources/weapons/depth_strike_weapon_definition.gd` | 纵深挥舞类数据：棍身尺寸、小扇形角度、俯仰与透视 |
+| `resources/weapons/yoyo_weapon_definition.gd` | 溜溜球类数据：绳长、球径、甩出与收回速度、重复命中冷却 |
 | `resources/weapons/longsword.tres` | 第一把长剑的完整数值配置 |
 | `resources/weapons/long_staff.tres` | 当前长棍的数值、定向挥击范围与外观配置 |
+| `resources/weapons/yoyo.tres` | 当前溜溜球的数值、飞行手感与外观配置 |
 | `resources/weapons/templates/swing_weapon_template.tres` | 可直接复制的长剑类通用模板 |
 | `resources/weapons/templates/staff_weapon_template.tres` | 可直接复制的长棍类通用模板 |
+| `resources/weapons/templates/yoyo_weapon_template.tres` | 可直接复制的溜溜球类通用模板 |
 | `scripts/weapons/weapon_controller.gd` | 装备、输入状态、攻速限制、攻击实例生命周期 |
 | `scripts/weapons/weapon_attack.gd` | 攻击行为基类、数据快照、命中去重、暴击和击退数据 |
 | `scripts/weapons/swing_attack.gd` | 挥砍动画与连续扫掠判定 |
 | `scripts/weapons/depth_strike_attack.gd` | 长棍的小扇形挥舞、远近过渡与连续判定 |
+| `scripts/weapons/yoyo_attack.gd` | 溜溜球的指针跟随、绳长边界、收回与重复命中判定 |
 | `scenes/weapons/swing_attack.tscn` | 所有挥砍类武器共用的攻击场景 |
 | `scenes/weapons/depth_strike_attack.tscn` | 纵深挥击类武器的独立攻击场景 |
+| `scenes/weapons/yoyo_attack.tscn` | 溜溜球类武器的独立攻击场景 |
 | `scripts/combat/combat_hit.gd` | 单次命中的来源、武器 ID、伤害、暴击、位置、击退 |
 | `scripts/combat/health_component.gd` | 血量、防御、受伤和死亡信号 |
 | `scripts/combat/combat_hurtbox.gd` | 受击区域、阵营和 HealthComponent 引用 |
@@ -81,23 +101,48 @@
 
 复制 `templates/staff_weapon_template.tres` 即可添加同类武器；挥舞角度用 `arc_degrees`，远近过渡方向用 `reverse_strike`，尺寸用 `shaft_length` 与贴图，命中宽度用 `hit_width`。握点后方的棍尾仅作显示，不造成背后伤害。纵深俯仰角限制在 -80° 到 +80°，避免贴图翻转与投影退化。
 
-玩家场景的 `weapon_loadout` 数组决定 Q 的切换顺序，默认包含长剑和长棍。向数组追加资源即可加入更多武器，起始装备仍由 `WeaponController.starting_weapon` 决定。空项和当前武器会被跳过，空列表不改变装备。
+玩家侧的 `weapon_loadout` 数组与 `equip_next_weapon()` 都已删除，`WeaponController.starting_weapon` 也已删除，玩家不再自带或自行切换武器。装备从物品栏来：`resources/items/weapons/*.tres` 是 `WeaponData`，其 `weapon` 字段指向对应武器资源，选中该格子时 `PlayerCharacter.handy_item_changed()` 就把它 `equip()` 上去。要把某把武器放进开局快捷栏，在 `resources/inventory/inventory.tres` 的 `handy_items_pos` / `handy_items` 里加一格。
+
+## 溜溜球配置
+
+溜溜球使用 `yoyo.tres`，类型为 `YoyoWeaponDefinition`，攻击场景为 `yoyo_attack.tscn`。攻击方式参考泰拉瑞亚：球停在指针所在的位置，指针超出绳长时贴在绳长边界上；按住左键维持并持续命中，松手立刻收回。指针换边时球以 `follow_speed` 贴着边界扫过去，因此朝左、朝上等方向都能自然跟随。绳子和球都是运行时绘制，贴图只提供球的外观。
+
+| 属性 | 溜溜球默认值 |
+| --- | --- |
+| 伤害 / 暴击率 / 暴击倍率 | 12 / 4% / 2 |
+| 击退冲量 | 40 像素/秒 |
+| 前摇 / 有效期 / 后摇 / 间隔 | 0.06 / 4.0 / 0.30 / 0.06 秒 |
+| `max_range` / `hand_distance` | 绳长上限 84 像素 / 球收回后的停靠距离 8 像素 |
+| `head_radius` | 球的判定半径 6 像素，同时决定贴图缩放 |
+| `follow_speed` / `return_speed` | 追向指针 900 像素/秒 / 收回 900 像素/秒 |
+| `hit_interval` | 0.33 秒，同一个目标两次受伤之间的最短间隔 |
+| `spin_degrees_per_second` / `string_color` / `string_width` | 900°/秒自旋 / 绳子颜色 / 绳子粗细 |
+| 贴图 | 14×14 像素，整张宽度缩放到球的直径 |
+
+球的位置由指针决定：指针在攻击范围内时球停在指针处，超出绳长则贴在绳长边界上（`target_offset()`）。球以 `follow_speed` 追向该位置，所以指针换边时球会贴着边界扫过去，而不是瞬移。整段飞行都做判定，同一个目标按 `hit_interval` 重复受伤，而不是一次攻击只结算一次；按住左键维持，松手立刻收回，攻击在球回到手上时结束。没有按下过的攻击（AI 或测试直接 `try_attack`）会滞空到有效期结束再自己回来。
+
+收回需要 `return_seconds()` = 0.08 秒；HUD 显示的每秒攻击次数由 `attacks_per_second()` 覆写为“甩到边界后立刻收回”的最短循环，不受按住时长影响。
+
+复制 `templates/yoyo_weapon_template.tres` 即可添加同类武器；绳长用 `max_range`，球的大小用 `head_radius` 与贴图，跟随手感用 `follow_speed` 与 `return_speed`，输出节奏用 `hit_interval`。`recovery_seconds` 必须覆盖收回过程，否则装备时校验失败。
+
+溜溜球同样按本文件的 "武器只能从物品栏装备" 一节接入：物品模板 `resources/items/weapons/yoyo.tres` 是 `WeaponData`，其 `weapon` 字段指向 `resources/weapons/yoyo.tres`；要让开局就能选到，再把它的 id 加进 `resources/inventory/inventory.tres` 的快捷栏格子。
 
 ## 新增同类武器
 
-两份模板都已配置好贴图、攻击场景和全部可调参数，复制后即可装备，不需要新建脚本或场景。
+三份模板都已配置好贴图、攻击场景和全部可调参数，复制后即可装备，不需要新建脚本或场景。
 
 | 类型 | 复制入口 | 资源类型 / 攻击场景 | 默认动作 |
 | --- | --- | --- | --- |
 | 长剑类 | [swing_weapon_template.tres](../resources/weapons/templates/swing_weapon_template.tres) | `SwingWeaponDefinition` / `swing_attack.tscn` | 150° 扇形横扫 |
 | 长棍类 | [staff_weapon_template.tres](../resources/weapons/templates/staff_weapon_template.tres) | `DepthStrikeWeaponDefinition` / `depth_strike_attack.tscn` | 40° 小扇形 + 由远到近过渡 |
+| 溜溜球类 | [yoyo_weapon_template.tres](../resources/weapons/templates/yoyo_weapon_template.tres) | `YoyoWeaponDefinition` / `yoyo_attack.tscn` | 球跟随指针，超出绳长贴在边界 |
 
 1. 将对应模板复制到 `resources/weapons/`，例如 `iron_longsword.tres` 或 `iron_staff.tres`。每把新武器使用独立文件。
 2. 在 Inspector 修改 `resource_name`（编辑器名称）、唯一的 `id`、`display_name`（游戏名称）、伤害、暴击、击退和各阶段时间。模板 ID 是占位值，需要替换，例如 `iron_longsword` 或 `iron_staff`。
 3. 修改该类型的长度、宽度、角度等专属参数，需要换外观时同时配置 `icon`、`texture`、`texture_grip`。保留模板原有的脚本与 `attack_scene` 配对。
-4. 打开 `scenes/game/player.tscn`，选中 Player，将新 `.tres` 加入 `weapon_loadout` 数组。运行后按 Q 即可切换到新武器。若希望开局使用它，将同一资源设为子节点 `WeaponController.starting_weapon`。
+4. 建一个物品模板 `resources/items/weapons/<名称>.tres`（脚本用 `WeaponData`，材料 id 别和现有的撞，武器占 200 段），填 `id`、`name`、`texture`、`max_stack = 1`，并把 `weapon` 指向第 1–3 步的武器资源。玩家只能通过物品栏装备武器，所以这一步是必须的；要让开局就能选到，再把它的 id 放进 `resources/inventory/inventory.tres` 的快捷栏格子里。
 
-也可直接调用 `player.weapon_controller.equip(new_weapon)`。模板用于复制成独立武器；修改副本的数值不会改变模板或其他武器，运行状态由各自的攻击实例管理。两类武器都无需改玩家、控制器或伤害组件。刀、斧等采用弧形横扫的武器也可以复用长剑类模板。
+`WeaponController.equip(new_weapon)` 仍是公开接口，AI 和测试可以直接调；但玩家侧没有暴露任何调用它的快捷路径，装备统一走物品栏里的武器物品。
 
 两类贴图均使用透明背景，攻击端朝右（+X），`texture_grip` 从贴图左上角测量。长剑按 `blade_length / (贴图宽度 - 握点 X)` 等比缩放，默认贴图 44×14、握点 (6, 7)；长棍按 `shaft_length / (贴图宽度 - 握点 X)` 缩放后再应用远近投影，默认贴图 32×5、握点 (8, 2.5)。更换贴图时尽量裁掉攻击端多余的透明留白，避免视觉长度与判定不符。
 
@@ -141,11 +186,12 @@ Enemy (Node2D / CharacterBody2D)
 - 使用 Godot `intersect_shape` 对相邻剑身姿态的凸包做扫掠，角度间隔不超过 5 度，并包含角色在两帧间的平移，避免高速穿透。
 - 长棍按有效阶段细分采样小扇形与远近过渡曲线，涵盖两侧轨迹和中途伸展到最远处的时刻；一帧跨完整段挥舞也能命中扫过的目标。其后摇收回和残留拖尾不造成伤害。
 - 前摇和后摇均不伤害，后摇起点不会再次检测已经结束的有效期。
-- 命中名单按 HealthComponent 去重，不影响同时击中其他目标；查询按批次取尽，超过 32 个受击框也不会丢目标。
+- 溜溜球按球心圆采样两帧之间的路径，球实际经过哪里就判定哪里；同一个目标按 `hit_interval` 重复受伤，而不是一次攻击只结算一次。球的位置由指针决定，指针超出绳长时贴在边界。
+- 命中名单按 HealthComponent 去重（溜溜球改用受击冷却），不影响同时击中其他目标；查询按批次取尽，超过 32 个受击框也不会丢目标。
 - 松开按键停止后续连击；已经开始的攻击正常完成。失去应用焦点或重建世界会立即取消攻击。场景树暂停时物理更新与计时一起暂停。
 - UI 消耗的左键按下事件不会触发攻击；松开事件即使被 UI 消耗，也会清除按住状态。
 - 当前地形没有物理墙体，剑默认不会被地形格阻挡。后续需要墙体遮挡时，应在命中接口前增加地形或物理射线判断。
-- 当前提供长剑、长棍、武器切换和训练靶；背包、拾取、敌人 AI、音效与联网不属于这一层。
+- 当前提供长剑、长棍、溜溜球、武器切换和训练靶；背包、拾取、敌人 AI、音效与联网不属于这一层。
 
 ## 验证与美术再生成
 
@@ -155,9 +201,10 @@ Enemy (Node2D / CharacterBody2D)
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/test_weapons.gd
 godot --headless --path . --script res://tests/test_combat_integration.gd
+godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
 ```
 
-测试覆盖两类模板的复制、独立调参、装备、正确动作类型、命中伤害和来源 ID，以及攻击阶段、方向、范围、阵营、碰撞层、多受击框去重、多目标、高速攻击、位移扫掠、数据快照、暴击、防御、击退、死亡重生、自动重复、快速点按、冷却、装备取消和不同攻击行为的扩展接口。集成测试另外验证模板副本加入武器列表后的 Q 切换、HUD 更新，以及玩家输入、世界重建和场景衔接。
+测试覆盖三类模板的复制、独立调参、装备、正确动作类型、命中伤害和来源 ID，以及攻击阶段、方向、范围、阵营、碰撞层、多受击框去重、多目标、高速攻击、位移扫掠、数据快照、暴击、防御、击退、死亡重生、自动重复、快速点按、冷却、装备取消和不同攻击行为的扩展接口。溜溜球另外覆盖指针内定位、绳长边界、松手收回、重复命中冷却、跟随速度限制与无人按住的自动回收。集成测试另外验证开局空手、通过快捷栏格子上装武器、模板副本做成物品后同样能装备、HUD 更新，以及玩家输入、世界重建和场景衔接。物品栏验收另外验证选中不触发使用、`use()` 返回值决定扣数、武器物品装备后不消耗、滚轮可以停在空格上。
 
 重新生成本次加入的原创像素占位素材（需要 Pillow）：
 
@@ -165,4 +212,4 @@ godot --headless --path . --script res://tests/test_combat_integration.gd
 python tools/generate_combat_art.py
 ```
 
-该脚本只生成长剑、长棍和训练靶，不会覆盖地形和玩家素材。
+该脚本只生成长剑、长棍、溜溜球和训练靶，不会覆盖地形和玩家素材。

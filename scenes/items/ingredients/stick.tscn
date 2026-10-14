@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://2jins0go35b2"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ingredients/material_model.gd" id="1_model"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_model"]
 [ext_resource type="Texture2D" uid="uid://dqo4mb8xwwoy7" path="res://assets/items/ingredients/stick.png" id="2_icon"]
-[ext_resource type="Resource" path="res://resources/items/ingredients/stick.tres" id="3_data"]
+[ext_resource type="Resource" uid="uid://d3tftbwgj0hti" path="res://resources/items/ingredients/stick.tres" id="3_data"]
 
 [sub_resource type="ConvexPolygonShape2D" id="Shape_stick"]
 points = PackedVector2Array(-6, 3, 3, -6, 6, -4, -4, 6)

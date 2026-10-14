@@ -16,6 +16,7 @@ func _ready() -> void:
 	
 	inventory = player.inventory
 	inventory.inventory_update.connect(bag_update)
+	inventory.handy_selection_changed.connect(_refresh_selection)
 	
 	init_button()
 	bag_update()
@@ -35,11 +36,19 @@ func init_button() -> void:
 		button.put_item_signal.connect(_on_slot_put.bind(pos)) 
 		button.swap_item_signal.connect(_on_slot_swap.bind(pos)) #快捷栏交换：有别的物品要放进本格
 
+		button.quick_move_signal.connect(_on_slot_quick_move.bind(pos)) #shift+左键：整堆挪回背包
+
+		button.select_item_signal.connect(_on_slot_select.bind(pos)) #左键切换选中
+
+
+
 ##物品栏更新函数，同步物品栏数据
 func bag_update() ->void:
 
 	for pos in item_buttons.size():
 		_slot_update(pos)
+
+	_refresh_selection()
 
 ##把某一格的显示和物品栏数据对齐
 func _slot_update(pos:int) ->void:
@@ -77,18 +86,50 @@ func _on_slot_put(item_id:int,num:int,pos:int) ->void:
 
 	inventory.add_item(item_id,num)
 
-# ==============================================================================
-# ↓↓↓↓ 快捷栏交换：本格放着别的物品时，和拖来的那一格整堆互换 ↓↓↓↓
-# ==============================================================================
 ##from_pos是拖出来的那一格，to_pos是本格(由信号绑定，只看格子本身)
 func _on_slot_swap(item_id:int,num:int,from_pos:int,to_pos:int) ->void:
 	inventory.swap_handy_slot(from_pos,to_pos,item_id,num)
-# ==============================================================================
-# ↑↑↑↑ 快捷栏交换（结束）↑↑↑↑
-# ==============================================================================
+
+#//////////////////////选取部分
+##把每一格的描边和背包里记的选中格对齐
+func _refresh_selection() ->void:
+
+	var selected:int = inventory.get_selected_handy()
+
+	for pos in item_buttons.size():
+		item_buttons[pos].set_selected(pos == selected)
+
+##左键切换选中
+func _on_slot_select(pos:int, _bound_pos:int) ->void:
+	inventory.select_handy_slot(pos)
+
+##选中只在物品栏露出来、又没在拖东西的时候生效
+func _can_operate() ->bool:
+
+	if player == null or inventory == null:
+		return false
+
+	if !visible:
+		return false
+
+	return true
+
+##从 from 按 step 走到下一格，绕圈；没有选中时从环外起步（向后落在第1格）
+func _next_slot(from:int, step:int) ->int:
+
+	if from < 0:
+		from = -1 if step > 0 else 0
+
+	return posmod(from + step, Inventory.HANDY_SLOT_COUNT)
+
+
+##快捷移动
+func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
+	inventory.quick_move_to_bag(pos)
 
 
 func _input(event: InputEvent) -> void:
+
 	if event is InputEventKey:
 		if Input.is_action_just_pressed("alchemy_menu"):
 			visible = !visible
@@ -96,4 +137,29 @@ func _input(event: InputEvent) -> void:
 
 		if Input.is_action_just_pressed("open_inventory")&&visible == false:
 				visible = true
+
+	#物品栏选中
+	if !_can_operate():
+		return
+
+	var key_event:InputEventKey = event as InputEventKey
+
+	if key_event != null and key_event.pressed and !key_event.echo:
+		var digit:int = key_event.physical_keycode - KEY_0
+
+		if digit >= 1 and digit <= Inventory.HANDY_SLOT_COUNT:
+			inventory.select_handy_slot(digit - 1)
+			get_viewport().set_input_as_handled()
+
+		return
+
+	var mouse_event:InputEventMouseButton = event as InputEventMouseButton
+
+	if mouse_event != null and mouse_event.pressed:
+		if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			inventory.select_handy_slot(_next_slot(inventory.get_selected_handy(),-1))
+			get_viewport().set_input_as_handled()
+		elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			inventory.select_handy_slot(_next_slot(inventory.get_selected_handy(),1))
+			get_viewport().set_input_as_handled()
 

@@ -4,12 +4,13 @@
 
 ## 近战武器
 
-鼠标瞄准，左键挥击，按住连续攻击，Q 切换长剑 / 长棍。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾。出生点附近的训练靶可验证伤害、暴击与击退。
+鼠标瞄准，左键挥击，按住连续攻击。开局空手，武器只能从物品栏装备：选中长剑、长棍或溜溜球所在的格子（默认第 1 格长剑、第 2 格长棍），再按左键即装备。Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` 三个入口都已移除，玩家侧没有绕过物品栏的装备路径。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾；溜溜球参考泰拉瑞亚，球停在指针处持续命中，指针超出绳长时贴在边界上，松手立刻收回。出生点附近的训练靶可验证伤害、暴击与击退。
 
-- **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres` 或 `resources/weapons/long_staff.tres`。
+- **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres`、`resources/weapons/long_staff.tres` 或 `resources/weapons/yoyo.tres`。
 - **长剑类通用模板**：[swing_weapon_template.tres](resources/weapons/templates/swing_weapon_template.tres)，150° 扇形横扫。
 - **长棍类通用模板**：[staff_weapon_template.tres](resources/weapons/templates/staff_weapon_template.tres)，40° 小扇形与由远到近过渡。
-- **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图，再加入玩家的 `weapon_loadout` 数组；无需新增脚本或攻击场景。
+- **溜溜球类通用模板**：[yoyo_weapon_template.tres](resources/weapons/templates/yoyo_weapon_template.tres)，球跟随指针并受绳长限制，松手收回。
+- **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图；再建一个 `resources/items/weapons/*.tres`（脚本用 `WeaponData`，`weapon` 指向它），玩家就能从物品栏装备（见 [武器只能从物品栏装备](docs/weapons.md#武器只能从物品栏装备)）。无需新增脚本或攻击场景。
 - **添加不同类型武器**：继承 `WeaponDefinition` / `WeaponAttack`，配置独立攻击场景，无需修改玩家或控制器。
 - **完整说明**：[武器架构、参数、扩展和测试](docs/weapons.md)。
 
@@ -73,7 +74,7 @@ Project_YongXian/
 
 草地、土路、岩土、树林和水岸的接触边沿使用像素融合与圆角过渡，跨区块保持一致；箱庭出入口附近也会逐渐混入相邻区域的地面色调，同时保留每个箱庭的单一群系与通行规则。
 
-地面按种子随机散落**石头和木棍**，每图约 20–70 个，分布疏松；小屋外优先放置两种材料。靠近后按 **E** 拾取，材料进入背包并可堆叠，已拾取点位在返回地图后不会补刷。按 **B** 打开炼金界面，从背包拖入材料：石头提供矿物属性，木棍提供木质属性，两者反应生成固结属性；固结目前是无直接使用效果的终产物属性。
+地面按种子随机散落**石头和木棍**，每图约 20–70 个，分布疏松；小屋外优先放置两种材料。靠近后按 **E** 拾取，材料进入背包并可堆叠，已拾取点位在返回地图后不会补刷。按 **B** 打开炼金界面，从背包拖入材料：石头提供矿物属性，木棍提供木质属性，两者反应生成固结属性；固结目前是无直接使用效果的终产物属性。背包与快捷栏之间除了拖拽，还支持 **shift+左键** 整堆挪动：背包→快捷栏优先叠进已有的同种格子，没有同种就放第一个空格，快捷栏占满时整堆留在背包里；快捷栏→背包整格挪回。
 
 触及出入口时，角色与画面**双向瞬切**到目标箱庭的对应入口，不播放跨区域行走或淡入淡出。汇流区域保留来自不同主干 / 岔路的多个入口，各入口对应自己的返回方向。相机以当前地图矩形设置硬 `limit`，切图时重置 `smoothing`，避免画面滑过区域间隙。
 
@@ -122,11 +123,14 @@ Project_YongXian/
 
 [地形过渡与材料验收](tools/test_transitions_materials.gd) 已在 Godot 4.6 通过：带截图 7,388 项检查、四个种子共 2,374 个材料点位，包含跨区块邻格、入口色调、确定性生成、实际 E 键拾取、返回不补刷、背包保留及投放区与坩埚反应。连续通路、26 项切图状态与小地图模式回归同时通过。
 
-[协作者功能兼容验收](tools/test_inventory_material_compatibility.gd) 通过 225 项检查：保留原材料与配方，验证快捷栏整堆交换、同类分格、返还背包、真实 GUI 拖拽的 E 键旋转和拾取隔离；四种子两变体的全部战斗/Boss 房均匹配现有怪物池，新增怪物群系自动纳入地图主题，独立采样与正式游戏一致。
+[协作者功能兼容验收](tools/test_inventory_material_compatibility.gd) 通过 235 项检查：保留原材料与配方，验证快捷栏整堆交换、同类分格、返还背包、shift+左键快捷移动、真实 GUI 拖拽的 E 键旋转和拾取隔离；四种子两变体的全部战斗/Boss 房均匹配现有怪物池，新增怪物群系自动纳入地图主题，独立采样与正式游戏一致。
+
+[物品栏选中与使用验收](tools/test_handy_selection_and_use.gd) 通过 55 项检查：选中只认格子（整堆交换后不漂移、清空后自动取消）、左键点格子只切换选中不触发使用、`use()` 的返回值决定扣几份（返回超量时最多扣空本格）、武器转给武器系统装备且不消耗、数字键与滚轮换选中、拖拽时输入被挡住。
 
 ```sh
 godot --headless --path . --script res://tools/test_transitions_materials.gd
 godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
+godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
 godot --headless --path . --script res://tools/test_map_integration.gd
@@ -180,7 +184,7 @@ godot --headless --path . --script res://tests/test_weapons.gd
 | `friction` | 1800 | 松开按键后每秒衰减的速度 |
 | `collide_with_terrain` | true | 是否阻挡深水 / 浅水 / 森林 / 针叶林 / 雨林 / 山地 / 雪峰（道路格除外） |
 | `max_health` | 10 | 新世界初始最大生命；切换箱庭保留当前生命 |
-| `weapon_loadout` | 武器资源数组 | 按数组顺序循环装备，沿用现有武器参数与配置 |
+| `weapon_loadout` | 已移除 | 玩家不再自带或循环切换武器，装备只能从物品栏选中使用 |
 
 按住方向键约 **0.16 秒**到达最大速度（每帧 +23.3），松开约 **0.12 秒**停下（每帧 −30）。位移按 X/Y 分轴推进，贴着海岸走不会卡住。
 
@@ -195,11 +199,14 @@ godot --headless --path . --script res://tests/test_weapons.gd
 | 按键 | 功能 |
 |------|------|
 | W A S D / 方向键 | 移动主角 |
-| 鼠标 / 左键 | 瞄准 / 挥剑，按住连续攻击 |
-| Q | 循环切换长剑 / 长棍 |
+| 鼠标 / 左键 | 瞄准 / 使用选中物品（选中武器格时才是挥击，按住连续攻击；选中空格、材料、药水时不攻击） |
+| 1 – 9 / 滚轮 / 左键点格子 | 选中物品栏格子，空格也能选中（只切换选中，不触发使用） |
+| 右键点格子 | 选中该格并使用 |
 | M | 展开全屏地图 / 返回右上角小地图 |
 | R | 换个种子重开世界 |
 | F3 | 开关右上角性能面板 |
+
+开局空手，快捷栏第 1 格是长剑、第 2 格是长棍，选中第 1 格按左键即可拿到长剑（武器只能从物品栏装备，没有按键或接口可以绕过）。
 
 左上角显示种子、格子与区块坐标、当前地形与群系、以及是否走在路上；右上角小地图保持常驻，按 M 可展开全屏地图查看自身位置与本局已探索区块。
 

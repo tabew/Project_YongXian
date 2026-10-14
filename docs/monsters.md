@@ -175,7 +175,7 @@ BaseMonster (CharacterBody2D)
 
 调试输入 `K` 会调用 `GameWorld.kill_monsters_in_tree()`，只处理 `monsters` 组并调用 `kill()`，不直接操作掉落物或其他实体。
 
-“给”的 `_finalize_death()` 在 `_is_dead` 保护下只创建一个 `GroundPickup`：一次从 LOOT 随机流取样，`roll < 0.70` 为给毛（ID 4），否则为猴皮（ID 5），数量固定为1。普通致命伤害和 K 击杀均掉落，非致命受击、地图卸载和距离回收不掉落；重复死亡调用不会重复创建。新掉落先放在 spawner 下，`GameWorld._refresh_pickup()` 同时扫描它和当前地图物品根节点，死亡后即可按 E 收取。切图时沿用原有非怪物实体保存逻辑，未拾取掉落物随所属地图隐藏/恢复；已拾取物品不会重建。两件材料各有独立图标、`IngredientData` 和 `MaterialModel` 场景，注册在药水模板之前，不预设用户未指定的炼金/物理属性，也不加入自然地面材料生成。
+“给”的 `_finalize_death()` 在 `_is_dead` 保护下只创建一个 `GroundPickup`：一次从 LOOT 随机流取样，`roll < 0.70` 为给毛（ID 4），否则为猴皮（ID 3），数量固定为1。普通致命伤害和 K 击杀均掉落，非致命受击、地图卸载和距离回收不掉落；重复死亡调用不会重复创建。新掉落先放在 spawner 下，`GameWorld._refresh_pickup()` 同时扫描它和当前地图物品根节点，死亡后即可按 E 收取。切图时沿用原有非怪物实体保存逻辑，未拾取掉落物随所属地图隐藏/恢复；已拾取物品不会重建。两件材料各有独立图标、`IngredientData` 和 `MaterialModel` 场景，注册在药水模板之前，不预设用户未指定的炼金/物理属性，也不加入自然地面材料生成。
 
 ## 动画
 

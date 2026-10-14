@@ -74,7 +74,7 @@ func _run() -> void:
 	f.holder.add_child(stone)
 	stone.global_position = actor.global_position + Vector2(4, 0)
 	var stick := GroundPickup.new()
-	stick.bind(items.create(3), 2, f.source)
+	stick.bind(items.create(1), 2, f.source)
 	f.holder.add_child(stick)
 	stick.global_position = actor.global_position + Vector2(-4, 0)
 	check(actor.swallow_nearby_items() == 2, "patrol_swallows_actual_world_items")
@@ -117,7 +117,7 @@ func _run() -> void:
 	actor = trio[0]
 	f.player.global_position = actor.global_position + Vector2(128, 0)
 	var carried := GroundPickup.new()
-	carried.bind(items.create(3), 4, f.source)
+	carried.bind(items.create(1), 4, f.source)
 	f.holder.add_child(carried)
 	carried.global_position = trio[1].global_position
 	check(trio[1].swallow_nearby_items() == 1, "future_group_member_swallows_original_stack")

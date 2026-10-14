@@ -73,6 +73,12 @@ func _try_hit(hurtbox: CombatHurtbox) -> void:
 	if _hit_receivers.has(target_id):
 		return
 	_hit_receivers[target_id] = true
+	_land_hit(hurtbox)
+
+
+## 生成一次命中并交给目标。子类改变“谁在什么时候可以被命中”的规则后，
+## 仍然复用这里的伤害、暴击、击退与命中信号。
+func _land_hit(hurtbox: CombatHurtbox) -> void:
 	var hit: CombatHit = CombatHit.new()
 	hit.source = wielder
 	hit.weapon_id = definition.id

@@ -21,7 +21,11 @@ var _pickup_label: Label = null
 
 
 func _ready() -> void:
-	hint_label.text = "WASD 移动　·　E 拾取　·　左键 攻击　·　Q 换武器　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
+	# ==========================================================================
+	# ↓↓↓↓ 改动：操作提示跟着新的物品栏选中/使用方式走 ↓↓↓↓
+	hint_label.text = "WASD 移动　·　E 拾取　·　左键 使用选中物品　·　1-9/滚轮/点格子 选中　·　右键格子 使用　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
+	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
+	# ==========================================================================
 	_pickup_label = Label.new()
 	_pickup_label.name = "PickupHint"
 	_pickup_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
