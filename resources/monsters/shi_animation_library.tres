@@ -1,77 +1,166 @@
-[gd_resource type="AnimationLibrary" load_steps=9 format=3]
+[gd_resource type="AnimationLibrary" format=3 uid="uid://y106isvvkupd"]
 
-[sub_resource type="Animation" id="Idle"]
-resource_name = "Idle"
-length = 1.0
-loop_mode = 1
+[sub_resource type="Animation" id="Death"]
+resource_name = "Death"
+length = 0.25
 tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath(".:body_squash")
 tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.5, 1), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [Vector2(1, 1), Vector2(1.03, 0.97), Vector2(1, 1)]}
-
-[sub_resource type="Animation" id="Hop"]
-resource_name = "Hop"
-length = 0.22
-tracks/0/type = "value"
-tracks/0/path = NodePath(".:_visual_height")
-tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.11, 0.22), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [0.0, 5.0, 0.0]}
-tracks/1/type = "value"
-tracks/1/path = NodePath(".:body_squash")
-tracks/1/interp = 1
-tracks/1/keys = {"times": PackedFloat32Array(0, 0.11, 0.22), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [Vector2(1.15, 0.85), Vector2(0.9, 1.1), Vector2(1, 1)]}
-
-[sub_resource type="Animation" id="Rest"]
-resource_name = "Rest"
-length = 1.0
-loop_mode = 1
-tracks/0/type = "value"
-tracks/0/path = NodePath(".:_visual_height")
-tracks/0/keys = {"times": PackedFloat32Array(0), "transitions": PackedFloat32Array(1), "update": 0, "values": [0.0]}
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.4, 0.25)]
+}
 
 [sub_resource type="Animation" id="Form"]
 resource_name = "Form"
 length = 0.25
 tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath(".:body_squash")
 tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.12, 0.25), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [Vector2(1, 1), Vector2(1.2, 0.8), Vector2(1, 1)]}
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.12, 0.25),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.2, 0.8), Vector2(1, 1)]
+}
+
+[sub_resource type="Animation" id="Hop"]
+resource_name = "Hop"
+length = 0.22
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:_visual_height")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.11, 0.22),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.0, 5.0, 0.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:body_squash")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.11, 0.22),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1.15, 0.85), Vector2(0.9, 1.1), Vector2(1, 1)]
+}
+
+[sub_resource type="Animation" id="Hurt"]
+resource_name = "Hurt"
+length = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:_visual_height")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:visual_pose")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.025, 0.05, 0.075, 0.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(-4, 0), Vector2(4, 0), Vector2(-2, 0), Vector2(0, 0)]
+}
+
+[sub_resource type="Animation" id="Idle"]
+resource_name = "Idle"
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:body_squash")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.03, 0.97), Vector2(1, 1)]
+}
+
+[sub_resource type="Animation" id="Rest"]
+resource_name = "Rest"
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:_visual_height")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+
+[sub_resource type="Animation" id="Shoot"]
+resource_name = "Shoot"
+length = 0.18
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:body_squash")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.18),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.1, 0.9), Vector2(1, 1)]
+}
 
 [sub_resource type="Animation" id="Spin"]
 resource_name = "Spin"
 length = 0.6
 loop_mode = 1
 tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath(".:body_squash")
 tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.3, 0.6), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [Vector2(1, 1), Vector2(1.03, 0.97), Vector2(1, 1)]}
-
-[sub_resource type="Animation" id="Shoot"]
-resource_name = "Shoot"
-length = 0.18
-tracks/0/type = "value"
-tracks/0/path = NodePath(".:body_squash")
-tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.08, 0.18), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [Vector2(1, 1), Vector2(1.1, 0.9), Vector2(1, 1)]}
-
-[sub_resource type="Animation" id="Hurt"]
-resource_name = "Hurt"
-length = 0.1
-tracks/0/type = "value"
-tracks/0/path = NodePath(".:_visual_height")
-tracks/0/keys = {"times": PackedFloat32Array(0), "transitions": PackedFloat32Array(1), "update": 0, "values": [0.0]}
-tracks/1/type = "value"
-tracks/1/path = NodePath(".:visual_pose")
-tracks/1/interp = 1
-tracks/1/keys = {"times": PackedFloat32Array(0, 0.025, 0.05, 0.075, 0.1), "transitions": PackedFloat32Array(1, 1, 1, 1, 1), "update": 0, "values": [Vector2(0, 0), Vector2(-4, 0), Vector2(4, 0), Vector2(-2, 0), Vector2(0, 0)]}
-
-[sub_resource type="Animation" id="Death"]
-resource_name = "Death"
-length = 0.25
-tracks/0/type = "value"
-tracks/0/path = NodePath(".:body_squash")
-tracks/0/interp = 1
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.25), "transitions": PackedFloat32Array(1, 1), "update": 0, "values": [Vector2(1, 1), Vector2(1.4, 0.25)]}
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(1.03, 0.97), Vector2(1, 1)]
+}
 
 [resource]
-_data = {&"Idle": SubResource("Idle"), &"Hop": SubResource("Hop"), &"Rest": SubResource("Rest"), &"Form": SubResource("Form"), &"Spin": SubResource("Spin"), &"Shoot": SubResource("Shoot"), &"Hurt": SubResource("Hurt"), &"Death": SubResource("Death")}
+_data = {
+&"Death": SubResource("Death"),
+&"Form": SubResource("Form"),
+&"Hop": SubResource("Hop"),
+&"Hurt": SubResource("Hurt"),
+&"Idle": SubResource("Idle"),
+&"Rest": SubResource("Rest"),
+&"Shoot": SubResource("Shoot"),
+&"Spin": SubResource("Spin")
+}

@@ -1,21 +1,23 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bat40hakwh4kd"]
 
-[ext_resource type="Script" path="res://scripts/items/ItemModel.gd" id="1_model"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/sticky_ball.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_model"]
+[ext_resource type="Texture2D" uid="uid://bh0p0f2dej48m" path="res://assets/items/ingredients/sticky_ball.svg" id="2_icon"]
 [ext_resource type="Resource" path="res://resources/items/ingredients/sticky_ball.tres" id="3_data"]
 
 [sub_resource type="CircleShape2D" id="Shape_ball"]
 radius = 5.0
 
-[node name="StickyBallModel" type="RigidBody2D"]
+[node name="StickyBallModel" type="RigidBody2D" unique_id=599708288]
 texture_filter = 1
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_model")
 data = ExtResource("3_data")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=695728887]
 scale = Vector2(3, 3)
 texture = ExtResource("2_icon")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1112999720]
 scale = Vector2(3, 3)
 shape = SubResource("Shape_ball")

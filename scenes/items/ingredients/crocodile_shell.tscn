@@ -1,16 +1,23 @@
-[gd_scene load_steps=5 format=3]
-[ext_resource type="Script" path="res://scripts/items/ItemModel.gd" id="1_model"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/crocodile_shell.svg" id="2_icon"]
+[gd_scene format=3 uid="uid://urq0cc8ua5mg"]
+
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_model"]
+[ext_resource type="Texture2D" uid="uid://dndoai7nlfqqt" path="res://assets/items/ingredients/crocodile_shell.svg" id="2_icon"]
 [ext_resource type="Resource" path="res://resources/items/ingredients/crocodile_shell.tres" id="3_data"]
+
 [sub_resource type="RectangleShape2D" id="Shape"]
 size = Vector2(10, 10)
-[node name="CrocodileShellModel" type="RigidBody2D"]
+
+[node name="CrocodileShellModel" type="RigidBody2D" unique_id=508649550]
 texture_filter = 1
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_model")
 data = ExtResource("3_data")
-[node name="Sprite2D" type="Sprite2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=313735231]
 scale = Vector2(3, 3)
 texture = ExtResource("2_icon")
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=904484171]
 scale = Vector2(3, 3)
 shape = SubResource("Shape")

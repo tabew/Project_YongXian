@@ -2,11 +2,13 @@
 
 [ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_80wqk"]
 [ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="1_cnamo"]
+[ext_resource type="Resource" uid="uid://0o07321sh6g1" path="res://resources/items/ingredients/herb.tres" id="2_3vjeg"]
 
 [node name="Herb" type="RigidBody2D" unique_id=38936394]
 collision_layer = 8
 collision_mask = 8
 script = ExtResource("1_80wqk")
+data = ExtResource("2_3vjeg")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=882047740]
 scale = Vector2(0.667, 0.667)

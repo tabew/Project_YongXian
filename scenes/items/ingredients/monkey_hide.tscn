@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_x7e3l"]
 [ext_resource type="Texture2D" uid="uid://b2pmiqa4dsiyx" path="res://assets/items/ingredients/monkey_hide.svg" id="2_icon"]
+[ext_resource type="Resource" uid="uid://jkq4sit5pc7n" path="res://resources/items/ingredients/monkey_hide.tres" id="3_data"]
 
 [sub_resource type="RectangleShape2D" id="Shape_hide"]
 size = Vector2(12, 12)
@@ -11,6 +12,7 @@ texture_filter = 1
 collision_layer = 8
 collision_mask = 8
 script = ExtResource("1_x7e3l")
+data = ExtResource("3_data")
 metadata/_custom_type_script = "uid://dn8rwxlqagowl"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1932186100]

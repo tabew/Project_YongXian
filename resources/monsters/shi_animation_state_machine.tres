@@ -1,45 +1,56 @@
-[gd_resource type="AnimationNodeStateMachine" load_steps=13 format=3]
+[gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://btjo2mmq7xj3d"]
+
+[sub_resource type="AnimationNodeAnimation" id="Death"]
+animation = &"Death"
+
+[sub_resource type="AnimationNodeAnimation" id="Form"]
+animation = &"Form"
+
+[sub_resource type="AnimationNodeAnimation" id="Hop"]
+animation = &"Hop"
+
+[sub_resource type="AnimationNodeAnimation" id="Hurt"]
+animation = &"Hurt"
 
 [sub_resource type="AnimationNodeAnimation" id="Idle"]
 animation = &"Idle"
-[sub_resource type="AnimationNodeAnimation" id="Hop"]
-animation = &"Hop"
+
 [sub_resource type="AnimationNodeAnimation" id="Rest"]
 animation = &"Rest"
-[sub_resource type="AnimationNodeAnimation" id="Form"]
-animation = &"Form"
-[sub_resource type="AnimationNodeAnimation" id="Spin"]
-animation = &"Spin"
+
 [sub_resource type="AnimationNodeAnimation" id="Shoot"]
 animation = &"Shoot"
-[sub_resource type="AnimationNodeAnimation" id="Hurt"]
-animation = &"Hurt"
-[sub_resource type="AnimationNodeAnimation" id="Death"]
-animation = &"Death"
-[sub_resource type="AnimationNodeStateMachineTransition" id="Travel"]
+
+[sub_resource type="AnimationNodeAnimation" id="Spin"]
+animation = &"Spin"
+
 [sub_resource type="AnimationNodeStateMachineTransition" id="Start"]
 advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="Travel"]
+
 [sub_resource type="AnimationNodeStateMachineTransition" id="Auto"]
-advance_mode = 2
 switch_mode = 2
+advance_mode = 2
+
 [sub_resource type="AnimationNodeStateMachineTransition" id="DeathTransition"]
 
 [resource]
-states/Idle/node = SubResource("Idle")
-states/Idle/position = Vector2(240, 160)
-states/Hop/node = SubResource("Hop")
-states/Hop/position = Vector2(440, 0)
-states/Rest/node = SubResource("Rest")
-states/Rest/position = Vector2(640, 0)
-states/Form/node = SubResource("Form")
-states/Form/position = Vector2(440, 160)
-states/Spin/node = SubResource("Spin")
-states/Spin/position = Vector2(640, 160)
-states/Shoot/node = SubResource("Shoot")
-states/Shoot/position = Vector2(840, 160)
-states/Hurt/node = SubResource("Hurt")
-states/Hurt/position = Vector2(440, 320)
 states/Death/node = SubResource("Death")
 states/Death/position = Vector2(240, 320)
+states/Form/node = SubResource("Form")
+states/Form/position = Vector2(440, 160)
+states/Hop/node = SubResource("Hop")
+states/Hop/position = Vector2(440, 0)
+states/Hurt/node = SubResource("Hurt")
+states/Hurt/position = Vector2(440, 320)
+states/Idle/node = SubResource("Idle")
+states/Idle/position = Vector2(240, 160)
+states/Rest/node = SubResource("Rest")
+states/Rest/position = Vector2(640, 0)
+states/Shoot/node = SubResource("Shoot")
+states/Shoot/position = Vector2(840, 160)
+states/Spin/node = SubResource("Spin")
+states/Spin/position = Vector2(640, 160)
 states/Start/position = Vector2(40, 160)
 transitions = ["Start", "Idle", SubResource("Start"), "Idle", "Hop", SubResource("Travel"), "Hop", "Idle", SubResource("Travel"), "Hop", "Rest", SubResource("Travel"), "Rest", "Hop", SubResource("Travel"), "Rest", "Idle", SubResource("Travel"), "Idle", "Form", SubResource("Travel"), "Form", "Spin", SubResource("Auto"), "Spin", "Shoot", SubResource("Travel"), "Shoot", "Spin", SubResource("Auto"), "Idle", "Hurt", SubResource("Travel"), "Hurt", "Idle", SubResource("Auto"), "Spin", "Hurt", SubResource("Travel"), "Idle", "Death", SubResource("DeathTransition"), "Spin", "Death", SubResource("DeathTransition")]

@@ -1,21 +1,23 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://xgffmabd1eop"]
 
-[ext_resource type="Script" path="res://scripts/items/ItemModel.gd" id="1_model"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/slime_liquid.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_model"]
+[ext_resource type="Texture2D" uid="uid://d2283bsbnthad" path="res://assets/items/ingredients/slime_liquid.svg" id="2_icon"]
 [ext_resource type="Resource" path="res://resources/items/ingredients/slime_liquid.tres" id="3_data"]
 
 [sub_resource type="RectangleShape2D" id="Shape_liquid"]
 size = Vector2(10, 10)
 
-[node name="SlimeLiquidModel" type="RigidBody2D"]
+[node name="SlimeLiquidModel" type="RigidBody2D" unique_id=2114351367]
 texture_filter = 1
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_model")
 data = ExtResource("3_data")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1875926995]
 scale = Vector2(3, 3)
 texture = ExtResource("2_icon")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1211188006]
 scale = Vector2(3, 3)
 shape = SubResource("Shape_liquid")
