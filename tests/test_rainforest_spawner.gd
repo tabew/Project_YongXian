@@ -15,7 +15,7 @@ const PLAYER_SCENE: PackedScene = preload("res://scenes/game/player.tscn")
 const BASE_SCENE: PackedScene = preload("res://scenes/monsters/base_monster.tscn")
 const GIVE_SPAWN_DATA: MonsterSpawnData = preload("res://resources/monsters/give_spawn_data.tres")
 const ALLOWED_BIOMES: Array[int] = [
-	Biome.Kind.FOREST, Biome.Kind.TAIGA, Biome.Kind.TROPICAL_RAINFOREST,
+	Biome.Kind.SAVANNA, Biome.Kind.GRASSLAND, Biome.Kind.FOREST, Biome.Kind.TROPICAL_RAINFOREST,
 ]
 
 
@@ -64,7 +64,7 @@ func _run() -> void:
 	generator.walkable = false
 	spawner.setup(generator, manager, player)
 	spawner._on_chunk_applied(Vector2i.ZERO)
-	if not spawner.monsters.is_empty() or spawner.get_child_count() != 0:
+	if not spawner.monsters.is_empty() or _monster_child_count(spawner) != 0:
 		_fail("Blocked forest tiles must not spawn monsters")
 		return
 
@@ -79,12 +79,20 @@ func _run() -> void:
 		_fail("Base template is missing its spawn context or inherited health bar")
 		return
 	spawner.clear_monsters()
-	if not spawner.monsters.is_empty() or spawner.get_child_count() != 0:
+	if not spawner.monsters.is_empty() or _monster_child_count(spawner) != 0:
 		_fail("Base template did not clean up through MonsterSpawner")
 		return
 
-	print("FOREST_SPAWNER_TEST_PASSED allowed=forest,taiga,rainforest other_biomes_rejected=true template_configured=true")
+	print("FOREST_SPAWNER_TEST_PASSED allowed=savanna,grassland,forest,rainforest other_biomes_rejected=true template_configured=true")
 	get_tree().quit(0)
+
+
+func _monster_child_count(spawner: MonsterSpawner) -> int:
+	var count: int = 0
+	for child: Node in spawner.get_children():
+		if child is BaseMonster:
+			count += 1
+	return count
 
 
 func _fail(message: String) -> void:

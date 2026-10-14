@@ -4,7 +4,7 @@
 
 ## 当前实现
 
-- 当前唯一怪物是“给”：只刷新在森林、针叶林、热带雨林群系的可通行格子中，生成后可以跨群系追逐玩家。
+- 当前唯一怪物是“给”：只生成在稀树草原、草原、森林、热带雨林群系的可通行格子中，生成后可以跨群系追逐玩家。
 - 每个已加载区块按 `MonsterSpawnData` 独立掷随机；同一种子、同一区块、同一个 `monster_id` 会得到稳定一致的候选位置。
 - 生成器逐格尝试可通行位置，同一区块内已经占用的格子不会重复放怪。
 - `GameWorld/MonsterSpawner` 已加入 `resources/monsters/give_spawn_data.tres`，所以普通游戏流程无需额外脚本接线。
@@ -67,7 +67,7 @@ BaseMonster (CharacterBody2D)
 
 ## 生成流程
 
-1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player)`。
+1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player, active_map)`。
 2. `setup()` 清空旧怪物，订阅 `ChunkManager.chunk_applied`，并立即为所有已加载区块生成怪物。
 3. 每个区块内遍历 `spawn_definitions`；RNG 种子由世界种子、区块坐标和 `monster_id` 共同产生。
 4. `MonsterSpawnData.can_spawn_at()` 要求当前格可通行，且当前格群系在 `allowed_biomes` 中或列表为空。
@@ -77,6 +77,8 @@ BaseMonster (CharacterBody2D)
 当前 `GameWorld` 会让整张地图长期加载，所以切图时调用 `setup()` 替换当前地图的存活怪物，并关闭 `MonsterSpawner._process()` 里的距离回收逻辑。生成器自带按 `unload_radius + despawn_margin_chunks` 回收怪物的设计，仍可用于未来的动态世界或独立测试。
 
 本局击杀记录保存在 `MonsterSpawner._defeated_spawn_ids`，身份为 `monster_id + 原始生成格坐标`，巡逻或追击后的位置不会改变身份。`BaseMonster.kill()` 只在真正死亡时发出一次 `killed`；正常伤害死亡和 K 调试击杀都会记录，切图清理、距离回收、隐藏邻图裁剪则不会记录。重放区块的确定性生成序列时，死怪仍占用原有名额，所以返回旧箱庭既不会复活，也不会在另一个位置补刷替代怪物；未击杀的生成名额仍正常出现。连续调用 `setup()` 且使用同一生成器时保留记录，`build_world()` 创建新生成器时清空，包括使用相同种子重开一局。记录目前仅在本局内存中保存。
+
+正式箱庭在生成前通过 `active_map` 剔除邻图候选格，避免两个区域共享一个区块时，邻图先占满 `max_per_chunk` 名额再被地图裁剪，导致当前入口无怪。未传此参数的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
 
 地图切换时，非怪物掉落物会保存到所属地图的 `MapEntities_<map_id>` 根节点；离开当前箱庭后隐藏并暂停，返回后恢复。每帧 `GameWorld._confine_map_monsters()` 会把怪物位置限制在当前地图矩形内，已加载的隐藏邻图也不会留下跨图怪物。
 
@@ -132,10 +134,10 @@ BaseMonster (CharacterBody2D)
 
 - `resources/monsters/give_ai_config.tres`：10 格视野、10 格攻击距离、1 秒攻击冷却、2.5 秒丢失视野宽限、`search_on_lost_sight = false`（丢失视野直接回 `Patrol`）、移动速度 72、决策间隔 0.1 秒、LOD 距离 14 格。
 - `GiveMonsterAttack`（`scripts/monsters/give_monster_attack.gd`）：距离 6 到 10 格（包含两端）时寻找 1 格内仍在 `throwable_stones` 组且实现 `throw_at(target, damage)` 的石子，找到则播放 `Throw` 并投掷，造成 1 点伤害；距离 < 6 格时，在落点可走、整段位移不穿墙且落点视线无遮挡时发起跳跃，跳跃时长 0.42 秒，动画在 0.21 秒处把 `_visual_height` 抬到 24 像素，落点由脚本插值处理，结束且与玩家距离 <= 2 格时造成 1 点近战伤害。
-- 远程攻击时附近没有石子则本次出手失败，按 0.3 秒失败重试，不会切换到跳跃；当前地图还没有正式石子，因此这个分支会保持等待。
+- 远程攻击时附近没有可用石子则本次出手失败，按 0.3 秒失败重试，不会切换到跳跃；只取怪物1格内、可见且无遮挡的石子，不会跨地图取用隐藏或暂停的材料。正式地图的石头 `GroundPickup`（ID 2）已接入投掷接口。
 - 受击会打断跳跃并清空出手意图，旧位移不会覆盖击退；看不到攻击者时会把受击位置记为可疑信息，交给 `Search` 处理而不是直接回家。
 
-投石接口不依赖具体石子类型。正式石子应该沿用 `IngredientData` / `IngredientModel`，进入 `throwable_stones` 组并实现 `throw_at`，怪物代码不需要知道石子种类。
+投石接口不依赖具体石子类型。正式地面石头使用 `IngredientData` / `GroundPickup`，仅 ID 2 的可用石头进入 `throwable_stones` 组并实现 `throw_at(target, damage)`；炼金界面的 `MaterialModel` 不参与地图投石。出手时固定瞄准位置，以320像素/秒飞行并绘制弧线；用扫掠圆检测目标、物理射线和逐格 supercover 检查阻挡，命中扣1点生命，移动目标可以躲开。飞行时立即移出弹药组并禁止 E 拾取，落地后恢复原材料与弹药资格，不复制或消耗材料；堆叠只分出一个石头。离开箱庭时飞行随物品根节点暂停，返回继续，空闲地面物品不执行物理轮询。
 
 ## 受击、击退与死亡
 
@@ -150,6 +152,8 @@ BaseMonster (CharacterBody2D)
 - 死亡会进入 `Death` 并 `queue_free()`，目前不等待死亡动画播完；`kill()` 会把已经带在身上的 `ingredients` / `throwable_stones` 子节点先移到世界父节点，避免随怪物一起销毁。
 
 调试输入 `K` 会调用 `GameWorld.kill_monsters_in_tree()`，只处理 `monsters` 组并调用 `kill()`，不直接操作掉落物或其他实体。
+
+“给”的 `_finalize_death()` 在 `_is_dead` 保护下只创建一个 `GroundPickup`：一次从 LOOT 随机流取样，`roll < 0.70` 为给毛（ID 4），否则为猴皮（ID 5），数量固定为1。普通致命伤害和 K 击杀均掉落，非致命受击、地图卸载和距离回收不掉落；重复死亡调用不会重复创建。新掉落先放在 spawner 下，`GameWorld._refresh_pickup()` 同时扫描它和当前地图物品根节点，死亡后即可按 E 收取。切图时沿用原有非怪物实体保存逻辑，未拾取掉落物随所属地图隐藏/恢复；已拾取物品不会重建。两件材料各有独立图标、`IngredientData` 和 `MaterialModel` 场景，注册在药水模板之前，不预设用户未指定的炼金/物理属性，也不加入自然地面材料生成。
 
 ## 动画
 
@@ -200,6 +204,10 @@ godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
 godot --headless --path . res://tests/test_monster_persistence.tscn
+godot --headless --path . --script res://tools/test_give_loot.gd
+godot --headless --path . res://tests/test_monster_active_map.tscn
+godot --headless --path . --script res://tools/test_monster_region_entry.gd
+godot --headless --path . --script res://tools/test_give_ground_stone.gd
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="IngredientData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/items/ingredients/give_fur.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_data")
+id = 4
+name = "给毛"
+texture = ExtResource("2_icon")
+item_scene_path = "res://scenes/items/ingredients/give_fur.tscn"

@@ -141,7 +141,10 @@ func _try_throw_stone(monster: BaseMonster, target: Node2D) -> bool:
 		monster.stop_navigation()
 		return false
 	monster.play_monster_animation(&"Throw", true)
-	stone.call("throw_at", target, DAMAGE)
+	var result: Variant = stone.call("throw_at", target, DAMAGE)
+	if result is bool and not result:
+		_set_intent(monster, false)
+		return false
 	_set_intent(monster, true)
 	return true
 
@@ -153,10 +156,17 @@ func _find_stone(monster: BaseMonster) -> Node2D:
 		if not node is Node2D or not node.has_method("throw_at"):
 			continue
 		var stone := node as Node2D
+		if stone.is_queued_for_deletion() or not stone.is_visible_in_tree():
+			continue
 		var distance: float = monster.global_position.distance_to(stone.global_position)
-		if distance <= nearest_distance:
-			nearest = stone
-			nearest_distance = distance
+		if distance > nearest_distance:
+			continue
+		if stone.has_method("can_be_thrown") and not stone.call("can_be_thrown"):
+			continue
+		if monster.world_generator != null and not monster.has_clear_line_to_position(stone.global_position):
+			continue
+		nearest = stone
+		nearest_distance = distance
 	return nearest
 
 

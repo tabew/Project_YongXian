@@ -104,7 +104,8 @@ func _refresh() -> void:
 	var lines := PackedStringArray()
 	lines.append("种子 %d" % GameState.world_seed)
 	if spec != null:
-		lines.append("%s　区域 %d × %d" % [_world.describe_map(), spec.extent.x, spec.extent.y])
+		var room_kind: int = _world.get_generator().run.type_of(spec.node_id)
+		lines.append("%s · %s　区域 %d × %d" % [_world.describe_map(), RoomType.name_of(room_kind), spec.extent.x, spec.extent.y])
 		lines.append(spec.shape_name())
 	if _player is PlayerCharacter:
 		var character := _player as PlayerCharacter
@@ -133,6 +134,9 @@ func _refresh() -> void:
 	stats_lines.append("生成 %.2f ms/块" % stats["generate_avg_ms"])
 	stats_lines.append("铺图 %.2f ms/块" % stats["apply_avg_ms"])
 	stats_lines.append("共生成 %d　缓存命中 %d" % [stats["generated"], stats["cache_hits"]])
+	var spawner := _world.get_parent().get_node_or_null("MonsterSpawner") as MonsterSpawner
+	if spawner != null:
+		stats_lines.append("本区域怪物 %d" % spawner.get_spawned_monster_count())
 	stats_lines.append("FPS %d" % Engine.get_frames_per_second())
 	stats_label.text = "\n".join(stats_lines)
 

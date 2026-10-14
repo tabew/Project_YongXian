@@ -138,7 +138,7 @@ godot --headless --path . --script res://tests/test_weapons.gd
 
 ## 生物群系
 
-保留 14 种群系与 16 种地形数据定义。**每张区域严格只有一个 `MapSpec.biome_id`**：其完整矩形内的所有格子，包括围合边缘、室内和池塘，`sample_biome()` 都返回这一群系。区域主题按世界种子打乱分配，初图固定为森林。正式游戏从现有怪物定义自动取可用群系，所有战斗与 Boss 区域都选择怪物池支持的主题；目前为森林、针叶林或热带雨林，并保留至少一个雨林战斗区域。其他房型保留多样主题，新增怪物配置后自动扩展战斗群系。下表说明数据定义中的主要地形对应关系；实际区域按主题配置可走地面、阻挡地形和边界。
+保留 14 种群系与 16 种地形数据定义。**每张区域严格只有一个 `MapSpec.biome_id`**：其完整矩形内的所有格子，包括围合边缘、室内和池塘，`sample_biome()` 都返回这一群系。区域主题按世界种子打乱分配，初图固定为森林。正式游戏从现有怪物定义自动取可用群系，所有战斗与 Boss 区域都选择怪物池支持的主题；目前为稀树草原、草原、森林或热带雨林，并保留至少一个雨林战斗区域。其他房型保留多样主题，新增怪物配置后自动扩展战斗群系。下表说明数据定义中的主要地形对应关系；实际区域按主题配置可走地面、阻挡地形和边界。
 
 | 群系 | 主要地形 | 群系 | 主要地形 |
 |------|----------|------|----------|
@@ -225,11 +225,13 @@ python tools/generate_art.py
 
 完整怪物架构、生成配置与扩展说明见 [docs/monsters.md](docs/monsters.md)。
 
-箱庭切换使用通用 `MonsterSpawner`，按当前地图已加载区块生成怪物，并裁剪共享边界的生成范围；隐藏预加载邻图不会刷新可见怪物。本局击杀按怪物类型与原始生成格记录，返回旧箱庭或重载区块时不会复活，也不会补刷替代怪物；只有新开世界才清空记录。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
+箱庭切换使用通用 `MonsterSpawner`，按当前地图已加载区块生成怪物，在生成前排除邻图候选格，避免共享区块的生成名额被邻图占用；隐藏预加载邻图不会刷新可见怪物。HUD 显示房间类型，F3 面板显示本区域怪物数；森林/雨林主题的非战斗房间仍不刷怪。本局击杀按怪物类型与原始生成格记录，返回旧箱庭或重载区块时不会复活，也不会补刷替代怪物；只有新开世界才清空记录。怪物死亡掉落保存到所属箱庭，离开后隐藏并暂停，返回后恢复。
 
-“给”只会随已加载区块生成在森林、针叶林、热带雨林群系的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
+“给”只会随已加载区块生成在稀树草原、草原、森林、热带雨林群系的可通行格子中，同一种子与区块会得到稳定一致的随机位置。玩家进入 10 格范围后，怪物只有在视线无阻挡时才产生攻击意图：距离 6 至 10 格（包含两端）时拾取 1 格内的石子投掷，低于 6 格时弹跳到玩家面前并近战。手边没有石子时停止本次远程攻击，不会改用跳跃。两种攻击均造成 1 点伤害且攻击间隔均为 1 秒。“给”拥有 100 点生命，玩家每个新世界以 10 点生命开始。
 
-所有怪物应继承 `scripts/monsters/base_monster.gd`，AI 本体在 `scripts/monsters/ai/`：`EnemyBrain` 是通用四状态机（`Patrol` / `Chase` / `Attack` / `Search`），每只怪物各有一份黑板、感知、导航与攻击实现，共享 `EnemyAIConfig` 数据配置、`PerceptionManager` 与 `PathRequestScheduler` 两个自动加载服务以及 `EventBus`。丢失玩家视野超过 `lose_sight_grace` 后，怪物会把 `PatrolAnchor` 改写成自己当时所在的位置，并在原地附近继续巡逻，绝不回到出生点或原巡逻点，所以状态集合里没有 Return / GoHome / Flee。感知复用场景中的 `TargetRayCast`（`RayCast2D`）检测物理墙体，并逐格检查程序化地形的可通行性；寻路复用 `AStarGrid2D`，攻击由各怪物自己的 `EnemyAttack` 实现（“给”是 6~10 格投石、6 格内跳跃近战），投石与跳跃都不能穿墙。子类通过 `has_player_aggro()` 查询是否处于 Chase / Attack，通过 `clear_player_aggro()` 立刻放弃目标并以当前位置为锚点回到巡逻。“给”只限制刷新位置属于森林、针叶林或热带雨林群系，生成后可以追逐玩家进入其他群系。
+击杀“给”必定在死亡位置掉落一件专属材料：70% 为给毛（ID 4），30% 为猴皮（ID 5），一次抽样二选一，不会空掉落或同时掉两件；普通伤害死亡和 K 击杀走同一流程，切图卸载不掉落。靠近后按 E 拾取进入现有背包。未拾取的掉落物按箱庭保存，返回时恢复；拾取后和怪物死亡记录一样不会补刷。两件材料不会加入自然散落材料生成池。
+
+所有怪物应继承 `scripts/monsters/base_monster.gd`，AI 本体在 `scripts/monsters/ai/`：`EnemyBrain` 是通用四状态机（`Patrol` / `Chase` / `Attack` / `Search`），每只怪物各有一份黑板、感知、导航与攻击实现，共享 `EnemyAIConfig` 数据配置、`PerceptionManager` 与 `PathRequestScheduler` 两个自动加载服务以及 `EventBus`。丢失玩家视野超过 `lose_sight_grace` 后，怪物会把 `PatrolAnchor` 改写成自己当时所在的位置，并在原地附近继续巡逻，绝不回到出生点或原巡逻点，所以状态集合里没有 Return / GoHome / Flee。感知复用场景中的 `TargetRayCast`（`RayCast2D`）检测物理墙体，并逐格检查程序化地形的可通行性；寻路复用 `AStarGrid2D`，攻击由各怪物自己的 `EnemyAttack` 实现（“给”是 6~10 格投石、6 格内跳跃近战），正式地面石头（`GroundPickup`，ID 2）已实现投掷接口，仅取1格内可用石头；投石有飞行过程，命中扣1血，落地后仍可拾取，飞行期间不可再次取用。投石与跳跃都不能穿墙。子类通过 `has_player_aggro()` 查询是否处于 Chase / Attack，通过 `clear_player_aggro()` 立刻放弃目标并以当前位置为锚点回到巡逻。“给”只限制生成位置属于稀树草原、草原、森林或热带雨林群系，生成后可以追逐玩家进入其他群系。
 
 通用生成器位于 `scripts/monsters/monster_spawner.gd`，生成配置类型位于 `monster_spawn_data.gd`。新增怪物时右键 `scenes/monsters/base_monster.tscn` 创建继承场景，再新建一份 `MonsterSpawnData` 资源并加入 `GameWorld/MonsterSpawner` 的 `spawn_definitions` 数组即可。生成器通过公开的 `monsters: Array[BaseMonster]` 保存存活怪物，怪物死亡时自动移除引用，并在区块卸载或更换世界时遍历释放。`resources/monsters/give_spawn_data.tres` 是“给”的首份配置示例。
 
@@ -258,6 +260,10 @@ godot --headless --path . res://tests/test_monster_hit_effects.tscn
 godot --path . res://tests/test_hit_flash_render.tscn --rendering-method gl_compatibility
 godot --headless --path . res://tests/test_monster_animations.tscn
 godot --headless --path . res://tests/test_monster_persistence.tscn
+godot --headless --path . --script res://tools/test_give_loot.gd
+godot --headless --path . res://tests/test_monster_active_map.tscn
+godot --headless --path . --script res://tools/test_monster_region_entry.gd
+godot --headless --path . --script res://tools/test_give_ground_stone.gd
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn

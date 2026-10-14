@@ -234,7 +234,7 @@ func _setup_map_monsters() -> void:
 		root.visible = is_active
 		root.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
 	_monster_map = _current_node
-	monster_spawner.setup(_generator, chunk_manager, player)
+	monster_spawner.setup(_generator, chunk_manager, player, player.active_map)
 	# 新加载器长期保留整张地图，不能沿用旧版按距离卸载且等区块重铺才刷新的逻辑。
 	# 只关闭 spawner 的距离回收；怪物子节点仍正常处理，切图由 setup 统一回收。
 	monster_spawner.set_process(false)
@@ -278,7 +278,7 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 				continue
 			var pickup := GroundPickup.new()
 			pickup.name = "Material_%d_%d" % [entry["tile"].x, entry["tile"].y]
-			pickup.bind(data, int(entry["amount"]))
+			pickup.bind(data, int(entry["amount"]), _generator)
 			pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 			entity_root.add_child(pickup)
 		_material_maps[spec.node_id] = true
@@ -296,12 +296,18 @@ func _refresh_pickup() -> void:
 		hud.show_pickup(null)
 		return
 	var entity_root: Node2D = _map_entity_roots.get(_current_node)
-	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
+	# 新击杀掉落暂存在 spawner，切图后归入所属地图；两处都要能立即拾取。
+	var pickup_roots: Array[Node2D] = [monster_spawner]
 	if entity_root != null:
-		for child: Node in entity_root.get_children():
+		pickup_roots.append(entity_root)
+	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
+	for pickup_root: Node2D in pickup_roots:
+		for child: Node in pickup_root.get_children():
 			if not child is GroundPickup or child.is_queued_for_deletion():
 				continue
 			var pickup := child as GroundPickup
+			if not pickup.is_available_for_pickup():
+				continue
 			var distance: float = player.global_position.distance_squared_to(pickup.global_position)
 			if distance < closest and _can_reach_pickup(pickup.global_position):
 				closest = distance

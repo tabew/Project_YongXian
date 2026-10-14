@@ -16,6 +16,8 @@ var content: MapContent = null
 var _generator: WorldGenerator = null
 var _chunk_manager: ChunkManager = null
 var _player: PlayerCharacter = null
+## 正式箱庭只为当前地图消耗生成名额；空值保留通用流式世界行为。
+var _active_map: MapSpec = null
 var _monsters_by_chunk: Dictionary = {}
 ## 本局死亡记录按原始生成位置保存，巡逻/追击后的位置不影响身份。
 var _defeated_spawn_ids: Dictionary = {}
@@ -24,7 +26,8 @@ var _defeated_spawn_ids: Dictionary = {}
 func setup(
 	generator: WorldGenerator,
 	chunk_manager: ChunkManager,
-	player: PlayerCharacter
+	player: PlayerCharacter,
+	active_map: MapSpec = null
 ) -> void:
 	# 同一生成器代表同一局；切换箱庭保留记录，新开世界（包括相同种子）重置。
 	if generator != _generator:
@@ -32,6 +35,7 @@ func setup(
 	clear_monsters()
 	_generator = generator
 	_player = player
+	_active_map = active_map
 	if _chunk_manager != null and _chunk_manager.chunk_applied.is_connected(_on_chunk_applied):
 		_chunk_manager.chunk_applied.disconnect(_on_chunk_applied)
 	_chunk_manager = chunk_manager
@@ -146,6 +150,10 @@ func _on_monster_killed(spawn_id: String) -> void:
 ## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。
 ## 未接入内容层时一律允许，行为与改造前一致。
 func allows_spawn_at(tile: Vector2i) -> bool:
+	if _active_map != null:
+		var local: Vector2i = tile - _active_map.origin
+		if not _active_map.contains_local(local.x, local.y):
+			return false
 	if content == null or _generator == null:
 		return true
 	var spec: MapSpec = _generator.sample_map(tile)
