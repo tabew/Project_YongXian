@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" uid="uid://bpk4eaaq2go1w" path="res://scripts/items/weapons/weapon_data.gd" id="1_weapon"]
+[ext_resource type="Texture2D" path="res://assets/weapons/yoyo.png" id="2_texture"]
+[ext_resource type="Resource" path="res://resources/weapons/yoyo.tres" id="3_definition"]
+
+[resource]
+script = ExtResource("1_weapon")
+id = 202
+name = "溜溜球"
+texture = ExtResource("2_texture")
+max_stack = 1
+weapon_definition = ExtResource("3_definition")
+metadata/_custom_type_script = "uid://bpk4eaaq2go1w"

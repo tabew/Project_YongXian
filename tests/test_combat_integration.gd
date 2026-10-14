@@ -109,6 +109,15 @@ func _run() -> void:
 	# ↑↑↑↑ 改动：用物品栏装备长剑 ↑↑↑↑
 	# ==========================================================================
 
+	# 溜溜球也按同一套接入物品栏：临时登记一个武器物品放进第 3 格，用完再收回去
+	var yoyo_item_id: int = 202
+	var yoyo_item: WeaponData = WeaponData.new()
+	yoyo_item.id = yoyo_item_id
+	yoyo_item.name = "测试溜溜球"
+	yoyo_item.max_stack = 1
+	yoyo_item.weapon_definition = load("res://resources/weapons/yoyo.tres") as WeaponDefinition
+	_put_hotbar_item(inventory, root.get_node("ItemListGlobal"), 2, yoyo_item)
+
 	await create_timer(0.8).timeout
 	controller.set_aim(dummy.global_position - player.global_position)
 	await _screenshot("idle.png")
@@ -149,7 +158,33 @@ func _run() -> void:
 	await create_timer(0.7).timeout
 	_check(not controller.is_attacking(), "Switching while held requires a fresh mouse press")
 	_mouse(false)
-	await _use_hotbar_slot(player, 1)
+
+	# ==========================================================================
+	# ↓↓↓↓ 改动：溜溜球的用例改成从物品栏第3格装备（协作者新增的机制保留） ↓↓↓↓
+	await _use_hotbar_slot(player, 2)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"yoyo", "Using the yoyo hotbar slot equips the yoyo")
+	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD updates to the yoyo")
+
+	# 溜溜球：按住时球停在绳长上限持续命中，松手后立刻收回
+	var yoyo_hits: Array[CombatHit] = []
+	var count_yoyo_hit: Callable = func(hit: CombatHit, _amount: float) -> void: yoyo_hits.append(hit)
+	dummy.health.damaged.connect(count_yoyo_hit)
+	player.global_position = dummy.global_position - controller.aim_direction * 40.0
+	controller.set_aim(dummy.global_position - player.global_position)
+	_mouse(true)
+	await create_timer(0.4).timeout
+	_check(controller.is_attacking(), "Yoyo responds to mouse attack input")
+	_check(not yoyo_hits.is_empty(), "Thrown yoyo damages the world target")
+	await create_timer(0.8).timeout
+	_check(controller.is_attacking(), "Holding the mouse keeps the yoyo out on its rope")
+	await _screenshot("yoyo_throw.png")
+	_mouse(false)
+	await create_timer(0.4).timeout
+	_check(not controller.is_attacking(), "Releasing the mouse reels the yoyo back")
+	_check(yoyo_hits.size() >= 2, "A held yoyo lands repeated hits on the world target")
+	dummy.health.damaged.disconnect(count_yoyo_hit)
+	# ↑↑↑↑ 改动：溜溜球用例（结束）↑↑↑↑
+	# ==========================================================================
 
 	var template_copies: Array[WeaponDefinition] = [
 		(load("res://resources/weapons/templates/swing_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
@@ -177,6 +212,8 @@ func _run() -> void:
 	await _use_hotbar_slot(player, 0)
 	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Hotbar slot 1 still equips the original sword")
 	# 测试注入的物品和格子都收回去，后面的用例继续用干净的开局背包
+	inventory.clear_handy_slot(2)
+	item_list.templates.erase(item_list.get_template(yoyo_item_id))
 	for index: int in range(template_copies.size()):
 		inventory.clear_handy_slot(2 + index)
 		item_list.templates.erase(item_list.get_template(item_ids[index]))

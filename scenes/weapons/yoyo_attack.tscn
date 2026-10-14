@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/yoyo_attack.gd" id="1_yoyo"]
+
+[node name="YoyoAttack" type="Node2D"]
+z_index = 2
+script = ExtResource("1_yoyo")
+
+[node name="Ball" type="Sprite2D" parent="."]
+texture_filter = 1

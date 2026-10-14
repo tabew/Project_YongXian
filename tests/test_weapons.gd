@@ -2,6 +2,7 @@ extends SceneTree
 
 const LONGSWORD: SwingWeaponDefinition = preload("res://resources/weapons/longsword.tres")
 const LONG_STAFF: DepthStrikeWeaponDefinition = preload("res://resources/weapons/long_staff.tres")
+const YOYO: YoyoWeaponDefinition = preload("res://resources/weapons/yoyo.tres")
 const DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
 var _failures: int = 0
@@ -259,6 +260,7 @@ func _run() -> void:
 	_check(dummy.sprite.visible and dummy.health.current_health == 100.0, "Training dummy respawns with full health")
 
 	await _test_long_staff()
+	await _test_yoyo()
 
 	_arena.free()
 	await process_frame
@@ -372,3 +374,101 @@ func _test_long_staff() -> void:
 	invalid.near_pitch_degrees = LONG_STAFF.near_pitch_degrees
 	invalid.arc_degrees = 100.0
 	_check(not invalid.validation_errors().is_empty(), "Staff rejects an oversized fan")
+
+func _test_yoyo() -> void:
+	_check(YOYO.validation_errors().is_empty(), "Yoyo configuration is valid")
+
+	# 指针在攻击范围内：球停在指针处，指针之外的敌人打不到。
+	_fixture(YOYO)
+	var at_cursor: HealthComponent = _target(Vector2(50, 0), 2, 4, 2)
+	var past_cursor: HealthComponent = _target(Vector2(78, 0))
+	var behind: HealthComponent = _target(Vector2(-60, 0))
+	await _sync_physics()
+	var attack: WeaponAttack = _start(Vector2(50, 0))
+	_check(attack is YoyoAttack, "Yoyo uses its own flight behavior, not a swing")
+	var ball: YoyoAttack = attack as YoyoAttack
+	attack._physics_process(0.05)
+	_check(at_cursor.current_health == 1000.0, "Yoyo windup cannot hit")
+	attack._physics_process(0.2)
+	_check(is_equal_approx(ball._distance, 50.0), "Ball rests exactly on the cursor when it is inside the rope length")
+	_check(at_cursor.current_health == 1000.0 - _data.damage, "Cursor-positioned ball hits the target under it")
+	_check(past_cursor.current_health == 1000.0, "Ball never travels past the cursor")
+	_check(behind.current_health == 1000.0, "Yoyo stays on the aimed side")
+
+	# 指针超出绳长：球贴在边界上。
+	_fixture(YOYO)
+	var edge: HealthComponent = _target(Vector2(80, 0), 2, 4, 2)
+	var unreachable: HealthComponent = _target(Vector2(200, 0))
+	var friendly: HealthComponent = _target(Vector2(80, 0), 1)
+	var wrong_layer: HealthComponent = _target(Vector2(80, 0), 2, 2)
+	var hits: Array[CombatHit] = []
+	edge.damaged.connect(func(hit: CombatHit, _amount: float) -> void: hits.append(hit))
+	await _sync_physics()
+	attack = _start(Vector2(200, 0))
+	attack._physics_process(0.3)
+	_check(is_equal_approx((attack as YoyoAttack)._distance, _data.max_range), "Ball stops at the rope boundary when the cursor is out of range")
+	_check(hits.size() == 1 and edge.current_health == 1000.0 - _data.damage, "Boundary ball hits what it touches")
+	_check(hits[0].weapon_id == _data.id, "Yoyo reports its own weapon id")
+	_check(unreachable.current_health == 1000.0, "Boundary ball cannot reach past the rope length")
+	_check(friendly.current_health == 1000.0, "Yoyo ignores the same team")
+	_check(wrong_layer.current_health == 1000.0, "Hit mask filters other layers")
+	attack._physics_process(0.1)
+	_check(hits.size() == 1, "Repeat hits respect the invulnerability interval")
+	attack._physics_process(_data.hit_interval)
+	_check(hits.size() == 2, "A parked yoyo keeps damaging the same target")
+
+	# 按住维持，松手立刻收回。
+	_controller.set_trigger_pressed(true)
+	attack._physics_process(0.05)
+	_check(_controller.is_attacking() and (attack as YoyoAttack)._phase == YoyoAttack.Phase.FOLLOW, "Holding keeps the ball out on its rope")
+	_controller.set_trigger_pressed(false)
+	attack._physics_process(0.05)
+	_check((attack as YoyoAttack)._phase == YoyoAttack.Phase.RETURN, "Releasing starts the reel-in")
+	attack._physics_process(1.0)
+	_check(not _controller.is_attacking(), "Releasing reels the yoyo back and ends the throw")
+	_check(not _controller.try_attack(), "Reuse delay blocks an immediate second throw")
+
+	# 指针换边时球跟着走，速度受 follow_speed 限制。
+	_fixture(YOYO)
+	var left: HealthComponent = _target(Vector2(-40, 0), 2, 4, 2)
+	await _sync_physics()
+	attack = _start(Vector2(8, 0))
+	attack._physics_process(0.2)
+	_check(left.current_health == 1000.0, "Ball has not crossed to the other side yet")
+	_controller.set_aim(Vector2(-40, 0))
+	attack._physics_process(0.02)
+	_check((attack as YoyoAttack)._direction.x < 0.0, "Ball turns toward the new cursor position")
+	_check(left.current_health == 1000.0, "Limited follow speed means the ball has not arrived yet")
+	attack._physics_process(0.1)
+	_check(left.current_health == 1000.0 - _data.damage, "Ball follows the cursor across the wielder")
+
+	# 没有按住过（AI 或测试直接出手）时，球滞空到有效期结束再自己回来。
+	_fixture(YOYO)
+	attack = _start(Vector2(60, 0))
+	attack._physics_process(_data.windup_seconds + 0.2)
+	_check(is_equal_approx((attack as YoyoAttack)._distance, 60.0), "Unheld yoyo still reaches the cursor")
+	attack._physics_process(_data.active_seconds)
+	_check(not _controller.is_attacking(), "An unheld yoyo reels itself in once the active window ends")
+
+	var template: YoyoWeaponDefinition = load("res://resources/weapons/templates/yoyo_weapon_template.tres") as YoyoWeaponDefinition
+	_check(template != null and template.validation_errors().is_empty(), "Yoyo template is ready to equip")
+	_fixture(template)
+	_data.id = &"custom_yoyo"
+	_data.damage = 25.0
+	_check(_controller.equip(_data), "Yoyo template copy equips after editing its stats")
+	var copy_target: HealthComponent = _target(Vector2(50, 0), 2, 4, 2)
+	await _sync_physics()
+	attack = _start(Vector2(50, 0))
+	attack._physics_process(1.0)
+	_check(copy_target.current_health == 975.0, "Yoyo template copy deals its edited damage")
+	_check(template.damage == 12.0 and template.id == &"new_yoyo_weapon", "Editing a copy leaves the yoyo template unchanged")
+
+	var invalid: YoyoWeaponDefinition = YOYO.duplicate(true) as YoyoWeaponDefinition
+	invalid.max_range = invalid.hand_distance
+	_check(not invalid.validation_errors().is_empty(), "Yoyo rejects a rope shorter than the hand distance")
+	invalid.max_range = 84.0
+	invalid.recovery_seconds = 0.05
+	_check(not invalid.validation_errors().is_empty(), "Yoyo requires the recovery to cover the return")
+	invalid.recovery_seconds = 0.3
+	invalid.hit_interval = 0.0
+	_check(not invalid.validation_errors().is_empty(), "Yoyo rejects a zero repeat interval")

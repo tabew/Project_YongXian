@@ -195,3 +195,51 @@ func swap_handy_slot(from_pos:int,to_pos:int,item_id:int,num:int = 1) ->void:
 
     inventory_update.emit()
 
+##快捷移动用的格子查找：先找已有的同种格子，没有同种再找空格，都满了返回-1
+func find_handy_slot_for(item_id:int) ->int:
+
+    for pos in HANDY_SLOT_COUNT:
+        if get_handy_slot_id(pos) == item_id:
+            return pos
+
+    for pos in HANDY_SLOT_COUNT:
+        if get_handy_slot_id(pos) < 0:
+            return pos
+
+    return -1
+
+##快捷移动(shift+左键)：背包->物品栏(快捷栏)，整堆挪进一个格子，返回实际挪走的数量
+func quick_move_to_handy(item_id:int,num:int = 1) ->int:
+
+    var count:int = num
+    var owned:int = get_count(item_id)
+
+    if item_id < 0 or count <= 0 or owned <= 0:
+        return 0
+
+    if count > owned:
+        count = owned #背包里没有这么多，只挪有的
+
+    var pos:int = find_handy_slot_for(item_id)
+
+    if pos < 0:
+        return 0 #物品栏满了，整堆留在背包里
+
+    add_handy_slot(pos,item_id,count)
+    remove_item(item_id,count)
+
+    return count
+
+##快捷移动(shift+左键)：物品栏(快捷栏)->背包，整格挪回背包，返回实际挪走的数量
+func quick_move_to_bag(pos:int) ->int:
+
+    var item_id:int = get_handy_slot_id(pos)
+    var count:int = get_handy_slot_count(pos)
+
+    if item_id < 0 or count <= 0:
+        return 0
+
+    add_item(item_id,count)
+    remove_handy_slot(pos,count)
+
+    return count
