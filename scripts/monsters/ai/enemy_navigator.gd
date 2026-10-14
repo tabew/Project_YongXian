@@ -145,7 +145,7 @@ func follow() -> FollowResult:
 		return FollowResult.NO_PATH
 
 	var next_position: Vector2 = WorldGenerator.tile_to_world(next_tile)
-	host.velocity = host.global_position.direction_to(next_position) * host.navigation_speed
+	host.velocity = host.global_position.direction_to(next_position) * host.movement_speed()
 	host.move_and_slide()
 	if host.get_slide_collision_count() > 0:
 		# 撞到物理墙体：下个决策帧立刻重新寻路。

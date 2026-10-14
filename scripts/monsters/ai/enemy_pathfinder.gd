@@ -17,6 +17,8 @@ static func build_path(
 	var empty: Array[Vector2i] = []
 	if host == null or host.world_generator == null:
 		return empty
+	if start_tile == target_tile or not host.is_navigation_tile_allowed(target_tile):
+		return empty
 
 	var margin := Vector2i(margin_tiles, margin_tiles)
 	var min_tile := Vector2i(

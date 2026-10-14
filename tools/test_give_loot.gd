@@ -54,10 +54,17 @@ func _run() -> void:
 	world.get_node("GameHUD/BagUi").hide()
 	world.get_node("GameHUD/Alchemy").hide()
 	var allowed: Array[int] = [Biome.Kind.SAVANNA, Biome.Kind.GRASSLAND, Biome.Kind.FOREST, Biome.Kind.TROPICAL_RAINFOREST]
-	_check(world._generator.config.combat_biomes == PackedInt32Array(allowed), "game_uses_exact_four_requested_combat_biomes")
+	_check(GIVE_DATA.allowed_biomes == allowed, "give_keeps_exact_four_requested_biomes")
+	var pool: Array[int] = []
+	for definition: MonsterSpawnData in world.monster_spawner.spawn_definitions:
+		for biome_id: int in definition.allowed_biomes:
+			if not pool.has(biome_id):
+				pool.append(biome_id)
+	pool.sort()
+	_check(world._generator.config.combat_biomes == PackedInt32Array(pool), "game_uses_all_registered_monster_habitats")
 	for spec: MapSpec in world._generator.map_specs():
 		if world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0:
-			_check(spec.biome_id in allowed, "actual_combat_region_supports_give")
+			_check(spec.biome_id in pool, "actual_combat_region_supports_registered_monster_pool")
 		for entry: Dictionary in GroundMaterials.plan(world._generator, spec):
 			_check(entry["item_id"] not in [4, 5], "exclusive_death_loot_never_spawns_as_ground_material")
 

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MonsterLootTable" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/monsters/monster_loot_table.gd" id="1_table"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/slime_liquid.tres" id="2_liquid"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/sticky_ball.tres" id="3_ball"]
+
+[resource]
+script = ExtResource("1_table")
+items = Array[Resource]([ExtResource("2_liquid"), ExtResource("3_ball")])
+weights = PackedFloat32Array(80, 20)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyAIConfig" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/ai/enemy_ai_config.gd" id="1_config"]
+[resource]
+script = ExtResource("1_config")
+ai_id = &"crocodile"
+patrol_radius_tiles = 8.0
+patrol_point_attempts = 32
+patrol_start_delay = 0.6
+patrol_wait_time = 1.0
+vision_distance_tiles = 10.0
+vision_angle_degrees = 360.0
+perception_interval = 0.10
+attack_range_tiles = 1.5
+attack_cooldown = 1.0
+move_speed = 160.0
+path_refresh_interval = 0.20
+path_margin_tiles = 8
+update_interval = 0.05
+lose_sight_grace = 2.5
+search_on_lost_sight = false

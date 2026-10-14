@@ -109,7 +109,7 @@ func _refresh() -> void:
 		lines.append(spec.shape_name())
 	if _player is PlayerCharacter:
 		var character := _player as PlayerCharacter
-		lines.append("生命 %d/%d" % [character.health, character.max_health])
+		lines.append("生命 %s/%s" % [str(character.health), str(character.max_health)])
 	lines.append("坐标 %d, %d　区块 %d, %d" % [tile.x, tile.y, chunk.x, chunk.y])
 	var terrain_name: String = Terrain.name_of(_world.get_terrain_at(position))
 	if spec != null and spec.cottage != null:

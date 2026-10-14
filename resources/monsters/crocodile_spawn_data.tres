@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CrocodileSpawnData" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/crocodile_spawn_data.gd" id="1_spawn"]
+[ext_resource type="PackedScene" path="res://scenes/monsters/crocodile_monster.tscn" id="2_monster"]
+[resource]
+script = ExtResource("1_spawn")
+monster_id = &"crocodile"
+monster_scene = ExtResource("2_monster")
+allowed_biomes = Array[int]([8])
+chunk_spawn_chance = 1.0
+max_per_chunk = 2
+candidate_attempts = 32
+independent_spawn_slots = true
+bank_spawn_chance = 0.10

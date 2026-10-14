@@ -1,7 +1,7 @@
 class_name PlayerCharacter
 extends CharacterBody2D
 
-signal health_changed(current: int, maximum: int)
+signal health_changed(current: float, maximum: float)
 signal defeated
 
 ## 主角占位实现：WASD / 方向键控制，速度带加速度与摩擦力，摄像机跟随。
@@ -38,7 +38,7 @@ signal defeated
 var terrain_source: WorldGenerator = null
 ## 当前箱庭的矩形通行边界，出口由 GameWorld 瞬切。
 var active_map: MapSpec = null
-var health: int = 10
+var health: float = 10.0
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -46,13 +46,13 @@ var _cached_walkable: bool = true
 
 
 func _ready() -> void:
-	health = max_health
-	health_changed.emit(health, max_health)
+	health = float(max_health)
+	health_changed.emit(health, float(max_health))
 
 
 func _physics_process(delta: float) -> void:
 	weapon_controller.set_aim(get_global_mouse_position() - global_position)
-	if health <= 0:
+	if health <= 0.0:
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
 		return
@@ -149,17 +149,17 @@ func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec
 	global_position = world_position
 	_cached_tile = Vector2i(2147483647, 2147483647)
 	if reset_health:
-		health = max_health
-		health_changed.emit(health, max_health)
+		health = float(max_health)
+		health_changed.emit(health, float(max_health))
 
 
-func take_damage(amount: int) -> void:
-	if amount <= 0 or health <= 0:
+func take_damage(amount: float) -> void:
+	if amount <= 0.0 or health <= 0.0:
 		return
-	health = maxi(health - amount, 0)
-	health_changed.emit(health, max_health)
-	_notify("受到 %d 点伤害，剩余生命 %d/%d" % [amount, health, max_health])
-	if health == 0:
+	health = maxf(health - amount, 0.0)
+	health_changed.emit(health, float(max_health))
+	_notify("受到 %s 点伤害，剩余生命 %s/%s" % [str(amount), str(health), str(max_health)])
+	if health <= 0.0:
 		velocity = Vector2.ZERO
 		defeated.emit()
 		_notify("生命归零")

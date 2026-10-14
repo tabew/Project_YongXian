@@ -10,6 +10,8 @@
 [ext_resource type="Script" uid="uid://cqo31wyudktju" path="res://scripts/monsters/monster_spawn_data.gd" id="7_spawn_data"]
 [ext_resource type="Resource" uid="uid://non3ac5ccv1p" path="res://resources/inventory/inventory.tres" id="8_bsk45"]
 [ext_resource type="Resource" path="res://resources/monsters/give_spawn_data.tres" id="8_give_spawn"]
+[ext_resource type="Resource" path="res://resources/monsters/crocodile_spawn_data.tres" id="9_crocodile_spawn"]
+[ext_resource type="Resource" path="res://resources/monsters/shi_spawn_data.tres" id="10_shi_spawn"]
 [ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/alchemy/alchemy.tscn" id="8_lsk7w"]
 [ext_resource type="PackedScene" uid="uid://cei2bfjxogxkp" path="res://scenes/ui/inventory/bottom_bag_ui.tscn" id="12_nms8r"]
 
@@ -22,7 +24,7 @@ tile_set = ExtResource("2_tileset")
 
 [node name="MonsterSpawner" type="Node2D" parent="." unique_id=46169950]
 script = ExtResource("6_monsters")
-spawn_definitions = Array[ExtResource("7_spawn_data")]([ExtResource("8_give_spawn")])
+spawn_definitions = Array[ExtResource("7_spawn_data")]([ExtResource("8_give_spawn"), ExtResource("9_crocodile_spawn"), ExtResource("10_shi_spawn")])
 
 [node name="Player" parent="." unique_id=512090753 groups=["player"] instance=ExtResource("3_player")]
 inventory = ExtResource("8_bsk45")

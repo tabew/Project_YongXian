@@ -16,6 +16,10 @@ var _death_committed: bool = false
 ## 怪物类型的 AI 数据配置；留空时使用通用默认值。
 @export var ai_config: EnemyAIConfig
 
+@export_group("死亡掉落")
+## 配置有效表后真正死亡必定掉一件；卸载/回收不调用死亡流程。
+@export var death_loot: MonsterLootTable
+
 @export_group("受击反馈")
 ## 基础反馈只产生约2像素位移；武器击退仍按强度加算，形成更明显的推开。
 @export_range(0.0, 500.0, 1.0) var default_knockback_speed: float = 40.0
@@ -457,6 +461,7 @@ func kill() -> void:
 		return
 	_death_committed = true
 	play_monster_animation(&"Death", true)
+	_drop_death_loot()
 	killed.emit()
 	var world_parent: Node = get_parent()
 	if world_parent != null:
@@ -464,6 +469,42 @@ func kill() -> void:
 			if child.is_in_group("ingredients") or child.is_in_group("throwable_stones"):
 				child.reparent(world_parent, true)
 	queue_free()
+
+
+func _drop_death_loot() -> void:
+	if death_loot == null or get_parent() == null:
+		return
+	var item: IngredientData = death_loot.choose_for_roll(MapRng.shared(MapRng.Stream.LOOT).randf())
+	if item == null:
+		push_warning("Monster '%s' has no valid death loot entries" % name)
+		return
+	var pickup := GroundPickup.new()
+	pickup.name = "%sLoot" % name
+	pickup.bind(item, 1, world_generator)
+	get_parent().add_child(pickup)
+	pickup.global_position = _death_loot_position()
+
+
+## 水中击杀的材料落在最近可通行岸边，玩家不用进入不可通行水面才能收取。
+func _death_loot_position() -> Vector2:
+	if world_generator == null:
+		return global_position
+	var tile: Vector2i = WorldGenerator.world_to_tile(global_position)
+	if world_generator.is_walkable(tile):
+		return global_position
+	var spec: MapSpec = world_generator.sample_map(tile)
+	var best: Vector2i = tile
+	var distance: int = 16 * 16 + 1
+	for y: int in range(-16, 17):
+		for x: int in range(-16, 17):
+			var squared: int = x * x + y * y
+			if squared >= distance:
+				continue
+			var candidate := tile + Vector2i(x, y)
+			if world_generator.sample_map(candidate) == spec and world_generator.is_walkable(candidate):
+				best = candidate
+				distance = squared
+	return WorldGenerator.tile_to_world(best)
 
 
 # --- 配置与感知原语 ---------------------------------------------------------
@@ -530,10 +571,14 @@ func _terrain_line_is_clear(from: Vector2, to: Vector2) -> bool:
 	var distance: float = from.distance_to(to)
 	var step_length: float = float(WorldGenerator.TILE_SIZE) * 0.25
 	var steps: int = maxi(ceili(distance / step_length), 1)
+	var previous_tile: Vector2i = EnemyPathfinder.INVALID_TILE
 	for step: int in range(1, steps):
 		var point: Vector2 = from.lerp(to, float(step) / float(steps))
 		var tile: Vector2i = WorldGenerator.world_to_tile(point)
-		if not is_navigation_tile_allowed(tile):
+		if tile == previous_tile:
+			continue
+		previous_tile = tile
+		if not is_visibility_tile_allowed(tile):
 			return false
 	return true
 
@@ -592,6 +637,19 @@ func is_terrain_segment_clear(from: Vector2, to: Vector2) -> bool:
 ## 子类可追加自己的移动限制；默认仅检查地形可通行性。
 func is_navigation_tile_allowed(tile: Vector2i) -> bool:
 	return world_generator != null and world_generator.is_walkable(tile)
+
+
+## 默认与移动判定相同；两栖怪物可放宽视线而限制水中巡逻。
+func is_visibility_tile_allowed(tile: Vector2i) -> bool:
+	return is_navigation_tile_allowed(tile)
+
+
+func is_patrol_tile_allowed(tile: Vector2i) -> bool:
+	return is_navigation_tile_allowed(tile)
+
+
+func movement_speed() -> float:
+	return navigation_speed
 
 
 func stop_navigation() -> void:

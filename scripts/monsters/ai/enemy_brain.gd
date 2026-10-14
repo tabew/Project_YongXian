@@ -245,7 +245,7 @@ func _try_request_patrol_point() -> bool:
 		# 与当前格重合的点会算出空路径，直接换一个候选。
 		if WorldGenerator.world_to_tile(candidate) == current_tile:
 			continue
-		if not _is_candidate_point(candidate, anchor):
+		if not host.is_patrol_tile_allowed(WorldGenerator.world_to_tile(candidate)) or not _is_candidate_point(candidate, anchor):
 			continue
 		return navigator.request_path(WorldGenerator.world_to_tile(candidate), true)
 	return false

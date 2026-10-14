@@ -20,6 +20,7 @@ const MAX_HEALTH: int = 100
 const FUR_DROP_CHANCE: float = 0.70
 const FUR_DATA: IngredientData = preload("res://resources/items/ingredients/give_fur.tres")
 const HIDE_DATA: IngredientData = preload("res://resources/items/ingredients/monkey_hide.tres")
+const LOOT_TABLE: MonsterLootTable = preload("res://resources/monsters/give_loot_table.tres")
 
 var health: int = MAX_HEALTH
 
@@ -30,6 +31,8 @@ var _is_dead: bool = false
 
 
 func _ready() -> void:
+	if death_loot == null:
+		death_loot = LOOT_TABLE
 	super._ready()
 	combat_health.health_changed.connect(_on_combat_health_changed)
 	health = roundi(combat_health.current_health)
@@ -78,22 +81,10 @@ func _finalize_death() -> void:
 		return
 	_is_dead = true
 	health = 0
-	_drop_death_loot()
 	defeated.emit()
 	super.kill()
 
 
 ## 同一轮抽样二选一，必定掉一件；地图卸载不经过死亡流程。
 static func death_loot_for_roll(roll: float) -> IngredientData:
-	return FUR_DATA if roll < FUR_DROP_CHANCE else HIDE_DATA
-
-
-func _drop_death_loot() -> void:
-	var loot_parent: Node = get_parent()
-	if loot_parent == null:
-		return
-	var pickup := GroundPickup.new()
-	pickup.name = "GiveLoot"
-	pickup.bind(death_loot_for_roll(MapRng.shared(MapRng.Stream.LOOT).randf()), 1)
-	loot_parent.add_child(pickup)
-	pickup.global_position = global_position
+	return LOOT_TABLE.choose_for_roll(roll)

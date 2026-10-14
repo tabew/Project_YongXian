@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAIConfig" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/ai/enemy_ai_config.gd" id="1"]
+[resource]
+script = ExtResource("1")
+ai_id = &"shi"
+patrol_radius_tiles = 3.0
+patrol_wait_time = 0.0
+patrol_start_delay = 0.1
+vision_distance_tiles = 10.0
+vision_angle_degrees = 360.0
+attack_range_tiles = 10.0
+attack_cooldown = 0.1
+lose_sight_grace = 2.5
+move_speed = 48.0
+update_interval = 0.1

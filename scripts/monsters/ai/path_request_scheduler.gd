@@ -52,9 +52,12 @@ func _process(_delta: float) -> void:
 
 
 func _deliver(entry: Dictionary) -> void:
+	# 切图后的旧排队目标可能已被释放；必须先检查Variant，再赋给强类型。
+	if not is_instance_valid(entry["host"]):
+		return
 	var host: BaseMonster = entry["host"]
 	var callback: Callable = entry["callback"]
-	if not is_instance_valid(host) or not callback.is_valid():
+	if not host.is_inside_tree() or not host.can_process() or not host.is_visible_in_tree() or not callback.is_valid():
 		return
 	var result: Array[Vector2i] = EnemyPathfinder.build_path(
 		host,
