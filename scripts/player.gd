@@ -22,10 +22,6 @@ signal defeated
 ## 打开后无法走进深水、浅水、山地和雪峰（路上的格子除外）。
 @export var collide_with_terrain: bool = true
 
-@export_group("武器")
-## 按顺序循环装备；添加资源即可扩充，无需按武器类型分支。
-@export var weapon_loadout: Array[WeaponDefinition] = []
-
 @export_group("生命")
 @export var max_health: int = 10
 
@@ -34,6 +30,10 @@ signal defeated
 
 @export_group("背包")
 @export var inventory:Inventory
+
+#玩家所持物品id
+var handy_item:int
+
 ## 地形来源，由 GameWorld 注入。
 var terrain_source: WorldGenerator = null
 ## 当前箱庭的矩形通行边界，出口由 GameWorld 瞬切。
@@ -49,6 +49,9 @@ func _ready() -> void:
 	health = max_health
 	health_changed.emit(health, max_health)
 
+	inventory.handy_selection_changed.connect(handy_item_changed)
+	inventory._init()
+	handy_item_changed()
 
 func _physics_process(delta: float) -> void:
 	weapon_controller.set_aim(get_global_mouse_position() - global_position)
@@ -66,20 +69,36 @@ func _physics_process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
+		#选中物品使用
+		if is_ui_blocking():
+			return
+
+		inventory.use_handy_slot()
 		weapon_controller.set_trigger_pressed(true)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("cycle_weapon"):
-		equip_next_weapon()
-		get_viewport().set_input_as_handled()
+		return
 
+func handy_item_changed()->void:
+	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
 
-func equip_next_weapon() -> bool:
-	var current_index: int = weapon_loadout.find(weapon_controller.equipped_weapon)
-	for offset: int in range(1, weapon_loadout.size() + 1):
-		var candidate: WeaponDefinition = weapon_loadout[(current_index + offset) % weapon_loadout.size()]
-		if candidate != null and candidate != weapon_controller.equipped_weapon:
-			if weapon_controller.equip(candidate):
-				return true
+	if handy_item >=200&&handy_item<300:
+		weapon_controller.equip((inventory.get_item_data[handy_item] as WeaponData).weapon)
+	else:
+		weapon_controller.equip(null)
+##ui是否挡着世界操作
+func is_ui_blocking() -> bool:
+
+	var hud:Node = get_tree().get_first_node_in_group("game_hud")
+
+	if hud == null:
+		return false
+
+	for panel_name:String in ["BagUi", "Alchemy"]:
+		var panel:CanvasItem = hud.get_node_or_null(panel_name) as CanvasItem
+
+		if panel != null and panel.visible:
+			return true
+
 	return false
 
 

@@ -34,10 +34,18 @@ func _run() -> void:
 	var alchemy: Node = world.get_node("GameHUD/Alchemy")
 	_check(dummy != null and dummy.is_visible_in_tree(), "开局训练靶仍可见")
 	_check(bag != null and alchemy != null, "背包和炼金界面保留")
-	_check(player.weapon_controller.equipped_weapon.id == &"longsword", "原长剑配置保留")
-	_check(player.equip_next_weapon(), "武器循环接口仍可用")
+	_check(player.weapon_controller.equipped_weapon == null, "开局空手，武器不再自带")
+	_check(player.inventory.get_handy_slot_id(0) == 200, "开局物品栏第1格是长剑")
+	_check(player.inventory.get_handy_slot_id(1) == 201, "开局物品栏第2格是长棍")
+	
+	player.inventory.select_handy_slot(0)
+	player.inventory.use_handy_slot(player)
+	_check(player.weapon_controller.equipped_weapon != null and player.weapon_controller.equipped_weapon.id == &"longsword", "从物品栏装备长剑")
+	player.inventory.select_handy_slot(1)
+	player.inventory.use_handy_slot(player)
 	var equipped: WeaponDefinition = player.weapon_controller.equipped_weapon
 	_check(equipped.id == &"long_staff", "原长棍配置仍可装备")
+
 	_check((world.hud.get_node("WeaponLabel") as Label).text.contains(equipped.display_name), "原武器HUD信号仍同步")
 	player.take_damage(3)
 	var remaining_health: int = player.health

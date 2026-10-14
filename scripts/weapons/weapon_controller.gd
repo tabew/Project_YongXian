@@ -6,7 +6,7 @@ signal attack_started(weapon: WeaponDefinition)
 signal attack_finished
 signal hit_landed(hit: CombatHit, hurtbox: CombatHurtbox)
 
-@export var starting_weapon: WeaponDefinition
+
 @export var team: int = 1
 
 var equipped_weapon: WeaponDefinition
@@ -16,11 +16,6 @@ var _attack: WeaponAttack
 var _held: bool = false
 var _pending_press: bool = false
 var _cooldown: float = 0.0
-
-
-func _ready() -> void:
-	if starting_weapon != null:
-		equip(starting_weapon)
 
 
 ## A null definition unequips. Invalid replacements leave the current weapon intact.
@@ -85,6 +80,9 @@ func try_attack() -> bool:
 	if equipped_weapon == null or is_attacking() or _cooldown > 0.0:
 		return false
 	var actor: Node2D = get_parent() as Node2D
+	if actor == null:
+		return false
+	_attack = equipped_weapon.attack_scene.instantiate() as WeaponAttack
 	if actor == null:
 		return false
 	_attack = equipped_weapon.attack_scene.instantiate() as WeaponAttack

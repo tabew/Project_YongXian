@@ -40,5 +40,7 @@ func create_model() -> ItemModel:
 
 	return model
 
-func use() -> void:
-	pass
+func use() -> int:
+
+	return 0
+

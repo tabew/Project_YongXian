@@ -10,6 +10,12 @@ signal put_item_signal(item_id:int, num:int)
 ##item_id/num是拿在手上的那份，from_pos是它原来所在的格子位置
 signal swap_item_signal(item_id:int, num:int, from_pos:int)
 
+##本格要被使用，pos是本格在物品栏里的位置
+signal use_item_signal(item_id:int, pos:int)
+
+##本格被左键点了，请求切换选中，pos是本格在物品栏里的位置
+signal select_item_signal(pos:int)
+
 ##自己在快捷栏里的格子位置，不是快捷栏格子则为-1
 var handy_slot:int = -1
 
@@ -27,6 +33,12 @@ var dragged_data:Dictionary = {} #拖拽载荷
 
 @onready var center_container:CenterContainer = $WaitforImage/CenterContainer
 @onready var background:ColorRect = $WaitforImage
+
+##选中描边。
+@onready var selected_border:Panel = get_node_or_null("SelectedBorder") as Panel
+
+##本格当前是不是选中
+var is_selected:bool = false
 
 var slot_item:SlotItem = null;
 
@@ -83,6 +95,42 @@ func put_item_by_id(item_id:int,num:int = 1) -> void:
 		slot_item.rotation = 0.0
 
 	put_item_signal.emit(item_id,num)
+
+
+##设置本格选中状态，只控制描边
+func set_selected(value:bool) -> void:
+
+	is_selected = value
+
+	if selected_border != null:
+		selected_border.visible = value
+
+##本格能不能被使用
+func can_use() -> bool:
+
+	return is_handy_button and slot_item != null and slot_item.item_id >= 0
+
+##请求使用本格
+func request_use() -> void:
+
+	if !can_use():
+		return
+
+	use_item_signal.emit(slot_item.item_id,handy_slot)
+
+##左键选中
+func _on_gui_input(event: InputEvent) -> void:
+
+	if !is_handy_button:
+		return
+
+	var mouse_event:InputEventMouseButton = event as InputEventMouseButton
+
+	if mouse_event == null or !mouse_event.pressed:
+		return
+
+	if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+		select_item_signal.emit(handy_slot)
 
 
 ##把物品放至光标

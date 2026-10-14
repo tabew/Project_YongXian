@@ -24,6 +24,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("2_p0qky")
+stretch_mode = 5
 
 [node name="AmountLabel" type="Label" parent="." unique_id=650801863]
 modulate = Color(1, 0, 0, 1)

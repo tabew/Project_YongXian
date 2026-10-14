@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3 uid="uid://cvi2kkeydwyrv"]
+
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_n3rcw"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_apa80"]
+[ext_resource type="Script" uid="uid://bpk4eaaq2go1w" path="res://scripts/items/weapons/weapon_data.gd" id="3_xbq6q"]
+[ext_resource type="Texture2D" uid="uid://c7h4a6c4e5ur5" path="res://assets/weapons/longsword.png" id="4_apa80"]
+[ext_resource type="Resource" uid="uid://bemlsf6au5070" path="res://resources/weapons/longsword.tres" id="5_weapon"]
+
+[resource]
+script = ExtResource("3_xbq6q")
+weapon = ExtResource("5_weapon")
+id = 200
+name = "长剑"
+texture = ExtResource("4_apa80")
+max_stack = 1
+item_scene_path = "uid://dckedj8dhfhao"
+weapon_definition = ExtResource("5_weapon")
+metadata/_custom_type_script = "uid://basv57d51ddac"

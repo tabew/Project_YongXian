@@ -31,18 +31,19 @@ func _dummy_in(world: Node) -> TrainingDummy:
 			return child as TrainingDummy
 	return null
 
+func _use_hotbar_slot(player: PlayerCharacter, pos: int) -> void:
+	player.inventory.select_handy_slot(pos)
+	player.inventory.use_handy_slot(player)
+	await process_frame
+	await process_frame
 
-func _cycle_weapon(echo: bool = false) -> void:
-	var event: InputEventKey = InputEventKey.new()
-	event.physical_keycode = KEY_Q
-	event.pressed = true
-	event.echo = echo
-	Input.parse_input_event(event)
-	event = InputEventKey.new()
-	event.physical_keycode = KEY_Q
-	Input.parse_input_event(event)
-	await process_frame
-	await process_frame
+
+## 临时把一个物品模板登记进注册表并放进某一格
+func _put_hotbar_item(inventory: Inventory, item_list: Node, pos: int, item: ItemData) -> void:
+	inventory.clear_handy_slot(pos)
+	item_list.templates.append(item)
+	item_list.call("_build_table")
+	inventory.add_handy_slot(pos, item.id, 1)
 
 
 func _screenshot(filename: String) -> void:
@@ -91,9 +92,23 @@ func _run() -> void:
 	(player.get_node("Camera2D") as Camera2D).position_smoothing_enabled = false
 	var dummy: TrainingDummy = _dummy_in(world)
 	_check(dummy != null, "World spawns a reachable training target")
-	_check(controller.equipped_weapon.id == &"longsword", "Player starts with longsword")
+	# ==========================================================================
+	# ↓↓↓↓ 改动：武器不再自带，开局空手，装备一律走物品栏 ↓↓↓↓
+	var inventory: Inventory = player.inventory
 	var weapon_label: Label = world.get_node("GameHUD/HUD/WeaponLabel") as Label
-	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD shows equipped weapon")
+	_check(controller.equipped_weapon == null, "Player starts unarmed (no starting_weapon)")
+	_check(not player.has_method("equip_next_weapon"), "Player exposes no direct weapon switch")
+	_check(inventory.get_handy_slot_id(0) == 200, "Starting hotbar slot 1 holds the longsword")
+	_check(inventory.get_handy_slot_id(1) == 201, "Starting hotbar slot 2 holds the staff")
+	_check(weapon_label.text.is_empty(), "HUD shows no weapon while unarmed")
+
+	# 物品栏选中之后用一次（左键）才会装上
+	await _use_hotbar_slot(player, 0)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Using the hotbar slot equips the longsword")
+	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD shows the weapon equipped through the backpack")
+	# ↑↑↑↑ 改动：用物品栏装备长剑 ↑↑↑↑
+	# ==========================================================================
+
 	await create_timer(0.8).timeout
 	controller.set_aim(dummy.global_position - player.global_position)
 	await _screenshot("idle.png")
@@ -106,11 +121,13 @@ func _run() -> void:
 	_check(dummy.health.current_health < dummy.health.max_health, "Player sword damages world target")
 	_check(not controller.is_attacking(), "Mouse release stops held attacks")
 
-	await _cycle_weapon()
-	_check(controller.equipped_weapon.id == &"long_staff", "Q equips the staff from the player loadout")
+	# ==========================================================================
+	# ↓↓↓↓ 改动：长棍同样从物品栏第2格装上 ↓↓↓↓
+	await _use_hotbar_slot(player, 1)
+	_check(controller.equipped_weapon.id == &"long_staff", "Using the next hotbar slot equips the staff")
 	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD updates to the staff")
-	await _cycle_weapon(true)
-	_check(controller.equipped_weapon.id == &"long_staff", "Key repeat does not cycle repeatedly")
+	# ↑↑↑↑ 改动：用物品栏装备长棍 ↑↑↑↑
+	# ==========================================================================
 	var health_before_staff: float = dummy.health.current_health
 	# The resized staff requires close range rather than the old 74-pixel reach.
 	player.global_position = dummy.global_position - controller.aim_direction * 30.0
@@ -126,38 +143,44 @@ func _run() -> void:
 	await _capture_depth_poses(controller, true)
 	_mouse(true)
 	await create_timer(0.04).timeout
-	await _cycle_weapon()
-	_check(controller.equipped_weapon.id == &"longsword", "Q cycles back to the sword")
+	await _use_hotbar_slot(player, 0)
+	_check(controller.equipped_weapon.id == &"longsword", "Switching through the hotbar goes back to the sword")
 	_check(not controller.is_attacking(), "Switching from staff cancels the active swing")
 	await create_timer(0.7).timeout
 	_check(not controller.is_attacking(), "Switching while held requires a fresh mouse press")
 	_mouse(false)
-	await _cycle_weapon()
-	var full_loadout: Array[WeaponDefinition] = player.weapon_loadout
-	player.weapon_loadout = []
-	_check(not player.equip_next_weapon(), "An empty loadout leaves equipment intact")
-	player.weapon_loadout = [null, controller.equipped_weapon]
-	_check(not player.equip_next_weapon(), "Null and current entries cannot reset an attack")
-	player.weapon_loadout = full_loadout
+	await _use_hotbar_slot(player, 1)
 
 	var template_copies: Array[WeaponDefinition] = [
 		(load("res://resources/weapons/templates/swing_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
 		(load("res://resources/weapons/templates/staff_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
 	]
-	player.weapon_loadout = full_loadout.duplicate()
 	for index: int in range(template_copies.size()):
 		var copy: WeaponDefinition = template_copies[index]
 		copy.id = StringName("loadout_copy_%d" % index)
 		copy.display_name = "Template copy %d" % index
-		player.weapon_loadout.append(copy)
-	for copy: WeaponDefinition in template_copies:
-		await _cycle_weapon()
-		_check(controller.equipped_weapon == copy, "Template copy added to loadout is reachable with Q")
+	var item_list: Node = root.get_node("ItemListGlobal")
+	var item_ids: Array[int] = [230, 231]
+	for index: int in range(template_copies.size()):
+		var copy_item: ItemData = ItemData.new()
+		copy_item.id = item_ids[index]
+		copy_item.name = template_copies[index].display_name
+		copy_item.max_stack = 1
+		copy_item.weapon_definition = template_copies[index]
+		_put_hotbar_item(inventory, item_list, 2 + index, copy_item)
+	for index: int in range(template_copies.size()):
+		var copy: WeaponDefinition = template_copies[index]
+		await _use_hotbar_slot(player, 2 + index)
+		_check(controller.equipped_weapon == copy, "Template copy added as an item is reachable through the backpack")
 		_check(weapon_label.text.contains(copy.display_name), "Template copy name appears in the HUD")
 		_check((world.get_node("GameHUD/HUD/WeaponIcon") as TextureRect).texture == copy.icon, "Template copy icon appears in the HUD")
-	await _cycle_weapon()
-	_check(controller.equipped_weapon == full_loadout[0], "Extended loadout cycles back to the original sword")
-	player.weapon_loadout = full_loadout
+	await _use_hotbar_slot(player, 0)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Hotbar slot 1 still equips the original sword")
+	# 测试注入的物品和格子都收回去，后面的用例继续用干净的开局背包
+	for index: int in range(template_copies.size()):
+		inventory.clear_handy_slot(2 + index)
+		item_list.templates.erase(item_list.get_template(item_ids[index]))
+	item_list.call("_build_table")
 
 	var blocker: Control = Control.new()
 	blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

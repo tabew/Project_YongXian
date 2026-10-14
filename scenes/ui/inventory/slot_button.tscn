@@ -1,6 +1,14 @@
-[gd_scene format=3 uid="uid://crsq0wvmhgi63"]
+[gd_scene load_steps=3 format=3 uid="uid://crsq0wvmhgi63"]
 
 [ext_resource type="Script" uid="uid://djbordwq4kxkl" path="res://scripts/ui/inventory/slot_button.gd" id="1_0kbok"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_selected"]
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.86, 0.45, 1)
 
 [node name="SlotButton" type="Button" unique_id=941150921]
 self_modulate = Color(1, 1, 1, 0)
@@ -29,5 +37,13 @@ offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="SelectedBorder" type="Panel" parent="." unique_id=1901446042]
+visible = false
+layout_mode = 0
+offset_right = 90.0
+offset_bottom = 90.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_selected")
 
 [connection signal="gui_input" from="." to="." method="_on_gui_input"]

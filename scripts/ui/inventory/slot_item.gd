@@ -9,14 +9,9 @@ class_name SlotItem
 
 @export var count:int = 0 #数量
 
-# ==============================================================================
-# ↓↓↓↓ item_list 注册表重构段：种类看 item_id，需要实例时从 ItemListGlobal 取 ↓↓↓↓
-# ==============================================================================
 ##物品id，判断是不是同一种物品只看这个
 @export var item_id:int = -1
 ##物品模板实例，由 ItemListGlobal 注册表提供，只用于取图标等展示数据。
-##故意写成 Variant：只拿得到物品id的调用(slot_item.item = 物品id)也能直接赋值，
-##赋进来的id会在setter里去注册表取模板，取不到则为null。
 var item: Variant = null:
 	get:
 		return _item
@@ -51,9 +46,6 @@ func _init(item_id_:int = -1,count_:int = 1) -> void:
 	item_id = item_id_
 	item = item_id_
 	count = count_
-# ==============================================================================
-# ↑↑↑↑ item_list 注册表重构段（结束）↑↑↑↑
-# ==============================================================================
 
 ##物品显示更新函数，更新数量和图标
 func slot_item_update()->void:

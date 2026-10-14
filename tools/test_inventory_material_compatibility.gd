@@ -91,6 +91,9 @@ func _run() -> void:
 		_check(attributes.get_template(id) != null, "原属性或新属性模板缺失 id=%d" % id)
 	inventory.add_item(2, 4)
 	inventory.add_item(3, 6)
+	_check(inventory.get_handy_slot_id(0) == 200 and inventory.get_handy_slot_id(1) == 201, "开局快捷栏未放长剑与长棍")
+	for slot: int in range(Inventory.HANDY_SLOT_COUNT):
+		inventory.clear_handy_slot(slot)
 	_check(bag.item_for_button.has(2) and bag.item_for_button.has(3), "背包UI未显示新材料")
 	_check(bag.item_for_button[2].slot_item.count == 4 and bag.item_for_button[3].slot_item.count == 6, "背包UI数量未同步")
 	bag.take_item(2, 2)
