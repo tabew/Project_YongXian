@@ -29,9 +29,34 @@ const HANDY_SLOT_COUNT:int = 9
 
 func _init() -> void:
     for item in has_items:
-        get_item_data[item] = ItemListGlobal.get_template(item)
+        get_item_data[item] = get_item_template(item)
     for item in handy_items_pos:
-        get_item_data[handy_items_pos[item]] = ItemListGlobal.get_template(handy_items_pos[item])
+        get_item_data[handy_items_pos[item]] = get_item_template(handy_items_pos[item])
+
+##取物品注册表节点。
+func get_registry_node() ->Node:
+
+    var loop:MainLoop = Engine.get_main_loop()
+
+    if !(loop is SceneTree):
+        return null
+
+    var tree:SceneTree = loop as SceneTree
+
+    if tree.root == null:
+        return null
+
+    return tree.root.get_node_or_null("ItemListGlobal")
+
+##按物品id取模板，注册表缺失或没登记时返回 null
+func get_item_template(item_id:int) ->ItemData:
+
+    var registry:Node = get_registry_node()
+
+    if registry == null or item_id < 0:
+        return null
+
+    return registry.get_template(item_id) as ItemData
 
 ##移除物品函数，item_id为物品id
 func remove_item(item_id:int,num:int = 1) ->void:
@@ -52,7 +77,7 @@ func add_item(item_id:int,num:int)->void:
     if !has_items.has(item_id):
         has_items.append(item_id)
         items[item_id] = num 
-        get_item_data[item_id] = ItemListGlobal.get_template(item_id)#没有该物品
+        get_item_data[item_id] = get_item_template(item_id)#没有该物品
 
     else:
         items[item_id] += num
@@ -195,6 +220,7 @@ func swap_handy_slot(from_pos:int,to_pos:int,item_id:int,num:int = 1) ->void:
 
     inventory_update.emit()
 
+#////////////////////快捷移动
 ##快捷移动用的格子查找：先找已有的同种格子，没有同种再找空格，都满了返回-1
 func find_handy_slot_for(item_id:int) ->int:
 
@@ -243,3 +269,4 @@ func quick_move_to_bag(pos:int) ->int:
     remove_handy_slot(pos,count)
 
     return count
+#////////////////////////

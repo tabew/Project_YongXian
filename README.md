@@ -10,7 +10,7 @@
 - **长剑类通用模板**：[swing_weapon_template.tres](resources/weapons/templates/swing_weapon_template.tres)，150° 扇形横扫。
 - **长棍类通用模板**：[staff_weapon_template.tres](resources/weapons/templates/staff_weapon_template.tres)，40° 小扇形与由远到近过渡。
 - **溜溜球类通用模板**：[yoyo_weapon_template.tres](resources/weapons/templates/yoyo_weapon_template.tres)，球跟随指针并受绳长限制，松手收回。
-- **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图；再建一个 `resources/items/weapons/*.tres`（`WeaponData`）把 `weapon_definition` 指向它，玩家就能从物品栏装备（见 [武器只能从物品栏装备](docs/weapons.md#武器只能从物品栏装备)）。无需新增脚本或攻击场景。
+- **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图；再建一个 `resources/items/weapons/*.tres`（脚本用 `WeaponData`，`weapon` 指向它），玩家就能从物品栏装备（见 [武器只能从物品栏装备](docs/weapons.md#武器只能从物品栏装备)）。无需新增脚本或攻击场景。
 - **添加不同类型武器**：继承 `WeaponDefinition` / `WeaponAttack`，配置独立攻击场景，无需修改玩家或控制器。
 - **完整说明**：[武器架构、参数、扩展和测试](docs/weapons.md)。
 

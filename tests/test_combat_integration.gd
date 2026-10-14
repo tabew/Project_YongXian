@@ -32,17 +32,22 @@ func _dummy_in(world: Node) -> TrainingDummy:
 	return null
 
 func _use_hotbar_slot(player: PlayerCharacter, pos: int) -> void:
+	# select_handy_slot() 在"选中的还是同一格"时直接返回 false、不发信号，
+	# 装备是靠 handy_selection_changed 触发的，所以先挪开再选回来，保证一定会触发
+	player.inventory.handy_selected = -1
 	player.inventory.select_handy_slot(pos)
-	player.inventory.use_handy_slot(player)
+	player.inventory.use_handy_slot()
 	await process_frame
 	await process_frame
 
 
-## 临时把一个物品模板登记进注册表并放进某一格
+## 临时把一个物品模板登记进注册表，并先放进背包再放进快捷栏。
+## 先 add_item 是必须的：handy_item_changed() 只从 inventory.get_item_data 里取模板
 func _put_hotbar_item(inventory: Inventory, item_list: Node, pos: int, item: ItemData) -> void:
-	inventory.clear_handy_slot(pos)
 	item_list.templates.append(item)
 	item_list.call("_build_table")
+	inventory.clear_handy_slot(pos)
+	inventory.add_item(item.id, 1)
 	inventory.add_handy_slot(pos, item.id, 1)
 
 
@@ -96,18 +101,21 @@ func _run() -> void:
 	# ↓↓↓↓ 改动：武器不再自带，开局空手，装备一律走物品栏 ↓↓↓↓
 	var inventory: Inventory = player.inventory
 	var weapon_label: Label = world.get_node("GameHUD/HUD/WeaponLabel") as Label
-	_check(controller.equipped_weapon == null, "Player starts unarmed (no starting_weapon)")
+	# 当前实现是"选中即装备"：起始选中是第1格（长剑），所以开局手里就是长剑
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Player starts with the longsword equipped from the hotbar")
 	_check(not player.has_method("equip_next_weapon"), "Player exposes no direct weapon switch")
 	_check(inventory.get_handy_slot_id(0) == 200, "Starting hotbar slot 1 holds the longsword")
 	_check(inventory.get_handy_slot_id(1) == 201, "Starting hotbar slot 2 holds the staff")
-	_check(weapon_label.text.is_empty(), "HUD shows no weapon while unarmed")
+	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD shows the equipped weapon")
 
-	# 物品栏选中之后用一次（左键）才会装上
-	await _use_hotbar_slot(player, 0)
-	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Using the hotbar slot equips the longsword")
-	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD shows the weapon equipped through the backpack")
-	# ↑↑↑↑ 改动：用物品栏装备长剑 ↑↑↑↑
+	# 走到长棍格：选中即装备（装备不再靠"用一次"）
+	await _use_hotbar_slot(player, 1)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"long_staff", "Selecting the next hotbar slot equips the staff")
+	# ↑↑↑↑ 改动：用物品栏装备 ↑↑↑↑
 	# ==========================================================================
+	# 切回长剑，后面的用例按长剑节奏来
+	await _use_hotbar_slot(player, 0)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Selecting slot 1 equips the longsword again")
 
 	# 溜溜球也按同一套接入物品栏：临时登记一个武器物品放进第 3 格，用完再收回去
 	var yoyo_item_id: int = 202
@@ -115,7 +123,7 @@ func _run() -> void:
 	yoyo_item.id = yoyo_item_id
 	yoyo_item.name = "测试溜溜球"
 	yoyo_item.max_stack = 1
-	yoyo_item.weapon_definition = load("res://resources/weapons/yoyo.tres") as WeaponDefinition
+	yoyo_item.weapon = load("res://resources/weapons/yoyo.tres") as WeaponDefinition
 	_put_hotbar_item(inventory, root.get_node("ItemListGlobal"), 2, yoyo_item)
 
 	await create_timer(0.8).timeout
@@ -197,11 +205,11 @@ func _run() -> void:
 	var item_list: Node = root.get_node("ItemListGlobal")
 	var item_ids: Array[int] = [230, 231]
 	for index: int in range(template_copies.size()):
-		var copy_item: ItemData = ItemData.new()
+		var copy_item: WeaponData = WeaponData.new()
 		copy_item.id = item_ids[index]
 		copy_item.name = template_copies[index].display_name
 		copy_item.max_stack = 1
-		copy_item.weapon_definition = template_copies[index]
+		copy_item.weapon = template_copies[index]
 		_put_hotbar_item(inventory, item_list, 2 + index, copy_item)
 	for index: int in range(template_copies.size()):
 		var copy: WeaponDefinition = template_copies[index]

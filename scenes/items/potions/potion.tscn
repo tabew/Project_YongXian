@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b3pw5ub0dbcpo"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ingredients/material_model.gd" id="1_xt2o6"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_xt2o6"]
 [ext_resource type="Texture2D" uid="uid://dvka76ih52ueg" path="res://assets/items/potions/potion_default.png" id="2_4im1p"]
 
 [node name="Potion" type="RigidBody2D" unique_id=1273332479]

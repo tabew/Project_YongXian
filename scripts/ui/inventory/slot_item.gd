@@ -29,10 +29,28 @@ func _resolve_item(value: Variant) -> ItemData:
 
 	if value is int:
 		var id:int = value
-		if id >= 0 and ItemListGlobal.has_template(id):
-			return ItemListGlobal.get_template(id)
+		var registry:Node = _registry()
+
+		if id >= 0 and registry != null and registry.has_template(id):
+			return registry.get_template(id)
 
 	return null
+
+
+##取物品注册表节点。
+func _registry() -> Node:
+
+	var loop: MainLoop = Engine.get_main_loop()
+
+	if !(loop is SceneTree):
+		return null
+
+	var tree: SceneTree = loop as SceneTree
+
+	if tree.root == null:
+		return null
+
+	return tree.root.get_node_or_null("ItemListGlobal")
 
 
 ##由物品id设置本格物品：id是种类依据，模板从注册表取

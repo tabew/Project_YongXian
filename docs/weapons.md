@@ -9,13 +9,15 @@
 Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` 三个入口都已移除：玩家侧没有任何直接装备武器的路径，避免绕过物品栏。装备链路只有一条：
 
 ```text
-快捷栏选中装武器的格子 → 左键使用 → ItemData.use()
-  → weapon_definition != null → WeaponController.equip(weapon_definition)
+快捷栏选中装武器的格子 → handy_selection_changed → WeaponData.weapon
+  → WeaponController.equip(weapon)
 ```
 
-开局 `resources/inventory/inventory.tres` 在快捷栏第 1 格放长剑（id 200）、第 2 格放长棍（id 201），并把 `handy_selected` 设为 0，进游戏选中第 1 格按左键即可拿到长剑。装备不消耗数量，`use()` 返回 0；`WeaponController.equip()` 的校验（数据合法性 + 攻击场景类型）仍然生效，失败时保留原武器。`WeaponController` 本身仍是通用组件，AI 和测试可以直接调 `equip()`，只是玩家不再有别的入口。
+开局 `resources/inventory/inventory.tres` 在快捷栏第 1 格放长剑（id 200）、第 2 格放长棍（id 201），并把 `handy_selected` 设为 0，进游戏就已经握着长剑。`WeaponController.equip()` 的校验（数据合法性 + 攻击场景类型）仍然生效，失败时保留原武器。`WeaponController` 本身仍是通用组件，AI 和测试可以直接调 `equip()`，只是玩家不再有别的入口。
 
-左键按下去先试着"使用选中物品"，只有当选中的格子是武器时才会把这一下交给 `WeaponController` 起手攻击；选中空格、材料或药水时左键不挥击（`PlayerCharacter.has_selected_weapon()` / `get_selected_weapon()` 就是这道判定），避免空手乱挥或者喝药水时顺带砍一刀。
+实际实现是"选中即装备"：`PlayerCharacter.handy_item_changed()` 监听 `Inventory.handy_selection_changed`，选中 id 在 200–299 之间的 WeaponData 格子就直接 `equip()`，选中其它格子则 `equip(null)` 卸下武器；所以不用按左键，切到武器格就已经拿在手上。武器物品的 `use()` 返回 0，不会被消耗。
+
+左键按下去会先调用 `Inventory.use_handy_slot()` 使用选中格，再把这一下交给 `WeaponController` 起手攻击（当前没有"必须选中武器才挥"的判断）。
 
 长棍朝鼠标选定方向做 40° 小扇形挥舞，同时从远处较短、较暗的姿态过渡到近处较长、较亮的姿态，并带短弧形拖尾。攻击开始后锁定本次方向，按住左键可连续挥击。切换会取消当前攻击，松开并重新按左键即可使用新武器。
 
@@ -99,7 +101,7 @@ Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` �
 
 复制 `templates/staff_weapon_template.tres` 即可添加同类武器；挥舞角度用 `arc_degrees`，远近过渡方向用 `reverse_strike`，尺寸用 `shaft_length` 与贴图，命中宽度用 `hit_width`。握点后方的棍尾仅作显示，不造成背后伤害。纵深俯仰角限制在 -80° 到 +80°，避免贴图翻转与投影退化。
 
-玩家侧的 `weapon_loadout` 数组与 `equip_next_weapon()` 都已删除，`WeaponController.starting_weapon` 也已删除，玩家不再自带或自行切换武器。装备从物品栏来：`resources/items/weapons/*.tres`（`WeaponData`）上的 `weapon_definition` 指向对应武器资源，`ItemData.use()` 检测到这个字段就转给武器系统，返回 0 表示不消耗。要把某把武器放进开局快捷栏，在 `resources/inventory/inventory.tres` 的 `handy_items_pos` / `handy_items` 里加一格。
+玩家侧的 `weapon_loadout` 数组与 `equip_next_weapon()` 都已删除，`WeaponController.starting_weapon` 也已删除，玩家不再自带或自行切换武器。装备从物品栏来：`resources/items/weapons/*.tres` 是 `WeaponData`，其 `weapon` 字段指向对应武器资源，选中该格子时 `PlayerCharacter.handy_item_changed()` 就把它 `equip()` 上去。要把某把武器放进开局快捷栏，在 `resources/inventory/inventory.tres` 的 `handy_items_pos` / `handy_items` 里加一格。
 
 ## 溜溜球配置
 
@@ -123,7 +125,7 @@ Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` �
 
 复制 `templates/yoyo_weapon_template.tres` 即可添加同类武器；绳长用 `max_range`，球的大小用 `head_radius` 与贴图，跟随手感用 `follow_speed` 与 `return_speed`，输出节奏用 `hit_interval`。`recovery_seconds` 必须覆盖收回过程，否则装备时校验失败。
 
-溜溜球同样按本文件的 "武器只能从物品栏装备" 一节接入：新建/复用 `resources/items/weapons/yoyo.tres`（`WeaponData`，`weapon_definition` 指向 `resources/weapons/yoyo.tres`），要让开局就能选到再把它的 id 加进 `resources/inventory/inventory.tres` 的快捷栏格子。
+溜溜球同样按本文件的 "武器只能从物品栏装备" 一节接入：物品模板 `resources/items/weapons/yoyo.tres` 是 `WeaponData`，其 `weapon` 字段指向 `resources/weapons/yoyo.tres`；要让开局就能选到，再把它的 id 加进 `resources/inventory/inventory.tres` 的快捷栏格子。
 
 ## 新增同类武器
 
@@ -138,7 +140,7 @@ Q 循环切换、`starting_weapon` 自动装备、`player.equip_next_weapon()` �
 1. 将对应模板复制到 `resources/weapons/`，例如 `iron_longsword.tres` 或 `iron_staff.tres`。每把新武器使用独立文件。
 2. 在 Inspector 修改 `resource_name`（编辑器名称）、唯一的 `id`、`display_name`（游戏名称）、伤害、暴击、击退和各阶段时间。模板 ID 是占位值，需要替换，例如 `iron_longsword` 或 `iron_staff`。
 3. 修改该类型的长度、宽度、角度等专属参数，需要换外观时同时配置 `icon`、`texture`、`texture_grip`。保留模板原有的脚本与 `attack_scene` 配对。
-4. 建一个物品模板 `resources/items/weapons/<名称>.tres`（`ItemData`，材料 id 别和现有的撞，武器占 200 段），填 `id`、`name`、`texture`、`max_stack = 1`，并把 `weapon_definition` 指向第 1–3 步的武器资源。玩家只能通过物品栏装备武器，所以这一步是必须的；要让开局就能选到，再把它的 id 放进 `resources/inventory/inventory.tres` 的快捷栏格子里。
+4. 建一个物品模板 `resources/items/weapons/<名称>.tres`（脚本用 `WeaponData`，材料 id 别和现有的撞，武器占 200 段），填 `id`、`name`、`texture`、`max_stack = 1`，并把 `weapon` 指向第 1–3 步的武器资源。玩家只能通过物品栏装备武器，所以这一步是必须的；要让开局就能选到，再把它的 id 放进 `resources/inventory/inventory.tres` 的快捷栏格子里。
 
 `WeaponController.equip(new_weapon)` 仍是公开接口，AI 和测试可以直接调；但玩家侧没有暴露任何调用它的快捷路径，装备统一走物品栏里的武器物品。
 

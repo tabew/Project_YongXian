@@ -35,7 +35,7 @@ func bag_update() ->void:
 			item_for_button[item_id].set_count(inventory.get_count(item_id))
 			continue
 
-		var item:ItemData = ItemListGlobal.get_template(item_id)
+		var item:ItemData = inventory.get_item_template(item_id)
 
 		if item == null:
 			continue
@@ -75,6 +75,7 @@ func put_item(item_id:int,num:int) ->void:
 
 	item_for_button[item_id].set_count(inventory.get_count(item_id))
 
+#//////////////////////////快捷移动
 ##shift+左键：本格整堆挪进物品栏(快捷栏)
 func _on_slot_quick_move(item_id:int,num:int) ->void:
 	if inventory.quick_move_to_handy(item_id,num) <= 0:
@@ -95,6 +96,7 @@ func _refresh_slot(item_id:int) ->void:
 
 	item_for_button[item_id].queue_free()
 	item_for_button.erase(item_id)
+#///////////////////////////////////
 
 ## 背包区域放回
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
