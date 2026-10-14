@@ -1,5 +1,6 @@
-class_name WeaponController
 extends Node2D
+
+class_name WeaponController
 
 signal weapon_changed(weapon: WeaponDefinition)
 signal attack_started(weapon: WeaponDefinition)
@@ -14,6 +15,16 @@ var equipped_weapon: WeaponDefinition
 var aim_direction: Vector2 = Vector2.RIGHT
 ## 原始瞄准向量（含距离），溜溜球一类跟随指针的武器用它决定球的位置。
 var aim_vector: Vector2 = Vector2.RIGHT
+
+## 炼金组合的伤害倍率；由随身炼金台写入，过载等状态下保持 1.0。
+var damage_multiplier: float = 1.0
+## 炼金遗物带来的额外暴击率；由随身炼金台写入，注入到每次攻击。
+var critical_chance_bonus: float = 0.0
+## 行为词条效果表（爆炸 / 连锁 / 回旋 / 弹射 / 穿透 / 扩散）；由随身炼金台写入。
+var hit_effects: Dictionary = {}
+## 过载使武器失效；失效期间不能起手，已在进行的攻击也会被取消。
+var disabled_remaining: float = 0.0
+var _disabled: bool = false
 
 var _attack: WeaponAttack
 var _held: bool = false
@@ -81,30 +92,69 @@ func cancel_attack() -> void:
 	_cooldown = 0.0
 
 
+## 过载或外部事件设置武器失效秒数。
+func set_disabled(seconds: float) -> void:
+	_disabled = true if seconds > 0.0 else false
+	disabled_remaining = maxf(seconds, 0.0)
+	if _disabled:
+		cancel_attack()
+
+
+func is_disabled() -> bool:
+	return _disabled
+
+
 func _physics_process(delta: float) -> void:
+	if disabled_remaining > 0.0:
+		disabled_remaining = maxf(disabled_remaining - delta, 0.0)
+		if disabled_remaining <= 0.0:
+			_disabled = false
+	if _disabled or is_attacking():
+		_pending_press = false
+		return
 	var tapped: bool = _pending_press
 	_pending_press = false
-	if is_attacking():
-		# 一次按住只对应一次攻击：需要按住维持的武器（如溜溜球）自己结束这一击。
-		return
 	_cooldown = maxf(0.0, _cooldown - delta)
 	if equipped_weapon != null and (tapped or (_held and equipped_weapon.auto_repeat)):
 		try_attack()
 
 
 func try_attack() -> bool:
-	if equipped_weapon == null or is_attacking() or _cooldown > 0.0:
+	if equipped_weapon == null or _disabled or is_attacking() or _cooldown > 0.0:
 		return false
 	var actor: Node2D = get_parent() as Node2D
 	if actor == null:
 		return false
 	_attack = equipped_weapon.attack_scene.instantiate() as WeaponAttack
+	_attack.damage_multiplier = damage_multiplier
+	_attack.critical_chance_bonus = critical_chance_bonus
+	_attack.hit_effects = hit_effects
 	_attack.finished.connect(_on_attack_finished)
 	_attack.hit_landed.connect(_on_hit_landed)
 	add_child(_attack)
 	_attack.start(equipped_weapon, actor, team, aim_direction)
+	_play_sfx(_swing_sfx_id(equipped_weapon), actor.global_position)
 	attack_started.emit(equipped_weapon)
 	return true
+
+
+## 挥砍音效按 id 命名（swing_<武器 id>）；没有专属素材时退回通用挥砍声。
+func _swing_sfx_id(weapon: WeaponDefinition) -> StringName:
+	var candidate: StringName = StringName("swing_%s" % weapon.id)
+	return candidate if _has_sfx(candidate) else &"swing_generic"
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
+
+
+func _has_sfx(id: StringName) -> bool:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	return manager != null and bool(manager.call("has_sfx", id))
 
 
 func _on_attack_finished() -> void:

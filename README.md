@@ -1,6 +1,8 @@
 # Project YongXian
 
-使用 **Godot 4.7** 开发的 2D 肉鸽游戏项目。目前包含主菜单、**8 层关卡图 + 14 个随机陆地箱庭区域 + 区块流式加载 + 14 种生物群系**、右上角小地图与 M 全屏探索地图，以及一个可用 WASD 控制、带加速度的占位主角。已加入可配置近战武器系统、第一把长剑与可重生训练靶。
+使用 **Godot 4.7** 开发的 2D 肉鸽游戏项目。主流程为**炼金工坊（局外）→ 出发门 → 局内 Run（层 → 区域 → 房间）→ 死亡 / 通关 → 结算灵感 → 回工坊买永久升级**：局内是**树状房间图 + 13 个区域主题**的随机地图，另有旧的连续箱庭世界（8 层关卡图 + 14 个随机陆地箱庭区域 + 区块流式加载 + 14 种生物群系）与小地图可单独运行。主角可用 WASD 控制、带加速度。
+
+战斗核心是**近战武器 + 随身炼金台**：击杀 / 破坏掉落的材料被吸附后，按 E 注入词条池，武器随炼金组合变异。局内产出的**灵感**是局外货币，用于购买永久升级。
 
 ## 近战武器
 
@@ -16,6 +18,73 @@
 
 ---
 
+## 随身炼金台（词条堆叠炼金）
+
+战斗循环：**击杀 / 破坏 → 吸附材料 → 按 E 展开 → 快速注入 → 武器变异 → 继续打**。地面材料靠近后自动吸附进炼金背包；按 **E** 打开炼金台，把材料放进 2 格素材槽，槽里所有词条汇总成**词条池**，产出**单一激活的炼金组合**并改写武器伤害与效果。
+
+- **词条**：元素 / 行为 / 触发 / 修饰四类，等级 I~V（倍率 1.0/1.3/1.6/2.0/2.5）。同词条叠加取最高等级、层数相加，叠加倍率 1/1.5/1.75/1.85/1.9。
+- **反应**：火+毒=毒烟、火+冰=蒸汽爆炸、电+磁=磁场、酸+金属=腐蚀、灵魂+骨=召唤骷髅、光+暗=湮灭、风+沙=尘暴……冲突词条（火+冰、酸+火、灵魂+机械、光+暗）触发反噬。
+- **单一激活组合**：相同组合（按最终效果标签判定）时间叠加、无硬上限；不同组合替换旧效果，旧效果以 **50% 强度爆发**一次。
+- **持续时间**：基础 12 秒，非战斗与慢动作中暂停；持续 / 稳定 / 活体 / 诅咒词条分别修正时长。
+- **热量**：每次炼金 +20，连续叠相同组合每次 +5，受击打断 +10。满 100 **过载**：结束当前效果、武器失效 8 秒、3 秒内不能炼金、自伤 15、随机一种材料损失一半。
+- **操作**：非战斗按 E 打开完整炼金台；战斗中短按 E 复用上次配方；战斗中长按 E 进入 25% 慢动作轮盘；Esc 关闭（不消耗材料）；左键选择 / 确认，右键取消 / 移除材料。
+- **数据驱动**：词条、材料、反应全部在 [resources/alchemy](resources/alchemy) 的配置表里，新增内容只改配置。
+- **完整说明**：[随身炼金台架构、数值公式与测试](docs/alchemy.md)。
+
+---
+
+## 局外炼金工坊与局内地图
+
+一局的标准流程：**炼金工坊（局外）→ 出发门 → 局内 Run（层 → 区域 → 房间）→ 死亡 / 通关 → 结算灵感 → 回工坊 → 用灵感买永久升级**。主菜单的「开始游戏」现在直接进工坊，工坊是新的主场景。
+
+### 炼金工坊
+
+工坊内自由走动，靠近交互点按 **E** 打开界面，交互方式与局内炼金台一致；没有站在交互点上时按 E 打开随身炼金台。布局与交互点全部在 [resources/workshop/workshop_layout.gd](resources/workshop/workshop_layout.gd) 里配置。
+
+| 交互点 | 功能 | 状态 |
+|--------|------|------|
+| 炼金台 | 用灵感买永久升级 | 已实现 |
+| 材料库 | 解锁 / 选择开局携带材料（初始 1 格，可解锁到 3 格） | 已实现 |
+| 难度祭坛 | 学徒 1.0x / 炼金师 1.2x / 大师 1.5x，通关一次解锁下一档 | 已实现 |
+| 训练场 | 无限材料试炼金 + 假人 | 已实现 |
+| 出发门 | 选武器 → 携带材料 → 难度 → 开始 | 已实现 |
+| 图鉴台 / 遗物架 / 成就墙 / 商店 | 只留接口 | 占位面板 |
+
+**永久升级**共 14 项（素材槽、背包、堆叠、基础时长、替换爆发、热量冷却、热量上限、吸附范围、逐元素等级、反应效果、过热损失、过热失效、快速预设、灵感留存 I~V），全部升满 **29100 灵感**，配置表见 [resources/workshop/permanent_upgrade_catalog.gd](resources/workshop/permanent_upgrade_catalog.gd)。
+
+### 局内地图
+
+结构为**层 → 区域 → 房间**：每层 2~3 个区域、每区域 4~8 个房间，**树状主干 + 少量环路**，同种子必然同图。房间类型共 10 种（战斗 / 精英 / Boss / 事件 / 商店 / 宝箱 / 炼金 / 休息 / 挑战 / 秘密），按炼金决策归为续组合 / 换组合 / 取材 / 冷却 / 图鉴五类，每层保底覆盖。
+
+- **区域主题**共 13 个（毒沼、矿洞、墓地、机械废墟、雷区、酸池、冰区、火区、沙漠、森林、血祭坛、光殿、深渊），各自决定敌人、场景元素、材料掉落与抗性 / 弱点，配置表见 [resources/run/region_theme_catalog.gd](resources/run/region_theme_catalog.gd)。
+- **清空房间**后弹出 **2~3 个门**，门面显示目标房间类型 + 区域主题 + 材料预告 + 敌人抗性 / 弱点，玩家按当前炼金需求选路。
+- **场景可吸附元素**（火盆、毒池、铁栏、冰柱、雷云、藤蔓、镜面……）按主题与房间形状落点，长按 **F** 蓄满吸附进炼金背包；**可破坏物**（木箱、矿脉、毒菇、骨堆、齿轮堆）打碎后掉落对应材料。
+- **热量曲线**：连续战斗房超过 4 个时自动插入冷却房，保证每 3~4 房有冷却窗口。
+- **秘密房**：额外生成 1 个房间挂在宿主房上，需要特定词条（炸墙 / 磁吸机关 / 相位穿墙 / 酸蚀门 / 火烧藤蔓 / 冰冻水面 / 电开机关 / 骨钥匙）进入。词条门数据与判定已就位，运行时入口尚未接。
+
+### 灵感
+
+灵感是本作的局外货币，在**击杀、破坏、事件**时产出，光点**无条件**飞向玩家（穿墙、不受物理阻挡）。
+
+| 来源 | 概率 | 数量 |
+|------|------|------|
+| 小怪 | 15% | 1~3 |
+| 精英怪 | 80% | 15~30 |
+| 区域 Boss | 100% | 50~80 |
+| 最终 Boss | 100% | 150~200 |
+| 特殊怪 | 50% | 5~10 |
+| 场景破坏 | 5% | 1 |
+| 事件 | 100% | 10~40 |
+
+- **光点动画**分五个阶段：生成（0~0.1s 爆出带闪光）→ 散开（0.1~0.4s 随机弹射偏上，3~5 格/秒，距离 0.5~1.5 格）→ 悬停（0.4~0.8s 减速到 0、轻微浮动闪烁）→ 飞向玩家（0.8s 后无条件实时追踪）→ 飞入（最后 0.2s 加速缩小消失）。速度由 2 格/秒 加速到 20 格/秒，Boss 光点走螺旋轨迹；光点直径 4~12px、拖尾 3~8 节（金 → 琥珀 → 透明）。同屏超过 30 个合并为光团，对象池预分配 200。
+- **差异化**：小怪悬停 0.2s 直线、精英 0.4s 弧线分批飞入、Boss 0.6s 螺旋逐个飞入、事件 0.3s 光带。
+- **死亡**：损失全部局内灵感，只按**灵感留存**升级保留 5% / 10% / 15% / 20% / 25%（上限 25%），材料全部丢失，回工坊。
+- **通关结算（贤者之石）**：材料按品质转化（普通 2 / 稀有 8 / 史诗 25 / 传说 80，Boss 材料 200），
+  `最终灵感 = round((局内已获得 + 基础 100 + 材料转化 + 表现加成) × 难度倍率 × (1 + 图鉴加成))`，结算界面逐项展示后进永久池。
+- **完整说明**：[地图系统 + 初始房间 + 灵感系统的模块拆分、数据结构与算法](docs/run_map_inspiration.md)。
+
+---
+
 ## 目录结构
 
 ```
@@ -25,6 +94,7 @@ Project_YongXian/
 ├── autoloads/                     # 全局单例
 │   ├── event_bus.gd               # 跨场景信号总线
 │   ├── game_state.gd              # 本局世界种子
+│   ├── audio_manager.gd           # 音频：素材扫描 / 播放器池 / 总线音量 / 音乐切换
 │   └── scene_manager.tscn/.gd     # 场景切换（黑幕淡入淡出）
 │
 ├── resources/
@@ -36,27 +106,59 @@ Project_YongXian/
 │   │   ├── map_spec.gd            # 箱庭尺寸、重叠庭室、山林边界与出入口
 │   │   ├── chunk_data.gd          # 单个区块的地形 + 群系 + 路网字节数组
 │   │   └── world_generator.gd     # 随机箱庭布局 + 群系 + 内部道路 + 区块生成
+│   ├── run/                       # 局内地图数据层（房间图 / 房间 / 区域主题 / 门 / 场景元素）
+│   ├── inspiration/               # 灵感（掉落表 / 飞入数学 / 局内账本，纯逻辑）
+│   ├── workshop/                  # 局外工坊（永久升级 / 难度档位 / 布局）
+│   ├── alchemy/                   # 炼金配置表（词条 / 材料 / 反应，唯一真源）
+│   ├── audio/sfx_spec.gd          # 音效参数表（音量 / 音高抖动 / 限流 / 总线）
 │   └── terrain_tileset.tres       # TileSet（2 个图集源：地形 + 路网）
 │
 ├── scenes/
 │   ├── menus/main_menu.tscn/.gd   # 主菜单
+│   ├── workshop/workshop.tscn/.gd # 炼金工坊（局外主场景）
 │   ├── world/chunk_manager.gd     # 区块加载器（异步生成 / 缓存 / 池化）
 │   ├── game/
 │   │   ├── game_world.tscn/.gd    # 游戏世界
 │   │   └── player.tscn            # 主角（占位图 + 摄像机）
 │   └── ui/
 │       ├── hud.tscn/.gd           # HUD 与性能面板
+│       ├── alchemy/alchemy_hud.tscn/.gd # 随身炼金台界面（完整面板 / 战斗轮盘 / 常驻状态）
 │       └── minimap.gd             # 右上角小地图
 │
-├── scripts/player.gd              # 主角移动逻辑
+├── scripts/
+│   ├── player.gd                  # 主角移动逻辑（E 键炼金、受击打断、武器倍率注入）
+│   ├── inspiration/               # 灵感：管理器单例 / 光点对象池 / 计数与飘字
+│   ├── workshop/                  # 工坊：交互点、各面板、出发与载荷
+│   └── alchemy/                   # 随身炼金台
+│       ├── core/                  # 纯逻辑：词条池 / 组合 / 时长 / 热量 / 背包（不依赖场景树）
+│       ├── alchemy_station.gd     # 编排节点：连接输入、背包、素材槽与战斗层
+│       └── alchemy_hud.gd         # 炼金界面表现层
 │
 ├── assets/
 │   ├── terrain_tiles.png          # 16x256 地形图集
 │   ├── road_tiles.png             # 16x48 路网图集
-│   └── player_placeholder.png     # 主角占位图
+│   ├── player_placeholder.png     # 主角占位图
+│   └── audio/                     # 音效与音乐（程序化占位素材，文件名即音效 id）
 │
-└── tools/generate_art.py          # 生成上面三张占位图的脚本
+├── default_bus_layout.tres        # 总线布局：Master → Music / SFX / UI
+├── tests/                         # 纯逻辑与集成测试（tests/test_*.gd，见 tools/run_tests.ps1）
+├── tools/
+│   ├── generate_art.py            # 生成上面三张占位图的脚本
+│   └── generate_sfx.py            # 生成全部占位音效与音乐
 ```
+
+---
+
+## 音效与音乐
+
+音频是**数据驱动 + 单一入口**：素材按 id 放进 `assets/audio/`，参数写在 `resources/audio/sfx_spec.gd`，事件处只调一次 `AudioManager.play_sfx()`。换正式素材时覆盖同名文件即可，不改脚本。总线分 Master / Music / SFX / UI，音量与静音持久化到 `user://audio_settings.cfg`。
+
+当前素材由 `tools/generate_sfx.py` 程序化生成（40 个音效 + 2 段循环音乐），用于先把播放链路跑通，音色本身是临时的。
+
+- **换素材**：同名覆盖 `assets/audio/sfx/` 或 `music/` 下的文件。
+- **加音效**：放文件 → 在 `SfxSpec.SPECS` 补一行参数 → 在事件处调 `AudioManager.play_sfx(&"id")`。
+- **音效 id**：就是文件名（不含扩展名），没有专属素材时安静跳过，不会报错。
+- **完整说明**：[音频架构、参数表、挂载点、测试](docs/audio.md)。
 
 ---
 
@@ -74,7 +176,7 @@ Project_YongXian/
 
 草地、土路、岩土、树林和水岸的接触边沿使用像素融合与圆角过渡，跨区块保持一致；箱庭出入口附近也会逐渐混入相邻区域的地面色调，同时保留每个箱庭的单一群系与通行规则。
 
-地面按种子随机散落**石头和木棍**，每图约 20–70 个，分布疏松；小屋外优先放置两种材料。靠近后按 **E** 拾取，材料进入背包并可堆叠，已拾取点位在返回地图后不会补刷。按 **B** 打开炼金界面，从背包拖入材料：石头提供矿物属性，木棍提供木质属性，两者反应生成固结属性；固结目前是无直接使用效果的终产物属性。背包与快捷栏之间除了拖拽，还支持 **shift+左键** 整堆挪动：背包→快捷栏优先叠进已有的同种格子，没有同种就放第一个空格，快捷栏占满时整堆留在背包里；快捷栏→背包整格挪回。
+地面按种子随机散落**石头和木棍**，每图约 20–70 个，分布疏松；小屋外优先放置两种材料。靠近后材料自动**吸附**进炼金背包（同时进入物品背包），已吸附点位在返回地图后不会补刷。吸附的材料按[世界材料 → 炼金材料桥接表](resources/alchemy/material_catalog.gd)映射成炼金材料（石头→硝石、木棍→火油、给毛→骨粉、猴皮→毒菇），按 **E** 打开随身炼金台使用。背包与快捷栏之间除了拖拽，还支持 **shift+左键** 整堆挪动：背包→快捷栏优先叠进已有的同种格子，没有同种就放第一个空格，快捷栏占满时整堆留在背包里；快捷栏→背包整格挪回。
 
 触及出入口时，角色与画面**双向瞬切**到目标箱庭的对应入口，不播放跨区域行走或淡入淡出。汇流区域保留来自不同主干 / 岔路的多个入口，各入口对应自己的返回方向。相机以当前地图矩形设置硬 `limit`，切图时重置 `smoothing`，避免画面滑过区域间隙。
 
@@ -121,13 +223,18 @@ Project_YongXian/
 
 [tools/test_cottage_biomes.gd](tools/test_cottage_biomes.gd) 补充起始小屋和单群系验收：四个种子各两个布局变体的整张区域规格与区块确定性、完整区域矩形的群系身份、不同种子的小屋与群系分配多样性、墙壁和家具阻挡、屋门通路、12 张地图的四连通 BFS，以及运行时切图、相机和生命/装备/背包/炼金实例保留。脚本输出邻格地形变更率、地面/阻挡连通簇和单格阻挡碎片数量，便于评估大片地形；本轮已在 Godot 4.6 通过生成专项验收（约 314 万格、4,282 个区块）及 29 项带截图运行时检查，包含切图后释放怪物的感知队列清理；12 张地图出生连通块覆盖率为 99.85%–100%，地形邻格变更率约为 0.97%–2.75%。有图形界面时加 `-- --capture` 可保存 `.godot/cottage-preview.png` 与 `.godot/region-biome-preview.png`。
 
-[地形过渡与材料验收](tools/test_transitions_materials.gd) 已在 Godot 4.6 通过：带截图 7,388 项检查、四个种子共 2,374 个材料点位，包含跨区块邻格、入口色调、确定性生成、实际 E 键拾取、返回不补刷、背包保留及投放区与坩埚反应。连续通路、26 项切图状态与小地图模式回归同时通过。
-
-[协作者功能兼容验收](tools/test_inventory_material_compatibility.gd) 通过 235 项检查：保留原材料与配方，验证快捷栏整堆交换、同类分格、返还背包、shift+左键快捷移动、真实 GUI 拖拽的 E 键旋转和拾取隔离；四种子两变体的全部战斗/Boss 房均匹配现有怪物池，新增怪物群系自动纳入地图主题，独立采样与正式游戏一致。
+[随身炼金台核心回归](docs/alchemy.md) 覆盖词条表、词条池、单一激活组合、持续时间、热量、材料背包、按 E 状态机与随身炼金台集成；绝大多数是不依赖 UI 的纯逻辑断言，武器命中与召唤物（索敌 / 出手 / 自爆 / 击杀接线）另有真实物理帧验证。
 
 ```sh
-godot --headless --path . --script res://tools/test_transitions_materials.gd
-godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
+godot --headless --path . --script res://tests/test_alchemy_traits.gd
+godot --headless --path . --script res://tests/test_alchemy_spec_values.gd
+godot --headless --path . --script res://tests/test_alchemy_pool.gd
+godot --headless --path . --script res://tests/test_alchemy_brew.gd
+godot --headless --path . --script res://tests/test_alchemy_heat.gd
+godot --headless --path . --script res://tests/test_alchemy_bag.gd
+godot --headless --path . --script res://tests/test_alchemy_input.gd
+godot --headless --path . --script res://tests/test_alchemy_station.gd
+godot --headless --path . --script res://tests/test_alchemy_summon.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
 godot --headless --path . --script res://tools/test_map_integration.gd
@@ -197,7 +304,11 @@ godot --headless --path . --script res://tests/test_weapons.gd
 |------|------|
 | W A S D / 方向键 | 移动主角 |
 | 鼠标 / 左键 | 瞄准 / 挥剑，按住连续攻击 |
-| Q | 循环切换长剑 / 长棍 |
+| Q | 循环切换长剑 / 长棍 / 溜溜球 |
+| E | 靠近工坊交互点打开界面；局内非战斗时打开炼金台，战斗中短按复用配方、长按进入轮盘 |
+| F | 长按吸附场景可吸附元素（火盆 / 毒池 / 冰柱 / 藤蔓……） |
+| Tab | 打开背包；炼金台内循环切换素材槽 |
+| Esc | 关闭当前界面（炼金台关闭不消耗材料） |
 | M | 展开全屏地图 / 返回右上角小地图 |
 | R | 换个种子重开世界 |
 | F3 | 开关右上角性能面板 |
@@ -209,8 +320,9 @@ godot --headless --path . --script res://tests/test_weapons.gd
 ## 快速开始
 
 1. 用 **Godot 4.7+** 打开本目录（选择 `project.godot`）
-2. 按 F5 运行，在主菜单点「开始游戏」
-3. 或命令行运行：`godot --path .`
+2. 按 F5 运行，在主菜单点「开始游戏」进入**炼金工坊**
+3. 在工坊里靠近**出发门**按 E，选好武器 / 携带材料 / 难度后开始一局
+4. 或命令行运行：`godot --path .`
 
 重新生成占位美术（可选，需要 Pillow）：
 
@@ -236,7 +348,7 @@ python tools/generate_art.py
 
 通用生成器位于 `scripts/monsters/monster_spawner.gd`，生成配置类型位于 `monster_spawn_data.gd`。新增怪物时右键 `scenes/monsters/base_monster.tscn` 创建继承场景，再新建一份 `MonsterSpawnData` 资源并加入 `GameWorld/MonsterSpawner` 的 `spawn_definitions` 数组即可。生成器通过公开的 `monsters: Array[BaseMonster]` 保存存活怪物，怪物死亡时自动移除引用，并在区块卸载或更换世界时遍历释放。`resources/monsters/give_spawn_data.tres` 是“给”的首份配置示例。
 
-统一道具基础层来自 `inventory` 分支：`scripts/items/item_data.gd`、`scripts/items/ingredients/ingredient_data.gd`、`ingredients_model.gd` 以及炼金/物理属性基类保持原路径和原 UID，供背包、合成和世界物品共同使用。
+统一道具基础层来自 `inventory` 分支：`scripts/items/item_data.gd`、`scripts/items/ingredients/ingredient_data.gd`、`scripts/items/ingredients/material_model.gd` 保持原路径和原 UID，供背包和世界物品共同使用。旧的炼金属性 / 物理属性基类（`scripts/alchemical_attribute/*`、`scripts/physical_attribute/*`、`resources/alchemical_attribute/*`）已随词条堆叠炼金重构整体删除，不再保留兼容层。
 
 当前地图尚无正式石子，上传版本不生成临时石子，因此“给”在远程范围内找不到石子时会停止本次攻击。地图团队接入正式石子时，应继续使用同一套 `IngredientData` / `IngredientModel`，加入 `throwable_stones` 组并实现 `throw_at(target, damage)` 方法；怪物代码不依赖具体石子类型。
 
@@ -268,6 +380,7 @@ godot --headless --path . --script res://tools/test_give_ground_stone.gd
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
 godot --headless --path . res://tests/test_rainforest_spawner.tscn
+godot --headless --path . --script res://tests/test_audio.gd
 ```
 
 ---

@@ -55,12 +55,14 @@ var _last_map: MapSpec = null
 var _last_gate: int = -1
 
 
-func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0) -> void:
+## planned_run：外部已经规划好的房间图（局内地图 FloorData 适配而来）。
+## 留空时沿用旧的"层 + 岔路"骨架。
+func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0, planned_run: RoomGraph = null) -> void:
 	world_seed = seed_value if seed_value != 0 else random_seed()
 	config = map_config if map_config != null else MapConfig.new()
 	variant = variant_index
 	rng = MapRng.new(world_seed)
-	run = RoomGraph.plan(world_seed, config, variant)
+	run = planned_run if planned_run != null else RoomGraph.plan(world_seed, config, variant)
 	_build_layout()
 	_configure_noise()
 
@@ -201,6 +203,14 @@ func _build_layout() -> void:
 
 ## 群系是区域属性，树林、河岸和屋内都保留该箱庭的主题身份。
 func _assign_region_biomes() -> void:
+	# 来自局内地图（FloorData）的骨架自带区域主题：主题直接决定群系，
+	# 不再走旧的 RegionBiomes 序列与战斗群系白名单。
+	if run != null and run.planned_from_floor:
+		for spec: MapSpec in _specs:
+			var themed: int = run.biome_of(spec.node_id)
+			spec.biome_id = themed if themed >= 0 else Biome.Kind.FOREST
+			spec.boundary_kind = RegionBiomes.boundary_for(spec.biome_id)
+		return
 	var themes: PackedInt32Array = RegionBiomes.sequence(world_seed, variant)
 	var rainforest: MapSpec = null
 	var combat: MapSpec = null

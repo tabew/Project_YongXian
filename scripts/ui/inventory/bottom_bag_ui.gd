@@ -100,11 +100,15 @@ func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
 
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		if Input.is_action_just_pressed("alchemy_menu"):
-			visible = !visible
-			return
+	if not (event is InputEventKey):
+		return
+	if _alchemy_panel_open():
+		return
+	if Input.is_action_just_pressed("open_inventory") && visible == false:
+		visible = true
 
-		if Input.is_action_just_pressed("open_inventory")&&visible == false:
-				visible = true
+## 炼金台打开时让出 Tab，交给炼金台的标签页切换。
+func _alchemy_panel_open() -> bool:
+	var panel: CanvasItem = get_tree().get_first_node_in_group("alchemy_panel") as CanvasItem
+	return panel != null and panel.visible
 

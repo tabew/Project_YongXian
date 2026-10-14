@@ -13,7 +13,7 @@ config_version=5
 config/name="Project YongXian"
 config/description="使用 Godot 开发的游戏项目。"
 config/version="0.1.0"
-run/main_scene="res://scenes/game/game_world.tscn"
+run/main_scene="res://scenes/workshop/workshop.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -22,10 +22,11 @@ config/icon="res://icon.svg"
 EventBus="*res://autoloads/event_bus.gd"
 GameState="*res://autoloads/game_state.gd"
 SceneManager="*res://autoloads/scene_manager.tscn"
-AlchemicalAttributeList="*uid://k5lsvl6bbbgk"
 ItemListGlobal="*uid://cyg4u48sj4d7i"
 PerceptionManager="*res://scripts/monsters/ai/perception_manager.gd"
 PathRequestScheduler="*res://scripts/monsters/ai/path_request_scheduler.gd"
+AudioManager="*res://autoloads/audio_manager.gd"
+Inspiration="*res://scripts/inspiration/inspiration_manager.gd"
 
 [display]
 
@@ -105,14 +106,24 @@ open_inventory={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194306,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
-alchemy_menu={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":66,"key_label":0,"unicode":98,"location":0,"echo":false,"script":null)
-]
-}
-pickup_item={
+alchemy_brew={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":69,"key_label":0,"unicode":101,"location":0,"echo":false,"script":null)
+]
+}
+alchemy_cancel={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194305,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+alchemy_cycle={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194306,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+absorb_element={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":70,"key_label":0,"unicode":102,"location":0,"echo":false,"script":null)
 ]
 }
 

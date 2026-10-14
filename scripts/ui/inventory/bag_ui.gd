@@ -106,14 +106,22 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	put_item(data.get("item_id"),data.get("count"))
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		if Input.is_action_just_pressed("open_inventory"):
-			visible = !visible
-			_input_update()
-			return
+	if not (event is InputEventKey):
+		return
+	# 打开炼金台时收起背包，避免两层界面同时响应。
+	if Input.is_action_just_pressed("alchemy_brew"):
+		visible = false
+		return
+	if _alchemy_panel_open():
+		return
+	if Input.is_action_just_pressed("open_inventory"):
+		visible = !visible
+		_input_update()
 
-		if Input.is_action_just_pressed("alchemy_menu"):
-			visible = false
+## 炼金台打开时让出 Tab，交给炼金台的标签页切换。
+func _alchemy_panel_open() -> bool:
+	var panel: CanvasItem = get_tree().get_first_node_in_group("alchemy_panel") as CanvasItem
+	return panel != null and panel.visible
 
 func _input_update():
 	if visible:

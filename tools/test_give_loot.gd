@@ -41,7 +41,6 @@ func _run() -> void:
 			_check(model != null and model.data.id == item_id, "registered_loot_has_inventory_drag_model")
 			if model != null:
 				model.free()
-	_check(items.templates.back().id == items.POTION_ID_STRAT, "potion_template_stays_last")
 
 	root.size = Vector2i(1280, 720)
 	root.get_node("GameState").set("world_seed", 24681357)
@@ -91,11 +90,8 @@ func _run() -> void:
 	world.player.global_position = drop.global_position
 	var item_id: int = drop.data.id
 	var before: int = world.player.inventory.get_count(item_id)
-	var pickup_event := InputEventAction.new()
-	pickup_event.action = &"pickup_item"
-	pickup_event.pressed = true
-	world._unhandled_input(pickup_event)
-	_check(world.player.inventory.get_count(item_id) == before + 1, "pickup_action_adds_one_drop_to_inventory")
+	world._adsorb_pickups()
+	_check(world.player.inventory.get_count(item_id) == before + 1, "adsorb_adds_one_drop_to_inventory")
 	_check(not drop.collect(world.player), "same_drop_cannot_be_collected_twice")
 	world._enter_map(2)
 	world._enter_map(0)

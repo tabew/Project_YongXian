@@ -4,6 +4,10 @@ extends Node2D
 ## 传统 RPG 箱庭：触及出口立即换到目标入口，主视图只显示当前区域。
 
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
+## 死亡结算完成后回到的局外场景。
+const WORKSHOP_SCENE: String = "res://scenes/workshop/workshop.tscn"
+## 死亡演出（爆散 + 飘字）到回工坊之间的等待。
+const DEATH_RETURN_DELAY: float = 1.6
 
 @export var spawn_training_dummy: bool = true
 ## 打开后每次生成世界都会打印完整地图报告（调试用）。
@@ -14,6 +18,14 @@ const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.
 @onready var player: PlayerCharacter = $Player
 @onready var hud: Control = $GameHUD/HUD
 @onready var camera: Camera2D = $Player/Camera2D
+## 灵感光点对象池：掉落在这里生成，无条件飞向主角。
+@onready var inspiration_field: InspirationField = $InspirationField
+## 灵感计数 + 飘字。
+@onready var inspiration_hud: InspirationHud = $GameHUD/Inspiration
+## 清空房间后的门选择界面。
+@onready var door_choice: DoorChoicePanel = $GameHUD/DoorChoice
+## 通关结算界面（贤者之石）。
+@onready var settlement: RunSettlementPanel = $GameHUD/Settlement
 
 var _cottage_view: CottageView = null
 var _training_dummy: TrainingDummy
@@ -27,13 +39,36 @@ var _monster_map: int = -1
 var _map_entity_roots: Dictionary = {}
 ## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
 var _material_maps: Dictionary = {}
+## 每张地图的场景元素与可破坏物只生成一次；元素吸附后会自行冷却回满。
+var _room_props: Dictionary = {}
+## 当前高亮的可吸附场景元素；同一时刻只允许吸附一个。
+var _nearby_element: SceneElement = null
+## 吸附键是否按住；长按到满才真正吸附。
+var _absorb_held: bool = false
 var _nearby_pickup: GroundPickup = null
 const PICKUP_RADIUS: float = 36.0
+## 吸附半径：击杀/破坏掉落的材料靠近即自动收进炼金背包。
+## 默认值仅作兜底；实际半径取 AlchemyStation.adsorb_radius_pixels()（磁词条会扩大）。
+const ADSORB_RADIUS: float = 48.0
+
+## 灵感掉落用的随机源：种子来自本局世界种子，保证同种子同结果。
+var _inspiration_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## 灵感单例（运行期查找，避免在 --script 测试里提前引用全局标识符）。
+var _inspiration: InspirationManager = null
+## 死亡结算只跑一次，避免 defeated 重复触发导致重复切换场景。
+var _run_failed: bool = false
+## 当前房间是否已清空；未清空时不开放出口，清空后弹出选门界面。
+var _room_cleared: bool = false
+## 通关结算只跑一次。
+var _run_finished: bool = false
 
 
 func _ready() -> void:
 	_base_zoom = camera.zoom
 	get_viewport().size_changed.connect(_on_viewport_resized)
+	_setup_inspiration()
+	door_choice.door_chosen.connect(_on_door_chosen)
+	settlement.confirmed.connect(_on_settlement_confirmed)
 	# 直接从编辑器单独运行本场景时，也要能开局。
 	if GameState.world_seed == 0:
 		GameState.start_new_world()
@@ -46,7 +81,13 @@ func _process(_delta: float) -> void:
 	_sync_training_dummy()
 	_confine_map_monsters()
 	_refresh_pickup()
+	_adsorb_pickups()
+	_update_scene_elements(_delta)
 	if player.health <= 0:
+		return
+	_update_room_clear()
+	# 未清空房间前不开放出口：打完房间才出现 2~3 个门。
+	if not _room_cleared:
 		return
 	var spec: MapSpec = player.active_map
 	var local: Vector2i = WorldGenerator.world_to_tile(player.global_position) - spec.origin
@@ -59,6 +100,7 @@ func _process(_delta: float) -> void:
 		if (side < 0 and local.x <= 1) or (side > 0 and local.x >= spec.extent.x - 2):
 			var carried_velocity: Vector2 = player.velocity
 			_enter_map(link["target"], link["arrival_side"], link["arrival_y"])
+			AudioManager.play_sfx(&"gate_transition")
 			# 落点与出口带分离，按住同方向即可走进新箱庭，不会立即弹回。
 			player.velocity = carried_velocity
 			EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
@@ -66,19 +108,100 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("regenerate_world"):
+	# 吸附键：按住累计进度，松开清零，避免误触把元素吸走。
+	if event.is_action_pressed("absorb_element") and not event.is_echo():
+		_absorb_held = true
+	elif event.is_action_released("absorb_element"):
+		_absorb_held = false
+		if is_instance_valid(_nearby_element):
+			_nearby_element.set_highlighted(false)
+			_nearby_element = null
+	elif event.is_action_pressed("regenerate_world"):
 		regenerate_world()
 	elif event.is_action_pressed("kill_all_monsters"):
 		kill_all_monsters()
-	elif event.is_action_pressed("pickup_item") and not event.is_echo():
-		_refresh_pickup()
-		if is_instance_valid(_nearby_pickup):
-			var material_name: String = _nearby_pickup.data.name
-			var quantity: int = _nearby_pickup.amount
-			if _nearby_pickup.collect(player):
-				EventBus.notification.emit("获得 %s ×%d" % [material_name, quantity])
-			_refresh_pickup()
-		get_viewport().set_input_as_handled()
+
+## 吸附：靠近的材料自动收进炼金背包，对应“击杀/破坏 → 吸附材料 → 按 E 展开”的核心循环。
+func _adsorb_pickups() -> void:
+	if player.health <= 0 or player.alchemy_station == null:
+		return
+	var entity_root: Node2D = _map_entity_roots.get(_current_node)
+	var pickup_roots: Array[Node2D] = [monster_spawner]
+	if entity_root != null:
+		pickup_roots.append(entity_root)
+	var radius: float = player.alchemy_station.adsorb_radius_pixels()
+	var radius_squared: float = radius * radius
+	for pickup_root: Node2D in pickup_roots:
+		for child: Node in pickup_root.get_children():
+			if not child is GroundPickup or child.is_queued_for_deletion():
+				continue
+			var pickup := child as GroundPickup
+			if not pickup.is_available_for_pickup():
+				continue
+			if player.global_position.distance_squared_to(pickup.global_position) > radius_squared:
+				continue
+			if not _can_reach_pickup(pickup.global_position):
+				continue
+			var material_name: String = pickup.data.name
+			var quantity: int = pickup.amount
+			if pickup.collect(player):
+				EventBus.notification.emit("吸附 %s ×%d" % [material_name, quantity])
+
+
+## 场景元素：靠近高亮，长按吸附键产出一份主题材料，随后元素进入冷却。
+## 长按进度记在元素上；松开或离开范围会由 set_highlighted(false) 清零，避免误触。
+func _update_scene_elements(delta: float) -> void:
+	if player.health <= 0 or player.alchemy_station == null:
+		return
+	var entity_root: Node2D = _map_entity_roots.get(_current_node)
+	if entity_root == null:
+		return
+	var nearest: SceneElement = null
+	var nearest_distance: float = SceneElement.INTERACT_RADIUS
+	for child: Node in entity_root.get_children():
+		if not child is SceneElement or child.is_queued_for_deletion():
+			continue
+		var element := child as SceneElement
+		if not element.is_ready_to_absorb():
+			continue
+		var distance: float = player.global_position.distance_to(element.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest = element
+	if nearest != _nearby_element:
+		if is_instance_valid(_nearby_element):
+			_nearby_element.set_highlighted(false)
+		_nearby_element = nearest
+		if _nearby_element != null:
+			_nearby_element.set_highlighted(true)
+	if _nearby_element == null or not _absorb_held:
+		return
+	if player.alchemy_station.is_menu_open() or player.alchemy_station.is_wheel_open():
+		return
+	var produced: Dictionary = _nearby_element.advance_hold(delta)
+	if produced.is_empty():
+		return
+	var added: int = player.alchemy_station.absorb_material(int(produced["material_id"]), int(produced["amount"]))
+	if added > 0:
+		AudioManager.play_sfx(&"absorb_material")
+		EventBus.notification.emit("吸附 %s ×%d" % [SceneElementCatalog.name_of(_nearby_element.element_id), added])
+
+
+## 可破坏物打碎：把材料落到它所在的地图里，交给已有的自动吸附流程收进炼金背包。
+func _on_breakable_broken(_prop_id: StringName, material_id: int, amount: int, prop: BreakableProp) -> void:
+	if not is_instance_valid(prop) or amount <= 0:
+		return
+	var data: IngredientData = ItemListGlobal.get_template(material_id) as IngredientData
+	if data == null:
+		return
+	var pickup := GroundPickup.new()
+	pickup.name = "Breakable_%d" % material_id
+	pickup.bind(data, amount, _generator)
+	var root: Node = prop.get_parent()
+	if root == null:
+		root = self
+	root.add_child(pickup)
+	pickup.global_position = prop.global_position
 
 
 ## 隐藏调试指令：只调用怪物死亡接口，不操作道具或其他世界实体。
@@ -95,10 +218,19 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 ## 用指定种子重建整个世界；只有重建世界才恢复玩家生命。
 func build_world(seed_value: int) -> void:
 	_hud_bound = false
+	_run_failed = false
+	_run_finished = false
+	_room_cleared = false
+	door_choice.hide_choices()
+	settlement.hide_panel()
+	inspiration_field.clear_all()
 	_clear_map_entities()
-	_generator = MapScorer.build_best(seed_value, _map_config_for_monsters())
+	# 局内地图由 RunMapGenerator 规划（层 → 区域 → 房间），世界生成器只负责地形与门。
+	_generator = RunMapBuilder.build(seed_value, 0, RunMapConfig.prototype(), MapConfig.new())
 	GameState.world_seed = _generator.world_seed
 	MapRng.set_shared_master(GameState.world_seed)
+	# 灵感掉落跟着本局世界种子走，同种子同结果。
+	_inspiration_rng.seed = GameState.world_seed
 	# 房间类型决定内容池：只有战斗 / Boss 区域刷怪。
 	monster_spawner.content = MapContent.build(_generator)
 	chunk_manager.setup(_generator, player)
@@ -107,11 +239,13 @@ func build_world(seed_value: int) -> void:
 	_setup_map_monsters()
 	# 初图落位并加载后才绑定，避免把上一局的位置记为已探索。
 	hud.bind_world(chunk_manager, player)
+	_bind_alchemy_hud()
 	_hud_bound = true
 	_sync_minimap()
 	if debug_map_report:
 		print(MapDebug.report(_generator))
 	EventBus.world_ready.emit(_generator.world_seed)
+	AudioManager.play_music(&"music_wilds")
 
 
 ## 从当前怪物定义取群系并集；新增怪物后地图会自动支持其战斗主题。
@@ -137,6 +271,12 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
+	# 换房即重新判定清空状态；旧房间的门选择界面立刻收起。
+	_room_cleared = false
+	door_choice.hide_choices()
+	if is_instance_valid(_nearby_element):
+		_nearby_element.set_highlighted(false)
+	_nearby_element = null
 	if _cottage_view == null:
 		_cottage_view = CottageView.new()
 		_cottage_view.name = "CottageView"
@@ -148,6 +288,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	_limit_camera(spec)
 	chunk_manager.load_map(map_node_id)
 	_setup_ground_materials(spec)
+	_setup_room_props(spec)
 	_refresh_pickup()
 	if _hud_bound:
 		_sync_training_dummy()
@@ -257,7 +398,11 @@ func _clear_map_entities() -> void:
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
+	if is_instance_valid(_nearby_element):
+		_nearby_element.set_highlighted(false)
+	_nearby_element = null
 	_material_maps.clear()
+	_room_props.clear()
 	for root: Node2D in _map_entity_roots.values():
 		remove_child(root)
 		root.queue_free()
@@ -282,6 +427,38 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 			pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 			entity_root.add_child(pickup)
 		_material_maps[spec.node_id] = true
+	_refresh_map_entity_visibility()
+
+
+## 场景元素与可破坏物：每张地图只铺一次；元素靠自身冷却回满，可破坏物打碎即消失。
+func _setup_room_props(spec: MapSpec) -> void:
+	if _room_props.has(spec.node_id):
+		return
+	var room: RoomData = _current_room()
+	if room == null:
+		return
+	var entity_root: Node2D = _map_entity_root(spec.node_id)
+	for entry: Dictionary in RoomProps.plan(_generator, spec, room):
+		var tile: Vector2i = entry["tile"]
+		var node: Node2D = null
+		if int(entry["kind"]) == RoomProps.Kind.ELEMENT:
+			var element := SceneElement.new()
+			element.bind(entry)
+			node = element
+		else:
+			var prop := BreakableProp.new()
+			prop.bind(entry)
+			prop.broken.connect(_on_breakable_broken.bind(prop))
+			node = prop
+		node.name = "%s_%d_%d" % [String(entry["id"]), tile.x, tile.y]
+		node.position = WorldGenerator.tile_to_world(tile)
+		entity_root.add_child(node)
+	_room_props[spec.node_id] = true
+	_refresh_map_entity_visibility()
+
+
+## 只有当前房间的道具会显示与运行；其余房间整棵树暂停，避免隔墙交互。
+func _refresh_map_entity_visibility() -> void:
 	for id: int in _map_entity_roots:
 		var map_root: Node2D = _map_entity_roots[id]
 		map_root.visible = id == _current_node
@@ -292,7 +469,7 @@ func _refresh_pickup() -> void:
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
-	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or $GameHUD/Alchemy.visible or get_viewport().gui_is_dragging():
+	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or player.alchemy_station.is_menu_open() or player.alchemy_station.is_wheel_open() or get_viewport().gui_is_dragging():
 		hud.show_pickup(null)
 		return
 	var entity_root: Node2D = _map_entity_roots.get(_current_node)
@@ -324,6 +501,177 @@ func _can_reach_pickup(target: Vector2) -> bool:
 		if not _generator.is_walkable(tile):
 			return false
 	return true
+
+## 把新炼金台 HUD 绑到主角的随身炼金台。
+func _bind_alchemy_hud() -> void:
+	var alchemy_hud: Node = $GameHUD/Alchemy
+	if alchemy_hud != null and alchemy_hud.has_method("bind"):
+		alchemy_hud.call("bind", player.alchemy_station)
+
+
+# ------------------------------------------------------------ 灵感
+
+## 把局内世界层接到灵感系统上：掉落 → 光点 → 飞入 → 计数 / 飘字，死亡 → 结算 → 回工坊。
+## 世界层只负责"在哪里生成光点"，金额与留存规则全在 InspirationManager / InspirationRules。
+func _setup_inspiration() -> void:
+	_inspiration = get_node_or_null("/root/Inspiration") as InspirationManager
+	inspiration_field.target = player
+	inspiration_field.collected.connect(_on_inspiration_collected)
+	inspiration_hud.bind(_inspiration)
+	player.defeated.connect(_on_player_defeated)
+	if not monster_spawner.monster_killed.is_connected(_on_monster_killed):
+		monster_spawner.monster_killed.connect(_on_monster_killed)
+	if _inspiration == null:
+		return
+	if not _inspiration.inspiration_dropped.is_connected(_on_inspiration_dropped):
+		_inspiration.inspiration_dropped.connect(_on_inspiration_dropped)
+	# 直接从编辑器运行本场景（没经过出发门）时也要有账本，否则掉落无处累计。
+	if not _inspiration.in_run:
+		_inspiration.start_run()
+
+
+## 击杀怪物：走概率表判定掉落，掉落记账后由 inspiration_dropped 驱动光点。
+func _on_monster_killed(monster: BaseMonster, inspiration_source: int) -> void:
+	# 炼金侧先结算：热量加速冷却、活体分裂、灵魂游魂，与掉落是否记账无关。
+	if player != null and monster != null:
+		player.on_monster_killed(monster.global_position)
+	if _inspiration == null or _run_failed:
+		return
+	_inspiration.roll_inspiration(monster.global_position, inspiration_source, _inspiration_rng)
+
+
+## 需要生成光点（来自任何掉落来源）。
+func _on_inspiration_dropped(position: Vector2, amount: int, source: int) -> void:
+	inspiration_field.spawn(position, amount, source)
+
+
+## 光点飞入：从"飞行中"转入已获得，并弹飘字。
+func _on_inspiration_collected(amount: int, source: int, _is_cluster: bool) -> void:
+	if _inspiration == null:
+		return
+	if _inspiration.collect_inspiration(amount) > 0:
+		inspiration_hud.show_gain(amount, source)
+
+
+## 死亡：损失局内灵感（按留存保留少量），演出后回工坊。
+func _on_player_defeated() -> void:
+	if _run_failed:
+		return
+	_run_failed = true
+	inspiration_field.clear_all()
+	var detail: Dictionary = {}
+	if _inspiration != null:
+		detail = _inspiration.fail_run()
+	inspiration_hud.show_loss(int(detail.get("lost", 0)))
+	inspiration_hud.show_total(int(detail.get("kept", 0)))
+	EventBus.notification.emit("你倒下了 · 损失 %d 灵感，保留 %d" % [
+		int(detail.get("lost", 0)), int(detail.get("kept", 0)),
+	])
+	AudioManager.play_sfx(&"inspiration_death")
+	await get_tree().create_timer(DEATH_RETURN_DELAY).timeout
+	SceneManager.change_scene(WORKSHOP_SCENE)
+
+
+# ------------------------------------------------------------ 房间与门
+
+## 当前房间的局内地图数据；旧骨架或未开局时返回 null。
+func _current_room() -> RoomData:
+	if _generator == null or _generator.run == null:
+		return null
+	return _generator.run.room_data(_current_node)
+
+
+## 房间清空 = 场上没有存活怪物；非战斗房一进门就算清空。
+func _update_room_clear() -> void:
+	var cleared: bool = _is_room_cleared()
+	if cleared == _room_cleared:
+		return
+	_room_cleared = cleared
+	if not cleared:
+		return
+	var room: RoomData = _current_room()
+	# Boss 房清空 = 通关：走贤者之石结算，不再开门。
+	if room != null and room.kind == RoomKind.Kind.BOSS:
+		_finish_run()
+		return
+	door_choice.show_choices(room)
+
+
+## 通关：贤者之石结算材料与灵感，弹结算界面，确认后回工坊。
+func _finish_run() -> void:
+	if _run_failed or _run_finished:
+		return
+	_run_finished = true
+	door_choice.hide_choices()
+	inspiration_field.clear_all()
+	var counts: Dictionary = _settlement_materials()
+	var result: Dictionary = {}
+	if _inspiration != null:
+		result = _inspiration.finish_run(counts["quality"], 0, 0.0, int(counts["boss"]))
+	AudioManager.play_sfx(&"sage_stone")
+	settlement.show_result(result)
+	EventBus.notification.emit("通关 · 贤者之石结算 %d 灵感" % int(result.get("final", 0)))
+
+
+## 结算材料：统计炼金背包与物品背包里的正式材料，按品质归类，Boss 材料单列。
+## 拾取会同时进两处背包；同一材料以炼金背包为准，避免重复计算，也覆盖只用炼金背包的来源。
+func _settlement_materials() -> Dictionary:
+	var counts: Dictionary = {"quality": {}, "boss": 0}
+	if player.alchemy_station == null:
+		return counts
+	var bag: AlchemyBag = player.alchemy_station.bag
+	var ids: Dictionary = {}
+	if player.inventory != null:
+		for item_id: int in player.inventory.items.keys():
+			ids[item_id] = true
+	if bag != null:
+		for material_id: int in bag.material_ids():
+			ids[material_id] = true
+	for material_id: int in ids.keys():
+		if not MaterialCatalog.has_material(material_id):
+			continue
+		var amount: int = 0
+		if bag != null and bag.count(material_id) > 0:
+			amount = bag.count(material_id)
+		elif player.inventory != null:
+			amount = player.inventory.get_count(material_id)
+		if amount <= 0:
+			continue
+		if MaterialCatalog.is_boss_material(material_id):
+			counts["boss"] = int(counts["boss"]) + amount
+		else:
+			var quality: int = MaterialCatalog.quality_of(material_id)
+			counts["quality"][quality] = int(counts["quality"].get(quality, 0)) + amount
+	return counts
+
+
+## 结算确认：回工坊。
+func _on_settlement_confirmed() -> void:
+	SceneManager.change_scene(WORKSHOP_SCENE)
+
+
+func _is_room_cleared() -> bool:
+	for child: Node in monster_spawner.get_children():
+		if child is BaseMonster and not child.is_queued_for_deletion():
+			return false
+	return true
+
+
+## 选中一条门：换算成世界编号后直接进房。
+func _on_door_chosen(data_node_id: int) -> void:
+	if _generator == null or _generator.run == null:
+		return
+	var target: int = _generator.run.world_node_of(data_node_id)
+	if target < 0:
+		return
+	door_choice.hide_choices()
+	var target_spec: MapSpec = _generator.map_spec(target)
+	var gate_y: int = int(target_spec.center.y)
+	if not target_spec.west_gates.is_empty():
+		gate_y = target_spec.west_gates[0]
+	_enter_map(target, -1, gate_y)
+	AudioManager.play_sfx(&"gate_transition")
+	EventBus.notification.emit("进入 %s" % _generator.run.describe(target))
 
 
 func _on_monster_chunk_applied(_coords: Vector2i) -> void:

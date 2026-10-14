@@ -10,8 +10,12 @@
 [ext_resource type="Script" uid="uid://cqo31wyudktju" path="res://scripts/monsters/monster_spawn_data.gd" id="7_spawn_data"]
 [ext_resource type="Resource" uid="uid://non3ac5ccv1p" path="res://resources/inventory/inventory.tres" id="8_bsk45"]
 [ext_resource type="Resource" path="res://resources/monsters/give_spawn_data.tres" id="8_give_spawn"]
-[ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/alchemy/alchemy.tscn" id="8_lsk7w"]
+[ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/ui/alchemy/alchemy_hud.tscn" id="8_lsk7w"]
 [ext_resource type="PackedScene" uid="uid://cei2bfjxogxkp" path="res://scenes/ui/inventory/bottom_bag_ui.tscn" id="12_nms8r"]
+[ext_resource type="Script" uid="uid://cmjvnfqoftsf5" path="res://scripts/inspiration/inspiration_field.gd" id="13_insp_field"]
+[ext_resource type="Script" uid="uid://b4mikrbhvdv42" path="res://scripts/inspiration/inspiration_hud.gd" id="14_insp_hud"]
+[ext_resource type="Script" uid="uid://i5nxf81h6yic" path="res://scripts/ui/door_choice_panel.gd" id="15_door_choice"]
+[ext_resource type="Script" path="res://scripts/ui/run_settlement_panel.gd" id="16_settlement"]
 
 [node name="GameWorld" type="Node2D" unique_id=408146263]
 script = ExtResource("1_world")
@@ -23,6 +27,9 @@ tile_set = ExtResource("2_tileset")
 [node name="MonsterSpawner" type="Node2D" parent="." unique_id=46169950]
 script = ExtResource("6_monsters")
 spawn_definitions = Array[ExtResource("7_spawn_data")]([ExtResource("8_give_spawn")])
+
+[node name="InspirationField" type="Node2D" parent="."]
+script = ExtResource("13_insp_field")
 
 [node name="Player" parent="." unique_id=512090753 groups=["player"] instance=ExtResource("3_player")]
 inventory = ExtResource("8_bsk45")
@@ -42,3 +49,33 @@ player = NodePath("../../Player")
 
 [node name="Alchemy" parent="GameHUD" unique_id=389668861 instance=ExtResource("8_lsk7w")]
 visible = false
+
+[node name="Inspiration" type="Control" parent="GameHUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("14_insp_hud")
+
+[node name="DoorChoice" type="Control" parent="GameHUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_door_choice")
+
+[node name="Settlement" type="Control" parent="GameHUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("16_settlement")

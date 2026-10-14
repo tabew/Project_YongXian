@@ -78,9 +78,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed("toggle_minimap"):
 		minimap.set_expanded(not minimap.is_expanded())
+		AudioManager.play_sfx(&"ui_toggle")
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("toggle_debug"):
 		stats_label.visible = not stats_label.visible
+		AudioManager.play_sfx(&"ui_toggle")
 
 
 func _process(delta: float) -> void:

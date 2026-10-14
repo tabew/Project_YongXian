@@ -152,13 +152,23 @@ func _run() -> void:
 	_check(yoyo_hits.size() >= 2, "A held yoyo lands repeated hits on the world target")
 	dummy.health.damaged.disconnect(count_yoyo_hit)
 
-	await _cycle_weapon()
-	_check(controller.equipped_weapon.id == &"longsword", "Q cycles back to the sword")
-	await _cycle_weapon()
-	await _cycle_weapon()
-	_check(controller.equipped_weapon.id == &"yoyo", "Q walks the whole loadout in order")
+	# 武器扩展后 loadout 变长：按「走完一圈并回到起点」验证轮换，不写死武器数量。
 	var full_loadout: Array[WeaponDefinition] = player.weapon_loadout
-	_check(full_loadout.size() == 3, "Player loadout holds the sword, the staff and the yoyo")
+	_check(full_loadout.size() >= 3, "Player loadout holds the sword, the staff, the yoyo and the extended weapons")
+	var kept_ids: Array[StringName] = []
+	for entry: WeaponDefinition in full_loadout:
+		if entry != null:
+			kept_ids.append(entry.id)
+	for required_id: StringName in [&"longsword", &"long_staff", &"yoyo"]:
+		_check(kept_ids.has(required_id), "Player loadout keeps %s" % required_id)
+	var start_index: int = full_loadout.find(controller.equipped_weapon)
+	_check(start_index >= 0, "Current weapon is part of the loadout")
+	for step: int in range(1, full_loadout.size()):
+		await _cycle_weapon()
+		_check(controller.equipped_weapon == full_loadout[(start_index + step) % full_loadout.size()],
+			"Q walks the whole loadout in order")
+	await _cycle_weapon()
+	_check(controller.equipped_weapon == full_loadout[start_index], "Q cycles back to the starting weapon")
 	player.weapon_loadout = []
 	_check(not player.equip_next_weapon(), "An empty loadout leaves equipment intact")
 	player.weapon_loadout = [null, controller.equipped_weapon]
@@ -176,13 +186,20 @@ func _run() -> void:
 		copy.id = StringName("loadout_copy_%d" % index)
 		copy.display_name = "Template copy %d" % index
 		player.weapon_loadout.append(copy)
-	for copy: WeaponDefinition in template_copies:
+	# 副本追加在列表末尾：先走到第一个副本，再逐个验证三个副本都能被 Q 选中。
+	var extended_loadout: Array[WeaponDefinition] = player.weapon_loadout
+	var copy_start: int = extended_loadout.find(template_copies[0])
+	_check(copy_start > 0, "Template copies are appended after the original loadout")
+	var current_index: int = extended_loadout.find(controller.equipped_weapon)
+	var steps_to_first_copy: int = posmod(copy_start - current_index, extended_loadout.size())
+	for _step: int in range(steps_to_first_copy):
 		await _cycle_weapon()
+	for copy: WeaponDefinition in template_copies:
 		_check(controller.equipped_weapon == copy, "Template copy added to loadout is reachable with Q")
 		_check(weapon_label.text.contains(copy.display_name), "Template copy name appears in the HUD")
 		_check((world.get_node("GameHUD/HUD/WeaponIcon") as TextureRect).texture == copy.icon, "Template copy icon appears in the HUD")
-	await _cycle_weapon()
-	_check(controller.equipped_weapon == full_loadout[0], "Extended loadout cycles back to the original sword")
+		await _cycle_weapon()
+	_check(controller.equipped_weapon == extended_loadout[0], "Extended loadout cycles back to the original sword")
 	player.weapon_loadout = full_loadout
 
 	var blocker: Control = Control.new()
@@ -228,6 +245,21 @@ func _run() -> void:
 	world.set("spawn_training_dummy", false)
 	world.call("build_world", 20261010)
 	_check(_dummy_in(world) == null, "Training target is optional")
+
+	# 炼金升级 / 遗物接线：暴击率注入武器，炼金瞬间给无敌。
+	player.alchemy_station.add_relic(&"crit_eye")
+	player.alchemy_station.add_upgrade(&"brew_invuln")
+	player._physics_process(0.0)
+	_check(is_equal_approx(controller.critical_chance_bonus, 0.15), "暴击之眼注入武器控制器")
+	player.alchemy_station.combo_activated.emit(player.alchemy_station.active_combo())
+	_check(is_equal_approx(player.invulnerable_remaining, 0.30), "炼金瞬间获得 0.3 秒无敌")
+	var health_before_invuln: int = player.health
+	player.take_damage(5)
+	_check(player.health == health_before_invuln, "无敌期间免疫伤害")
+	player.invulnerable_remaining = 0.0
+	player.take_damage(5)
+	_check(player.health == health_before_invuln - 5, "无敌结束后恢复受伤")
+
 	world.queue_free()
 	await process_frame
 	await process_frame

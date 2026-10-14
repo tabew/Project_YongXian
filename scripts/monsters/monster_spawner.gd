@@ -7,6 +7,10 @@ extends Node2D
 @export var spawn_definitions: Array[MonsterSpawnData] = []
 @export_range(0, 16, 1) var despawn_margin_chunks: int = 2
 
+## 怪物被真正击杀（不是切图回收）：携带怪物节点与它的灵感来源档位。
+## 只做广播，不决定掉落数量；灵感账本由局内世界层负责。
+signal monster_killed(monster: BaseMonster, inspiration_source: int)
+
 ## 当前仍有效的全部怪物；怪物退出场景树时自动移除引用。
 var monsters: Array[BaseMonster] = []
 
@@ -133,6 +137,7 @@ func spawn_monster(
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
 	monster.killed.connect(_on_monster_killed.bind(spawn_id), CONNECT_ONE_SHOT)
+	monster.killed.connect(_on_monster_killed_broadcast.bind(monster, definition.inspiration_source), CONNECT_ONE_SHOT)
 
 	monster.configure(_player, _generator, chunk_coords)
 	return monster
@@ -145,6 +150,13 @@ func _spawn_id(definition: MonsterSpawnData, tile: Vector2i) -> String:
 
 func _on_monster_killed(spawn_id: String) -> void:
 	_defeated_spawn_ids[spawn_id] = true
+
+
+## 死亡时怪物还没被 queue_free 掉，位置仍是最终击杀点，可以直接拿来掉落。
+func _on_monster_killed_broadcast(monster: BaseMonster, inspiration_source: int) -> void:
+	if not is_instance_valid(monster):
+		return
+	monster_killed.emit(monster, inspiration_source)
 
 
 ## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。

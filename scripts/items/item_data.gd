@@ -8,12 +8,6 @@ extends Resource
 @export var max_stack:int = 999 #最大堆叠数
 
 
-##具有的炼金属性，类型为array[AlchemicalData]
-@export var alchemical_attribute:Array[AlchemicalData] = []
-##具有的物理属性，类型为array[AlchemicalData]
-@export var physical_attribute:Array[PhysicalData] = []
-
-
 ##物品对应场景的文件路径
 @export_file("*.tscn") var item_scene_path:String = ""
 

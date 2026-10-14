@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="Texture2D" path="res://assets/player_placeholder.png" id="2_texture"]
@@ -7,6 +7,7 @@
 [ext_resource type="Resource" path="res://resources/weapons/long_staff.tres" id="5_long_staff"]
 [ext_resource type="Script" path="res://resources/weapons/weapon_definition.gd" id="6_definition"]
 [ext_resource type="Resource" path="res://resources/weapons/yoyo.tres" id="7_yoyo"]
+[ext_resource type="Script" path="res://scripts/alchemy/alchemy_station.gd" id="8_station"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(10, 8)
@@ -25,6 +26,9 @@ shape = SubResource("RectangleShape2D_body")
 [node name="WeaponController" type="Node2D" parent="."]
 script = ExtResource("3_weapons")
 starting_weapon = ExtResource("4_longsword")
+
+[node name="AlchemyStation" type="Node" parent="."]
+script = ExtResource("8_station")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(2, 2)

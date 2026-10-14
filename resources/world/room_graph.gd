@@ -24,6 +24,9 @@ var main_path: PackedInt32Array = PackedInt32Array()
 var branch_nodes: PackedInt32Array = PackedInt32Array()
 ## 关键房间：RoomType.Kind -> PackedInt32Array(node_id)
 var key_nodes: Dictionary = {}
+## 骨架是否由局内地图（FloorData）适配而来。
+## 为真时本图的不变量由 RunMapGenerator 保证，validate() 不再套用旧节奏模板的约束。
+var planned_from_floor: bool = false
 
 
 static func plan(seed_value: int, config: MapConfig = null, variant: int = 0) -> RoomGraph:
@@ -40,6 +43,31 @@ static func plan(seed_value: int, config: MapConfig = null, variant: int = 0) ->
 
 func type_of(node_id: int) -> int:
 	return types.get(node_id, RoomType.Kind.COMBAT)
+
+
+## 该房间的群系。旧骨架没有这个概念，返回 -1 表示"按旧规则决定"。
+func biome_of(_node_id: int) -> int:
+	return -1
+
+
+## 该房间在局内地图里的完整数据；旧骨架返回 null。
+func room_data(_node_id: int) -> RoomData:
+	return null
+
+
+## 该房间在新房间类型系统里的名字。旧骨架回落到旧类型名。
+func kind_name_of(node_id: int) -> String:
+	return RoomType.name_of(type_of(node_id))
+
+
+## 局内地图里的原始 node_id；旧骨架返回 -1。
+func data_node_of(_node_id: int) -> int:
+	return -1
+
+
+## 局内地图 node_id 对应的世界 node_id；旧骨架返回 -1。
+func world_node_of(_data_node_id: int) -> int:
+	return -1
 
 
 func is_main_path(node_id: int) -> bool:
@@ -272,6 +300,9 @@ func _demote_kind(assignment: Dictionary, kind: int, limit: int) -> void:
 
 ## 骨架硬约束（图级）。返回失败原因，空数组表示通过。
 func validate() -> PackedStringArray:
+	if planned_from_floor:
+		# 由局内地图适配的骨架：节奏与保底由 RunMapGenerator 负责，这里不重复校验。
+		return PackedStringArray()
 	var problems: PackedStringArray = []
 	var path_len: int = main_path.size()
 	if path_len < config.min_path_len or path_len > config.max_path_len:

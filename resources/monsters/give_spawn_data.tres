@@ -7,6 +7,6 @@
 script = ExtResource("1_spawn_data")
 monster_id = &"give"
 monster_scene = ExtResource("2_monster")
-allowed_biomes = Array[int]([4, 5, 6, 7])
+allowed_biomes = Array[int]([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
 max_per_chunk = 2
 candidate_attempts = 32

@@ -39,6 +39,8 @@ var pass_half_width: float = 20.0
 var boundary_kind: int = Terrain.Kind.FOREST
 ## 整个世界使用的群系由布局构建方赋值；起始屋使用独立碰撞覆盖。
 var biome_id: int = Biome.Kind.FOREST
+## 本区域的房间类型；炼金材料产出按房间类型（Boss 房）覆盖群系表。
+var room_kind: int = RoomType.Kind.COMBAT
 var cottage: CottageLayout = null
 ## 生成这张区域时选中的模板 id。
 var template_id: StringName = &""
@@ -53,6 +55,7 @@ var river_amplitude: float = 0.0
 static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_gate_count: int, room_kind: int = RoomType.Kind.COMBAT, variant: int = 0) -> MapSpec:
 	var spec := MapSpec.new()
 	spec.node_id = map_node_id
+	spec.room_kind = room_kind
 	var rng: RandomNumberGenerator = MapRng.node_rng(world_seed, map_node_id)
 	spec.shape = posmod(world_seed + map_node_id, SHAPE_NAMES.size())
 	# 按房间类型与门朝向挑选区域模板；挑模板用独立随机源，不影响主序列。

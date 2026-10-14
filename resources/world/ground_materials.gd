@@ -10,6 +10,8 @@ const MIN_COUNT: int = 20
 const MAX_COUNT: int = 70
 const SAFE_RADIUS: int = 3
 const STREAM_SALT: int = 0x47524F55
+## 石头 / 木棍在抽样表里的总权重；炼金材料按各自权重并入同一张表。
+const GROUND_WEIGHT: float = 12.0
 
 
 static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
@@ -40,6 +42,7 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
 		var saved: Vector2i = cells[index]
 		cells[index] = cells[other]
 		cells[other] = saved
+	var pool: Array[Dictionary] = _material_pool(spec)
 	for cell: Vector2i in cells:
 		if result.size() >= target:
 			break
@@ -49,8 +52,7 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
 			var tile: Vector2i = cell * GRID_SIZE + Vector2i(source.randi_range(1, GRID_SIZE - 2), source.randi_range(1, GRID_SIZE - 2))
 			if not _can_place(generator, spec, tile, result, exclusions):
 				continue
-			var item_id: int = STONE_ID if source.randf() < _stone_ratio(spec.biome_id) else STICK_ID
-			_append(result, occupied, tile, item_id, 1)
+			_append_pick(result, occupied, tile, source, pool)
 			break
 	# 很小或密林占比高的地图，穷举尚未占用网格内的格子兜底，仍不突破密度限制。
 	if result.size() < MIN_COUNT:
@@ -64,20 +66,103 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
 				for x: int in GRID_SIZE:
 					var tile: Vector2i = cell * GRID_SIZE + Vector2i(x, y)
 					if _can_place(generator, spec, tile, result, exclusions):
-						var item_id: int = STONE_ID if source.randf() < _stone_ratio(spec.biome_id) else STICK_ID
-						_append(result, occupied, tile, item_id, 1)
+						_append_pick(result, occupied, tile, source, pool)
 						placed = true
 						break
 				if placed:
 					break
-	# 每图均可获得两种材料，不只依赖有限次数的概率抽样。
-	for required_id: int in [STONE_ID, STICK_ID]:
-		var found: bool = false
-		for entry: Dictionary in result:
-			found = found or entry["item_id"] == required_id
-		if not found and not result.is_empty():
-			result[result.size() - 1]["item_id"] = required_id
+	# 每图均可获得石头与木棍（保证「投石」与基础采集），并至少刷出一种本群系的正式炼金材料。
+	_ensure_required(result, pool, source)
 	return result
+
+
+## 抽样表：石头 / 木棍保持原有群系比例，再并入本群系（或 Boss 房）的正式炼金材料。
+static func _material_pool(spec: MapSpec) -> Array[Dictionary]:
+	var pool: Array[Dictionary] = []
+	var stone_share: float = _stone_ratio(spec.biome_id)
+	pool.append({"id": STONE_ID, "weight": stone_share * GROUND_WEIGHT})
+	pool.append({"id": STICK_ID, "weight": (1.0 - stone_share) * GROUND_WEIGHT})
+	for entry: Dictionary in AlchemyMaterialSources.pool_for(spec):
+		pool.append({"id": int(entry["id"]), "weight": maxf(float(entry.get("weight", 1.0)), 0.0)})
+	return pool
+
+
+## 按权重抽一种材料；数量由品质决定（普通 1~3、稀有 1~2、更高 1）。
+static func _pick(source: RandomNumberGenerator, pool: Array[Dictionary]) -> Dictionary:
+	var total: float = 0.0
+	for entry: Dictionary in pool:
+		total += maxf(float(entry.get("weight", 0.0)), 0.0)
+	if pool.is_empty() or total <= 0.0:
+		return {"id": STONE_ID, "amount": 1}
+	var roll: float = source.randf() * total
+	for entry: Dictionary in pool:
+		roll -= maxf(float(entry.get("weight", 0.0)), 0.0)
+		if roll <= 0.0:
+			var material_id: int = int(entry["id"])
+			return {"id": material_id, "amount": AlchemyMaterialSources.amount_for(material_id, source)}
+	var last: int = int(pool[pool.size() - 1]["id"])
+	return {"id": last, "amount": AlchemyMaterialSources.amount_for(last, source)}
+
+
+static func _append_pick(result: Array[Dictionary], occupied: Dictionary, tile: Vector2i, source: RandomNumberGenerator, pool: Array[Dictionary]) -> void:
+	var pick: Dictionary = _pick(source, pool)
+	_append(result, occupied, tile, int(pick["id"]), int(pick["amount"]))
+
+
+static func _contains_id(result: Array[Dictionary], item_id: int) -> bool:
+	for entry: Dictionary in result:
+		if int(entry["item_id"]) == item_id:
+			return true
+	return false
+
+
+## 兜底：保证石头 / 木棍各至少一条，并至少刷出一条本群系的正式炼金材料。
+static func _ensure_required(result: Array[Dictionary], pool: Array[Dictionary], source: RandomNumberGenerator) -> void:
+	if result.is_empty():
+		return
+	var wanted: Array[int] = []
+	if not _contains_id(result, STONE_ID):
+		wanted.append(STONE_ID)
+	if not _contains_id(result, STICK_ID):
+		wanted.append(STICK_ID)
+	var biome_ids: Array[int] = []
+	for entry: Dictionary in pool:
+		var material_id: int = int(entry["id"])
+		if material_id != STONE_ID and material_id != STICK_ID and not biome_ids.has(material_id):
+			biome_ids.append(material_id)
+	if not biome_ids.is_empty() and not _contains_any(result, biome_ids):
+		wanted.append(biome_ids[0])
+	# 每次占用不同的槽位，避免后一条兜底把前一条刚补上的必备材料又换掉。
+	var used: Array[int] = []
+	for item_id: int in wanted:
+		var index: int = _free_index(result, used)
+		if index < 0:
+			return
+		used.append(index)
+		result[index]["item_id"] = item_id
+		result[index]["amount"] = AlchemyMaterialSources.amount_for(item_id, source)
+
+
+static func _contains_any(result: Array[Dictionary], item_ids: Array[int]) -> bool:
+	for entry: Dictionary in result:
+		if item_ids.has(int(entry["item_id"])):
+			return true
+	return false
+
+
+## 找一个可覆盖的槽位：优先末尾的非石头 / 木棍，且本次未被占用。
+static func _free_index(result: Array[Dictionary], used: Array[int]) -> int:
+	for index: int in range(result.size() - 1, -1, -1):
+		if used.has(index):
+			continue
+		var current: int = int(result[index]["item_id"])
+		if current == STONE_ID or current == STICK_ID:
+			continue
+		return index
+	for index: int in range(result.size() - 1, -1, -1):
+		if not used.has(index):
+			return index
+	return -1
 
 
 static func _add_starter(generator: WorldGenerator, spec: MapSpec, result: Array[Dictionary], occupied: Dictionary, exclusions: Array[Vector2i]) -> void:

@@ -89,8 +89,6 @@ func _test_item_data_contract() -> bool:
 	var ingredient := IngredientData.new()
 	var passed: bool = (
 		ingredient is ItemData
-		and ingredient.alchemical_attribute != null
-		and ingredient.physical_attribute != null
 		and ingredient.create_model() == null
 	)
 	if not passed:

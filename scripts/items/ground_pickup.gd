@@ -18,10 +18,15 @@ var _throw_start: Vector2 = Vector2.ZERO
 var _throw_destination: Vector2 = Vector2.ZERO
 var _throw_elapsed: float = 0.0
 var _throw_duration: float = 0.0
+## 炼金材料的悬浮循环动画；石头 / 木棍没有。
+var _float_tween: Tween = null
 
 const THROW_SPEED: float = 320.0
 const THROW_ARC_HEIGHT: float = 16.0
 const THROW_HIT_RADIUS: float = 10.0
+## 炼金材料在世界里的悬浮高度（像素）与一个来回的周期（秒）。
+const FLOAT_HEIGHT: float = 2.0
+const FLOAT_SECONDS: float = 1.6
 
 
 func _ready() -> void:
@@ -50,6 +55,9 @@ func collect(player: PlayerCharacter) -> bool:
 	_collected = true
 	_update_throwable_group()
 	player.inventory.add_item(data.id, amount)
+	if is_instance_valid(player.alchemy_station):
+		player.alchemy_station.absorb_world_material(data.id, amount)
+	_play_sfx(&"pickup_material", global_position)
 	collected.emit(data.id, amount)
 	visible = false
 	queue_free()
@@ -58,6 +66,19 @@ func collect(player: PlayerCharacter) -> bool:
 
 func is_available_for_pickup() -> bool:
 	return not _collected and not _in_flight and not is_queued_for_deletion() and data != null and amount > 0
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
+
+
+## 是否为正式炼金材料：决定悬浮表现与吸附提示。
+func is_alchemy_material() -> bool:
+	return data != null and MaterialCatalog.has_material(data.id)
 
 
 func can_be_thrown() -> bool:
@@ -92,6 +113,7 @@ func throw_at(target: Node2D, damage: int) -> bool:
 	set_highlighted(false)
 	_update_throwable_group()
 	set_physics_process(true)
+	_play_sfx(&"stone_throw", global_position)
 	return true
 
 
@@ -137,6 +159,7 @@ func _finish_throw() -> void:
 	_throw_target = null
 	set_physics_process(false)
 	_update_visual()
+	_play_sfx(&"stone_land", global_position)
 
 
 ## 枚举整段扫过的格子，含恰好擦过的对角格，避免高速投石穿过虚拟地形墙。
@@ -210,7 +233,23 @@ func _update_visual() -> void:
 	_sprite.texture = data.texture if data != null else null
 	visible = data != null and amount > 0 and not _collected
 	_update_throwable_group()
+	_refresh_float()
 	queue_redraw()
+
+
+## 炼金材料轻微上下悬浮；石头 / 木棍保持静止。
+func _refresh_float() -> void:
+	var should_float: bool = is_alchemy_material() and is_inside_tree() and not _collected and not _in_flight
+	if should_float and _float_tween == null:
+		_sprite.position = Vector2(0.0, -2.0)
+		_float_tween = create_tween().set_loops()
+		_float_tween.tween_property(_sprite, "position:y", -2.0 - FLOAT_HEIGHT, FLOAT_SECONDS * 0.5).set_trans(Tween.TRANS_SINE)
+		_float_tween.tween_property(_sprite, "position:y", -2.0, FLOAT_SECONDS * 0.5).set_trans(Tween.TRANS_SINE)
+	elif not should_float and _float_tween != null:
+		_float_tween.kill()
+		_float_tween = null
+		if is_instance_valid(_sprite):
+			_sprite.position = Vector2(0.0, -2.0)
 
 
 func _draw() -> void:

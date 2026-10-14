@@ -9,6 +9,9 @@ extends Resource
 @export_range(0.0, 1.0, 0.01) var chunk_spawn_chance: float = 1.0
 @export_range(1, 100, 1) var max_per_chunk: int = 1
 @export_range(1, 256, 1) var candidate_attempts: int = 24
+## 击杀后按哪一档灵感掉落表判定；默认小怪（InspirationRules.Source.NORMAL）。
+## 精英 / Boss 只需要在这里改数值，掉落与表现会自动跟着走。
+@export var inspiration_source: int = 0
 
 
 func can_spawn_at(generator: WorldGenerator, tile: Vector2i) -> bool:

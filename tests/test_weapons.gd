@@ -188,6 +188,26 @@ func _run() -> void:
 	front.reset()
 	_check(front.current_health == front.max_health, "Health reset restores target")
 
+	# 炼金遗物「暴击之眼」：额外暴击率注入到每次攻击。
+	_fixture()
+	_controller.critical_chance_bonus = 1.0
+	front = _target(Vector2(35, 0))
+	await _sync_physics()
+	received = []
+	front.damaged.connect(func(hit: CombatHit, _amount: float) -> void: received.append(hit))
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(received.size() == 1 and received[0].critical, "额外暴击率让基础暴击率 0 的武器必暴")
+	_controller.critical_chance_bonus = 0.0
+	_fixture()
+	front = _target(Vector2(35, 0))
+	await _sync_physics()
+	received = []
+	front.damaged.connect(func(hit: CombatHit, _amount: float) -> void: received.append(hit))
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(received.size() == 1 and not received[0].critical, "清空额外暴击率后不再必暴")
+
 	_fixture()
 	_data.auto_repeat = false
 	_controller.set_trigger_pressed(true)
@@ -261,6 +281,7 @@ func _run() -> void:
 
 	await _test_long_staff()
 	await _test_yoyo()
+	await _test_hit_effects()
 
 	_arena.free()
 	await process_frame
@@ -298,6 +319,109 @@ func _test_weapon_templates() -> void:
 		_check(not _controller.is_attacking(), "Template attack completes normally")
 		_check(template.id == original_id and template.damage == original_damage, "Editing and attacking with a copy leaves its template unchanged")
 		_check(sibling.id == original_id and sibling.damage == original_damage, "Other copies retain their independent values")
+
+
+## 行为词条效果表：把 AlchemyHitEffects 的空表补上测试用的确定数值。
+func _effects_table(entries: Dictionary) -> Dictionary:
+	var table: Dictionary = AlchemyHitEffects.empty_profile()
+	for key: StringName in entries:
+		table[key] = entries[key]
+	table["has_any"] = AlchemyHitEffects.has_any(table)
+	return table
+
+
+## 行为词条必须真的改变命中结果：爆炸 / 连锁 / 回旋 都要打到预期目标。
+## 全部用 chance = 1.0 的效果表，避免随机导致的偶发失败。
+func _test_hit_effects() -> void:
+	# ── 爆炸：命中点半径内的其它目标吃一次范围伤害 ──────────────────────
+	_fixture()
+	_controller.hit_effects = _effects_table({
+		"explode": {"chance": 1.0, "radius_tiles": 5.0, "damage": 0.5, "chain": false},
+	})
+	var primary: HealthComponent = _target(Vector2(35, 0))
+	var neighbor: HealthComponent = _target(Vector2(-35, 0))
+	var far_away: HealthComponent = _target(Vector2(0, 90))
+	var ally: HealthComponent = _target(Vector2(-30, 0), 1)
+	var wrong_layer: HealthComponent = _target(Vector2(0, -60), 2, 2)
+	await _sync_physics()
+	var attack: WeaponAttack = _start()
+	attack._physics_process(1.0)
+	_check(primary.current_health == 982.0, "爆炸：直接命中的目标只吃一次普通伤害")
+	_check(neighbor.current_health == 991.0, "爆炸：半径内的背后目标吃 50% 范围伤害")
+	_check(far_away.current_health == 1000.0, "爆炸：半径外目标不受影响")
+	_check(ally.current_health == 1000.0, "爆炸：同队目标不受范围伤害")
+	_check(wrong_layer.current_health == 1000.0, "爆炸：命中遮罩外的层不受范围伤害")
+
+	# ── 连锁：按距离挑最近的若干个目标跳伤害 ────────────────────────────
+	_fixture()
+	_controller.hit_effects = _effects_table({
+		"chain": {"chance": 1.0, "targets": 2, "damage": 0.5, "rebound": false},
+		"spread_tiles": 1.0,
+	})
+	var source: HealthComponent = _target(Vector2(35, 0))
+	var near_left: HealthComponent = _target(Vector2(0, 35))
+	var near_right: HealthComponent = _target(Vector2(0, -35))
+	var distant: HealthComponent = _target(Vector2(0, 70))
+	await _sync_physics()
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(source.current_health == 982.0, "连锁：直接命中目标吃普通伤害")
+	_check(near_left.current_health == 991.0, "连锁：第一个最近目标吃 50% 跳跃伤害")
+	_check(near_right.current_health == 991.0, "连锁：第二个最近目标吃 50% 跳跃伤害")
+	_check(distant.current_health == 1000.0, "连锁：超出跳跃名额的目标不受影响")
+
+	# ── 回旋：只对被命中的那个目标追加伤害，V 级再来一次 ────────────────
+	_fixture()
+	_controller.hit_effects = _effects_table({
+		"whirl": {"chance": 1.0, "damage": 1.0, "double": false},
+	})
+	primary = _target(Vector2(35, 0))
+	neighbor = _target(Vector2(-35, 0))
+	await _sync_physics()
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(primary.current_health == 964.0, "回旋：命中的目标额外吃一次 100% 伤害")
+	_check(neighbor.current_health == 1000.0, "回旋：不作用于其它目标")
+
+	_fixture()
+	_controller.hit_effects = _effects_table({
+		"whirl": {"chance": 1.0, "damage": 0.5, "double": true},
+	})
+	primary = _target(Vector2(35, 0))
+	await _sync_physics()
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(primary.current_health == 964.0, "回旋 V：二次回旋再补一次 50% 伤害")
+
+	# ── 空效果表：原有命中规则完全不变 ──────────────────────────────────
+	_fixture()
+	_controller.hit_effects = AlchemyHitEffects.empty_profile()
+	primary = _target(Vector2(35, 0))
+	neighbor = _target(Vector2(-35, 0))
+	await _sync_physics()
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(primary.current_health == 982.0, "空效果表：普通命中照常结算")
+	_check(neighbor.current_health == 1000.0, "空效果表：不产生任何额外命中")
+
+	# ── 真实词条表：AlchemyHitEffects 的输出可以被武器层直接消费 ──────────
+	_fixture()
+	var combo: BrewCombo = BrewCombo.new()
+	combo.traits = [TraitCatalog.create(&"explode", 4, 1)]
+	combo.effect_tags = [&"explode"]
+	var live: Dictionary = AlchemyHitEffects.profile(combo)
+	_check(is_equal_approx(float(live["explode"]["radius_tiles"]), 2.5), "炼金组合直接给出爆炸范围")
+	live["explode"]["chance"] = 1.0
+	_controller.hit_effects = live
+	primary = _target(Vector2(25, 0))
+	neighbor = _target(Vector2(0, 30))
+	var outside: HealthComponent = _target(Vector2(0, 55))
+	await _sync_physics()
+	attack = _start()
+	attack._physics_process(1.0)
+	_check(primary.current_health == 982.0, "真实词条表：直接命中伤害不变")
+	_check(is_equal_approx(neighbor.current_health, 985.6), "真实词条表：爆炸按 80% 比例结算范围伤害")
+	_check(outside.current_health == 1000.0, "真实词条表：2.5 格之外的目标安全")
 
 
 func _test_long_staff() -> void:
