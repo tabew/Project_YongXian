@@ -121,7 +121,7 @@ func _next_slot(from:int, step:int) ->int:
 		from = -1 if step > 0 else 0
 
 	return posmod(from + step, Inventory.HANDY_SLOT_COUNT)
-
+#///////////////////////////////////
 
 ##快捷移动
 func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
@@ -136,7 +136,7 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if Input.is_action_just_pressed("open_inventory")&&visible == false:
-				visible = true
+			visible = true
 
 	#物品栏选中
 	if !_can_operate():

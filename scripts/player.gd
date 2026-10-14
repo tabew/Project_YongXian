@@ -69,14 +69,25 @@ func _physics_process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
-		#选中物品使用
+		#选中物品左键使用
 		if is_ui_blocking():
 			return
 
-		inventory.use_handy_slot()
+		inventory.left_use_handy_slot(self)
 		weapon_controller.set_trigger_pressed(true)
 		get_viewport().set_input_as_handled()
 		return
+	
+	elif event.is_action_pressed("throw"):
+		#选中物品右键使用
+		if is_ui_blocking():
+			return
+
+		inventory.right_use_handy_slot(self)
+		get_viewport().set_input_as_handled()
+		return
+		
+
 
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())

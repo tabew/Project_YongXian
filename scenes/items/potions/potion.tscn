@@ -1,11 +1,12 @@
 [gd_scene format=3 uid="uid://b3pw5ub0dbcpo"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_xt2o6"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_xt2o6"]
 [ext_resource type="Texture2D" uid="uid://dvka76ih52ueg" path="res://assets/items/potions/potion_default.png" id="2_4im1p"]
 
 [node name="Potion" type="RigidBody2D" unique_id=1273332479]
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_xt2o6")
-metadata/_custom_type_script = "uid://h1ccj3m8c6tl"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1165119255]
 scale = Vector2(1.5, 1.5)

@@ -120,8 +120,8 @@ func get_selected_handy() ->int:
 
     return handy_selected
 
-##使用选取格子物品
-func use_handy_slot() -> void:
+##左键使用选取格子物品
+func left_use_handy_slot(player:PlayerCharacter) -> void:
 
     var pos:int = handy_selected
 
@@ -138,13 +138,37 @@ func use_handy_slot() -> void:
     if item == null:
         return
 
-    var consume:int = item.use()
+    var consume:int = item.left_use(player)
 
     if consume > 0:
         remove_handy_slot(pos,consume)
 
     return
 
+##右键使用选取格子物品
+func right_use_handy_slot(player:PlayerCharacter) -> void:
+
+    var pos:int = handy_selected
+
+    if pos < 0:
+        return
+
+    var item_id:int = get_handy_slot_id(pos)
+
+    if item_id < 0 or get_handy_slot_count(pos) <= 0:
+        return
+
+    var item:ItemData = get_item_data[item_id]
+
+    if item == null:
+        return
+
+    var consume:int = item.right_use(player)
+
+    if consume > 0:
+        remove_handy_slot(pos,consume)
+
+    return
 #//////////////////////////////
 
 ##把物品放进物品栏某格

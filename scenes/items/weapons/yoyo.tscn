@@ -1,12 +1,14 @@
 [gd_scene format=3 uid="uid://bmrjkvxp5f8bf"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_myx7r"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_myx7r"]
 [ext_resource type="Texture2D" uid="uid://d37u43rlrhp3v" path="res://assets/weapons/yoyo.png" id="2_ta0kg"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_wp5od"]
 radius = 7.071068
 
 [node name="Yoyo" type="RigidBody2D" unique_id=1456734748]
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_myx7r")
 metadata/_custom_type_script = "uid://dn8rwxlqagowl"
 

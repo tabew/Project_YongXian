@@ -40,7 +40,9 @@ func create_model() -> ItemModel:
 
 	return model
 
-func use() -> int:
+func left_use(player:PlayerCharacter) -> int:
 
 	return 0
 
+func right_use(player:PlayerCharacter) -> int:
+	return 0

@@ -1,21 +1,22 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://cjaeg78suqad0"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/material_model.gd" id="1_model"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/monkey_hide.svg" id="2_icon"]
-[ext_resource type="Resource" path="res://resources/items/ingredients/monkey_hide.tres" id="3_data"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_x7e3l"]
+[ext_resource type="Texture2D" uid="uid://b2pmiqa4dsiyx" path="res://assets/items/ingredients/monkey_hide.svg" id="2_icon"]
 
 [sub_resource type="RectangleShape2D" id="Shape_hide"]
 size = Vector2(12, 12)
 
-[node name="MonkeyHideModel" type="RigidBody2D"]
+[node name="MonkeyHideModel" type="RigidBody2D" unique_id=1029185163]
 texture_filter = 1
-script = ExtResource("1_model")
-data = ExtResource("3_data")
+collision_layer = 8
+collision_mask = 8
+script = ExtResource("1_x7e3l")
+metadata/_custom_type_script = "uid://dn8rwxlqagowl"
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1932186100]
 scale = Vector2(3, 3)
 texture = ExtResource("2_icon")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1297200803]
 scale = Vector2(3, 3)
 shape = SubResource("Shape_hide")

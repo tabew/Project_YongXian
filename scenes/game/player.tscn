@@ -24,5 +24,3 @@ script = ExtResource("3_weapons")
 zoom = Vector2(2, 2)
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
-
-[node name="InventoryManager" type="Node2D" parent="." unique_id=425640697]

@@ -22,6 +22,8 @@ polygon = PackedVector2Array(-126, 166, -144, 186, -79, 226, -2, 243, 88, 226, 1
 polygon = PackedVector2Array(112, -134, 178, -54, 201, 54, 174, 125, 147, 160, 163, 178, 218, 102, 230, -1, 209, -83, 154, -156)
 
 [node name="Area2D" type="Area2D" parent="." unique_id=778814247]
+collision_layer = 8
+collision_mask = 8
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=731534441]
 position = Vector2(1.499999, 43.500008)

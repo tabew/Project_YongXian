@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://2jins0go35b2"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_model"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_model"]
 [ext_resource type="Texture2D" uid="uid://dqo4mb8xwwoy7" path="res://assets/items/ingredients/stick.png" id="2_icon"]
 [ext_resource type="Resource" uid="uid://d3tftbwgj0hti" path="res://resources/items/ingredients/stick.tres" id="3_data"]
 
@@ -9,6 +9,8 @@ points = PackedVector2Array(-6, 3, 3, -6, 6, -4, -4, 6)
 
 [node name="StickModel" type="RigidBody2D" unique_id=1849339654]
 texture_filter = 1
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_model")
 data = ExtResource("3_data")
 

@@ -1,9 +1,11 @@
 [gd_scene format=3 uid="uid://dckedj8dhfhao"]
 
-[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/ItemModel.gd" id="1_278ht"]
+[ext_resource type="Script" uid="uid://dn8rwxlqagowl" path="res://scripts/items/item_model.gd" id="1_278ht"]
 [ext_resource type="Texture2D" uid="uid://c7h4a6c4e5ur5" path="res://assets/weapons/longsword.png" id="2_sc4qw"]
 
 [node name="Longsword" type="RigidBody2D" unique_id=1945683805]
+collision_layer = 8
+collision_mask = 8
 script = ExtResource("1_278ht")
 metadata/_custom_type_script = "uid://dn8rwxlqagowl"
 
