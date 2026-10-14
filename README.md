@@ -4,11 +4,12 @@
 
 ## 近战武器
 
-鼠标瞄准，左键挥击，按住连续攻击，Q 切换长剑 / 长棍。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾。出生点附近的训练靶可验证伤害、暴击与击退。
+鼠标瞄准，左键挥击，按住连续攻击，Q 切换长剑 / 长棍 / 溜溜球。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾；溜溜球参考泰拉瑞亚，球停在指针处持续命中，指针超出绳长时贴在边界上，松手立刻收回。出生点附近的训练靶可验证伤害、暴击与击退。
 
-- **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres` 或 `resources/weapons/long_staff.tres`。
+- **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres`、`resources/weapons/long_staff.tres` 或 `resources/weapons/yoyo.tres`。
 - **长剑类通用模板**：[swing_weapon_template.tres](resources/weapons/templates/swing_weapon_template.tres)，150° 扇形横扫。
 - **长棍类通用模板**：[staff_weapon_template.tres](resources/weapons/templates/staff_weapon_template.tres)，40° 小扇形与由远到近过渡。
+- **溜溜球类通用模板**：[yoyo_weapon_template.tres](resources/weapons/templates/yoyo_weapon_template.tres)，球跟随指针并受绳长限制，松手收回。
 - **添加同类武器**：复制对应模板，修改唯一 ID、名称、数值和贴图，再加入玩家的 `weapon_loadout` 数组；无需新增脚本或攻击场景。
 - **添加不同类型武器**：继承 `WeaponDefinition` / `WeaponAttack`，配置独立攻击场景，无需修改玩家或控制器。
 - **完整说明**：[武器架构、参数、扩展和测试](docs/weapons.md)。

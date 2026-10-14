@@ -127,13 +127,38 @@ func _run() -> void:
 	_mouse(true)
 	await create_timer(0.04).timeout
 	await _cycle_weapon()
-	_check(controller.equipped_weapon.id == &"longsword", "Q cycles back to the sword")
+	_check(controller.equipped_weapon.id == &"yoyo", "Q equips the yoyo from the player loadout")
 	_check(not controller.is_attacking(), "Switching from staff cancels the active swing")
 	await create_timer(0.7).timeout
 	_check(not controller.is_attacking(), "Switching while held requires a fresh mouse press")
 	_mouse(false)
+
+	# 溜溜球：按住时球停在绳长上限持续命中，松手后立刻收回。
+	var yoyo_hits: Array[CombatHit] = []
+	var count_yoyo_hit: Callable = func(hit: CombatHit, _amount: float) -> void: yoyo_hits.append(hit)
+	dummy.health.damaged.connect(count_yoyo_hit)
+	player.global_position = dummy.global_position - controller.aim_direction * 40.0
+	controller.set_aim(dummy.global_position - player.global_position)
+	_mouse(true)
+	await create_timer(0.4).timeout
+	_check(controller.is_attacking(), "Yoyo responds to mouse attack input")
+	_check(not yoyo_hits.is_empty(), "Thrown yoyo damages the world target")
+	await create_timer(0.8).timeout
+	_check(controller.is_attacking(), "Holding the mouse keeps the yoyo out on its rope")
+	await _screenshot("yoyo_throw.png")
+	_mouse(false)
+	await create_timer(0.4).timeout
+	_check(not controller.is_attacking(), "Releasing the mouse reels the yoyo back")
+	_check(yoyo_hits.size() >= 2, "A held yoyo lands repeated hits on the world target")
+	dummy.health.damaged.disconnect(count_yoyo_hit)
+
 	await _cycle_weapon()
+	_check(controller.equipped_weapon.id == &"longsword", "Q cycles back to the sword")
+	await _cycle_weapon()
+	await _cycle_weapon()
+	_check(controller.equipped_weapon.id == &"yoyo", "Q walks the whole loadout in order")
 	var full_loadout: Array[WeaponDefinition] = player.weapon_loadout
+	_check(full_loadout.size() == 3, "Player loadout holds the sword, the staff and the yoyo")
 	player.weapon_loadout = []
 	_check(not player.equip_next_weapon(), "An empty loadout leaves equipment intact")
 	player.weapon_loadout = [null, controller.equipped_weapon]
@@ -143,6 +168,7 @@ func _run() -> void:
 	var template_copies: Array[WeaponDefinition] = [
 		(load("res://resources/weapons/templates/swing_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
 		(load("res://resources/weapons/templates/staff_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
+		(load("res://resources/weapons/templates/yoyo_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
 	]
 	player.weapon_loadout = full_loadout.duplicate()
 	for index: int in range(template_copies.size()):

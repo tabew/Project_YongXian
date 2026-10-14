@@ -42,6 +42,20 @@ def long_staff() -> Image.Image:
     return image
 
 
+def yoyo() -> Image.Image:
+    """14x14 disc; the string is drawn at runtime and the cross reads as spin."""
+    image = Image.new("RGBA", (14, 14))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((0, 0, 13, 13), fill=OUTLINE)
+    draw.ellipse((1, 1, 12, 12), fill="#8ba2b5")
+    draw.ellipse((2, 2, 11, 11), fill="#e4f0f8")
+    draw.line([(6, 1), (6, 12)], fill="#6f8698")
+    draw.line([(1, 6), (12, 6)], fill="#6f8698")
+    draw.ellipse((5, 5, 8, 8), fill=OUTLINE)
+    draw.ellipse((6, 6, 7, 7), fill="#dab65e")
+    return image
+
+
 def training_dummy() -> Image.Image:
     image = Image.new("RGBA", (24, 32))
     draw = ImageDraw.Draw(image)
@@ -69,8 +83,9 @@ def main() -> None:
     (ASSETS / "combat").mkdir(parents=True, exist_ok=True)
     longsword().save(ASSETS / "weapons" / "longsword.png")
     long_staff().save(ASSETS / "weapons" / "long_staff.png")
+    yoyo().save(ASSETS / "weapons" / "yoyo.png")
     training_dummy().save(ASSETS / "combat" / "training_dummy.png")
-    print("Generated longsword.png, long_staff.png and training_dummy.png")
+    print("Generated longsword.png, long_staff.png, yoyo.png and training_dummy.png")
 
 
 if __name__ == "__main__":
