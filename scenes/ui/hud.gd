@@ -54,7 +54,12 @@ func bind_world(manager: ChunkManager, player: Node2D) -> void:
 		var controller: WeaponController = (player as PlayerCharacter).weapon_controller
 		controller.weapon_changed.connect(_on_weapon_changed)
 		_on_weapon_changed(controller.equipped_weapon)
-	minimap.bind(manager, player)
+	_refresh_timer = 0.0
+
+
+## 由 GameWorld 注入本层房间图：小地图画的是房间图，不再逐格采样地形。
+func bind_run(graph: RoomGraph, player: Node2D) -> void:
+	minimap.bind_run(graph, player)
 	_refresh_timer = 0.0
 
 

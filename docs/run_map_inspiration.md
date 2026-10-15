@@ -208,7 +208,7 @@ roll(来源, rng):
 | 秘密房 + 词条门（数据） | 已完成（`secret_door.gd` 8 种门 + `room_data.secret_door`） |
 | 秘密房入口运行时 | 已完成：宿主房出口生成词条门（`scripts/items/secret_door_prop.gd`），未开门时封路，带对应词条敲开或按 E 开门 |
 | 图鉴台 / 遗物架 / 成就墙 / 商店 | 只留接口（`placeholder_panel.gd`） |
-| 小地图（房间类型 / 主题色 / 未探索 ? / 秘密房 / 炼金效果 + 热量条） | 未做：现有小地图仍服务旧的箱庭世界 |
+| 小地图（房间类型 / 主题色 / 未探索 ? / 秘密房 / 炼金效果 + 热量条） | 已完成（`minimap_layout.gd` + `scenes/ui/minimap.gd`；旧的按地形采样的小地图已删除） |
 | Boss 多阶段弱点变化 | 未做 |
 | 事件房内容 / 挑战房 / 宝箱房 / 炼金房 | 房间类型已在生成器里分配，具体内容未做 |
 
@@ -230,6 +230,8 @@ godot --headless --path . --script res://tests/test_weapon_catalog.gd      # 123
 godot --headless --path . --script res://tests/test_workshop.gd            # 139 项
 godot --headless --path . --script res://tests/test_run_map_world.gd       # 1157 项
 godot --headless --path . --script res://tests/test_inspiration_world.gd   # 21 项
+godot --headless --path . --script res://tests/test_minimap_layout.gd      # 389 项
+godot --headless --path . --script res://tests/test_minimap_room_world.gd  # 24 项
 ```
 
 也可以一次跑完 `tests/` 下的全部脚本测试（单个测试带超时，避免渲染型测试在无头模式挂住）：

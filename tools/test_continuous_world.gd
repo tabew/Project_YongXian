@@ -284,26 +284,26 @@ func _check_visible_layers(node: Node, bounds: Rect2i) -> void:
 		_check_visible_layers(child, bounds)
 
 
-func _check_minimap(minimap: Minimap, generator: WorldGenerator) -> PackedByteArray:
-	var started: int = Time.get_ticks_usec()
-	var pixels: PackedByteArray = minimap.build_pixels()
-	print("MINIMAP: seed=%d build_ms=%.2f, bytes=%d" % [generator.world_seed, float(Time.get_ticks_usec() - started) / 1000.0, pixels.size()])
-	_check(pixels.size() == Minimap.TEXTURE_SIZE * Minimap.TEXTURE_SIZE * 3, "小地图像素尺寸错误")
-	var view := Rect2i(minimap._map_origin, Vector2i(Minimap.WINDOW_TILES, Minimap.WINDOW_TILES))
-	var visible_regions: int = 0
-	for spec: MapSpec in generator.map_specs():
-		if view.intersects(Rect2i(spec.origin, spec.extent)):
-			visible_regions += 1
-	_check(visible_regions >= 3, "小地图没有保留周边主干与岔路")
-	# 400个样本覆盖整个窗口，也验证没有渲染的邻图仍按真实世界着色。
-	for index: int in 400:
-		var linear: int = (index * 47) % (Minimap.TEXTURE_SIZE * Minimap.TEXTURE_SIZE)
-		var pixel := Vector2i(linear % Minimap.TEXTURE_SIZE, linear / Minimap.TEXTURE_SIZE)
-		var tile: Vector2i = minimap._map_origin + pixel * Minimap.TILES_PER_PIXEL
-		var rgb: int = minimap._color_rgb(generator.sample_terrain(tile), generator.sample_route(tile))
-		var offset: int = (pixel.y * Minimap.TEXTURE_SIZE + pixel.x) * 3
-		_check(pixels[offset] == ((rgb >> 16) & 255) and pixels[offset + 1] == ((rgb >> 8) & 255) and pixels[offset + 2] == (rgb & 255), "小地图与世界颜色不一致")
-	return pixels
+## 小地图现在画的是局内房间图（房型图标 / 区域主题色 / 未探索问号），
+## 不再逐格采样地形；这里只校验接线与房间图一致。
+func _check_minimap(minimap: Minimap, generator: WorldGenerator) -> Dictionary:
+	var graph: FloorRoomGraph = generator.run as FloorRoomGraph
+	_check(graph != null, "世界生成器带局内房间图")
+	if graph == null:
+		return {}
+	var slots: Dictionary = MinimapLayout.slots(graph)
+	_check(minimap._graph == graph, "小地图绑定当前房间图")
+	_check(minimap._slots == slots, "小地图槽位与房间图一致")
+	_check(minimap._slots.size() == graph.types.size(), "小地图覆盖全部房间")
+	_check(minimap._current_node == graph.start_node(), "小地图当前房间 = 起点")
+	_check(minimap.visible_nodes().has(graph.start_node()), "紧凑窗口包含当前房间")
+	var glyphs := PackedStringArray()
+	for node_id: int in slots:
+		glyphs.append(MinimapLayout.glyph_for(
+			MinimapLayout.kind_of(graph, node_id), minimap._visited.has(node_id)
+		))
+	print("MINIMAP: seed=%d rooms=%d" % [generator.world_seed, slots.size()])
+	return {"slots": slots, "glyphs": glyphs}
 
 
 func _check_gate_transitions(game: Node2D, manager: ChunkManager, player: PlayerCharacter, camera: Camera2D) -> void:
@@ -422,7 +422,7 @@ func _check_runtime() -> void:
 	await _settle(manager)
 	var generator: WorldGenerator = manager.get_generator()
 	var initial_epoch: int = manager._epoch
-	var pixels: PackedByteArray = _check_minimap(minimap, generator)
+	var snapshot: Dictionary = _check_minimap(minimap, generator)
 	_check_gate_transitions(game, manager, player, camera)
 	await _check_camera(game, manager, player, camera)
 	_start_workers(game, manager)
@@ -438,14 +438,15 @@ func _check_runtime() -> void:
 	_check(not manager._in_flight.is_empty(), "换seed测试没有派发worker")
 	game.build_world(97231)
 	_check(manager._epoch == initial_epoch + 1, "换种子未更新epoch")
-	_check(minimap._source_generator == manager.get_generator() and minimap._seed == 97231 and minimap._sampler.world_seed == 97231, "换种子残留旧小地图生成器")
-	_check(minimap._texture != null, "换种子没有同步重建当前小地图")
+	_check(minimap._graph == manager.get_generator().run, "换种子后小地图仍绑着旧房间图")
+	_check(minimap._slots.size() == manager.get_generator().run.types.size(), "换种子后小地图重算了槽位")
 	_check_active_map(game, manager, player, camera, 0)
 	await _settle(manager)
 	_check_world_data(manager)
 	var fresh: WorldGenerator = manager.get_generator()
-	var fresh_pixels: PackedByteArray = _check_minimap(minimap, fresh)
-	_check(fresh_pixels != pixels and minimap._seed == 97231, "小地图换seed后未更新")
+	var fresh_snapshot: Dictionary = _check_minimap(minimap, fresh)
+	_check(minimap._visited.size() == 1, "换种子后小地图已探索状态重置为起点")
+	_check(not snapshot.is_empty() and not fresh_snapshot.is_empty(), "换种子前后都拿到了小地图快照")
 	if "--capture" in OS.get_cmdline_user_args():
 		game.build_world(18473)
 		var capture_generator: WorldGenerator = manager.get_generator()

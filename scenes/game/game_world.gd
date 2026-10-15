@@ -45,6 +45,8 @@ var _room_props: Dictionary = {}
 var _secret_doors: Dictionary = {}
 ## 本局已打开的词条门（秘密房世界 node_id）。跨房间保留，重进宿主不再封路。
 var _opened_secret_doors: Dictionary = {}
+## 本局已进入的房间；小地图没进过的房间画成问号。
+var _visited_rooms: Dictionary = {}
 ## 当前高亮的可吸附场景元素；同一时刻只允许吸附一个。
 var _nearby_element: SceneElement = null
 ## 吸附键是否按住；长按到满才真正吸附。
@@ -229,6 +231,7 @@ func build_world(seed_value: int) -> void:
 	_run_finished = false
 	_room_cleared = false
 	_opened_secret_doors.clear()
+	_visited_rooms.clear()
 	door_choice.hide_choices()
 	settlement.hide_panel()
 	inspiration_field.clear_all()
@@ -247,6 +250,8 @@ func build_world(seed_value: int) -> void:
 	_setup_map_monsters()
 	# 初图落位并加载后才绑定，避免把上一局的位置记为已探索。
 	hud.bind_world(chunk_manager, player)
+	# 小地图画的是本层房间图（房型 / 主题色 / 未探索问号），不再逐格采样地形。
+	hud.bind_run(_generator.run, player)
 	_bind_alchemy_hud()
 	_hud_bound = true
 	_sync_minimap()
@@ -279,6 +284,8 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
+	# 进过的房间要记下来：小地图只给进过的房间显示房型与主题色，其余画问号。
+	_visited_rooms[map_node_id] = true
 	# 换房即重新判定清空状态；旧房间的门选择界面立刻收起。
 	_room_cleared = false
 	door_choice.hide_choices()
@@ -306,6 +313,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 
 func _sync_minimap() -> void:
 	hud.minimap.refresh_position()
+	hud.minimap.set_room_state(_current_node, _visited_rooms)
 	hud._refresh()
 
 

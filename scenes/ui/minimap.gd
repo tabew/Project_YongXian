@@ -1,178 +1,86 @@
 class_name Minimap
 extends Control
 
-## 右上角小地图与全屏探索地图。
+## 房间小地图：把局内房间图画成一张带房型图标、区域主题色与未探索问号的图。
 ##
-## 小地图独立采样玩家周围 512x512 格；按 M 铺满窗口显示已观察区域。
-## compact 的世界像素缓存与全屏逐格探索快照相互独立。
+## 紧凑模式跟随当前房间显示前后几列；按 M 展开成整层房间图 + 图例。
+## 两种模式都常驻显示当前炼金效果 + 倒计时 + 热量条。
+##
+## 布局、图例与配色都在 MinimapLayout（纯逻辑、可单测）里，本节点只负责画。
+## 旧的按地形采样的小地图已废弃：局内已是「层 → 区域 → 房间」，逐格地形图不再有意义。
 
-const TERRAIN_ATLAS: String = "res://assets/terrain_tiles.png"
-const ROAD_ATLAS: String = "res://assets/road_tiles.png"
+## 紧凑模式左右各显示几个深度。
+const COMPACT_DEPTH_RADIUS: int = 2
+## 紧凑模式的格子尺寸与间距。
+const COMPACT_CELL: float = 26.0
+const COMPACT_GAP: float = 9.0
+## 展开模式的格子尺寸与间距。
+const EXPANDED_CELL: float = 44.0
+const EXPANDED_GAP: float = 22.0
+const EXPANDED_MARGIN: float = 48.0
+## 收起时恢复的锚点偏移（与 hud.tscn 里 Minimap 节点的值一致）。
+const COMPACT_OFFSETS: Array[float] = [-178.0, 14.0, -14.0, 178.0]
 
-## 小地图为 512 格 / 128 像素；全屏保持逐格探索细节。
-const TILES_PER_PIXEL: int = 4
-const WINDOW_TILES: int = 512
-const TEXTURE_SIZE: int = WINDOW_TILES / TILES_PER_PIXEL
-const PIXEL_CACHE_LIMIT: int = TEXTURE_SIZE * TEXTURE_SIZE * 4
-const COMPACT_TILES_PER_PIXEL: int = TILES_PER_PIXEL
-const FULL_MAP_TILES_PER_PIXEL: int = 1
-## 全屏地图至少显示以玩家为中心的 15x7 个区块。
-const FULL_MAP_HALF_CHUNKS: Vector2i = Vector2i(7, 3)
-const REFRESH_INTERVAL: float = 0.25
-## 图集里取色的位置（每块贴图的正中心）。
-const ATLAS_PROBE: int = 8
-const FULL_MAP_MARGIN: float = 48.0
+const PANEL_COLOR: Color = Color(0.03, 0.04, 0.06, 0.76)
+const EXPANDED_BACKGROUND: Color = Color(0.02, 0.03, 0.045, 0.95)
+const BORDER_COLOR: Color = Color(0.78, 0.84, 0.92, 0.55)
+const TEXT_COLOR: Color = Color(0.92, 0.94, 0.98)
+const DIM_TEXT: Color = Color(0.70, 0.74, 0.82)
+## 深色底上的图标字色。
+const GLYPH_ON_DARK: Color = Color(0.88, 0.91, 0.96)
+## 亮色底上的图标字色。
+const GLYPH_ON_LIGHT: Color = Color(0.07, 0.08, 0.11)
+const LINK_COLOR: Color = Color(0.52, 0.58, 0.70, 0.80)
+const SECRET_LINK_COLOR: Color = Color(0.90, 0.74, 0.34, 0.90)
+const HEAT_TRACK: Color = Color(0.15, 0.16, 0.20)
+const HEAT_LOW: Color = Color(0.45, 0.78, 0.95)
+const HEAT_MID: Color = Color(1.0, 0.78, 0.30)
+const HEAT_HIGH: Color = Color(1.0, 0.36, 0.30)
+const HEAT_MID_THRESHOLD: float = 0.5
+const HEAT_HIGH_THRESHOLD: float = 0.75
+const ALERT_COLOR: Color = Color(1.0, 0.45, 0.40)
 
-const UNKNOWN_COLOR: Color = Color(0.08, 0.09, 0.12)
-const FULL_MAP_BACKGROUND: Color = Color(0.025, 0.03, 0.045, 0.96)
-## 路在地图上偏向暖黄，这样不管在什么群系上都能一眼看出路线。
-const ROAD_HIGHLIGHT: Color = Color(1.0, 0.85, 0.35)
-const ROAD_HIGHLIGHT_STRENGTH: float = 0.55
-const PLAYER_COLOR: Color = Color(1.0, 0.9, 0.25)
-const PLAYER_OUTLINE: Color = Color(0.08, 0.08, 0.10)
-const GRID_COLOR: Color = Color(1.0, 1.0, 1.0, 0.08)
-const BORDER_COLOR: Color = Color(0.78, 0.84, 0.92, 0.85)
-const LABEL_COLOR: Color = Color(0.90, 0.93, 1.0)
-const ACTIVE_LABEL_COLOR: Color = Color(1.0, 0.90, 0.35)
-const CAMERA_COLOR: Color = Color(0.90, 0.94, 1.0, 0.65)
-const LABEL_FONT_SIZE: int = 13
-
-@export var show_camera_view: bool = true
-
-var _manager: ChunkManager = null
+## 本层房间图；未开局时为空。
+var _graph: RoomGraph = null
 var _player: Node2D = null
-
-## 调色板直接以 RGB 字节存好，逐像素填的时候不用再做浮点转换。
-var _terrain_rgb: PackedByteArray = PackedByteArray()
-var _route_rgb: PackedByteArray = PackedByteArray()
-var _unknown_rgb: PackedByteArray = PackedByteArray()
-
-var _texture: ImageTexture = null
-var _image: Image = null
-
-## 当前贴图左上角对应的世界格子坐标。
-var _map_origin: Vector2i = Vector2i.ZERO
-var _map_image_size: Vector2i = Vector2i.ONE
-var _focus_chunk: Vector2i = Vector2i(2147483647, 2147483647)
-var _refresh_timer: float = 0.0
-var _compact_pixels_per_chunk: int = WorldGenerator.CHUNK_SIZE / COMPACT_TILES_PER_PIXEL
-var _full_pixels_per_chunk: int = WorldGenerator.CHUNK_SIZE / FULL_MAP_TILES_PER_PIXEL
-var _active_pixels_per_chunk: int = 1
-var _active_tiles_per_pixel: int = 1
-var _seen_version: int = -1
+## node_id -> Vector2i(深度, 同深度序号)。
+var _slots: Dictionary = {}
+## 本局已进入的房间；没进过的画成问号。
+var _visited: Dictionary = {}
+var _current_node: int = -1
 var _expanded: bool = false
-var _map_size: int = 0
-var _map_node: int = -1
-var _source_generator: WorldGenerator = null
-var _sampler: WorldGenerator = null
-var _seed: int = 0
-var _specs: Array[MapSpec] = []
-## 世界 tile -> RGB 整数；仅 compact 使用，不能作为探索记录。
-var _pixel_cache: Dictionary = {}
-## 同一个世界区块可能分属两个箱庭，分别记录已捕获的矩形区域。
-var _captured_regions: Dictionary = {}
-
-## 已探索区块的像素快照，确保区块离开缓存后仍能在全屏地图中显示。
-var _explored_chunks: Dictionary = {}
-var _exploration_version: int = 0
-var _seen_exploration_version: int = -1
 
 
 func _ready() -> void:
-	_compact_pixels_per_chunk = maxi(
-		WorldGenerator.CHUNK_SIZE / COMPACT_TILES_PER_PIXEL, 1
-	)
-	_full_pixels_per_chunk = maxi(
-		WorldGenerator.CHUNK_SIZE / FULL_MAP_TILES_PER_PIXEL, 1
-	)
-	_build_palette()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	queue_redraw()
 
 
-## 由 HUD 调用：注入区块管理器与主角。
-func bind(manager: ChunkManager, player: Node2D) -> void:
-	_manager = manager
+# ------------------------------------------------------------ 外部接口
+
+## 由 GameWorld 调用：注入本层房间图与主角，重新开局时也会再调一次。
+func bind_run(graph: RoomGraph, player: Node2D) -> void:
+	_graph = graph
 	_player = player
-	_clear_world_cache()
-	if _terrain_rgb.is_empty():
-		_build_palette()
-	_sync_generator()
-	_update_focus()
-	_capture_loaded_chunks()
-	_rebuild()
+	_slots = MinimapLayout.slots(graph)
+	# 存副本：GameWorld 的已探索表要一直持有，不能被这里清掉。
+	_visited = {}
+	_current_node = graph.start_node() if graph != null else -1
+	queue_redraw()
 
 
-func _clear_world_cache() -> void:
-	_texture = null
-	_image = null
-	_map_origin = Vector2i.ZERO
-	_map_image_size = Vector2i.ONE
-	_map_size = 0
-	_map_node = -1
-	_focus_chunk = Vector2i(2147483647, 2147483647)
-	_refresh_timer = 0.0
-	_seen_version = -1
-	_seed = 0
-	_source_generator = null
-	_sampler = null
-	_specs.clear()
-	_pixel_cache.clear()
-	_captured_regions.clear()
-	_explored_chunks.clear()
-	_exploration_version = 0
-	_seen_exploration_version = -1
+## 进入房间时推送：当前房间 + 本局已进入的房间集合（GameWorld 持有）。
+func set_room_state(current_node: int, visited: Dictionary) -> void:
+	_current_node = current_node
+	# 拷一份，避免和 GameWorld 的表共用同一个字典后被误清空。
+	_visited = visited.duplicate()
+	queue_redraw()
 
 
-func _sync_generator() -> bool:
-	if not is_instance_valid(_manager):
-		return false
-	var generator: WorldGenerator = _manager.get_generator()
-	if generator == null:
-		# 旧测试只提供区块缓存，没有 generator/spec，仍可显示并保存完整快照。
-		if _source_generator != null:
-			_clear_world_cache()
-		return true
-	if generator != _source_generator or generator.world_seed != _seed:
-		_clear_world_cache()
-		_source_generator = generator
-		_seed = generator.world_seed
-		# 不共享管理器的可变分类缓冲，也不把采样结果记为已探索。
-		_sampler = WorldGenerator.new(_seed, generator.config, generator.variant)
-		_specs = generator.map_specs().duplicate()
-	return true
-
-
-func _update_focus() -> void:
-	if not is_instance_valid(_player):
-		return
-	var focus: Vector2i = WorldGenerator.tile_to_chunk(
-		WorldGenerator.world_to_tile(_player.global_position)
-	)
-	if focus != _focus_chunk:
-		_focus_chunk = focus
-		_refresh_timer = 0.0
-		_seen_exploration_version = -1
-
-
-func _window_origin() -> Vector2i:
-	var tile: Vector2i = WorldGenerator.world_to_tile(_player.global_position)
-	var center: Vector2i = WorldGenerator.tile_to_chunk(tile) * WorldGenerator.CHUNK_SIZE
-	return center - Vector2i(WINDOW_TILES / 2, WINDOW_TILES / 2)
-
-
-## 出口瞬切或换种子时，当帧保持当前 compact/full 模式并同步刷新。
+## 换图 / 换种子后同步；房间图由 bind_run 注入，这里只需重算槽位并重画。
 func refresh_position() -> void:
-	if not is_instance_valid(_manager) or not is_instance_valid(_player):
-		return
-	if _sync_generator():
-		_update_focus()
-		_capture_loaded_chunks()
-		if _texture == null or (_expanded and _exploration_version != _seen_exploration_version):
-			_rebuild()
-		elif not _expanded and _window_origin() != _map_origin:
-			_rebuild()
-		_seen_version = _manager.version
-	_refresh_timer = REFRESH_INTERVAL
+	if _graph != null and _slots.is_empty():
+		_slots = MinimapLayout.slots(_graph)
 	queue_redraw()
 
 
@@ -180,7 +88,6 @@ func set_expanded(value: bool) -> void:
 	if _expanded == value:
 		return
 	_expanded = value
-
 	if _expanded:
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		z_index = 100
@@ -189,15 +96,11 @@ func set_expanded(value: bool) -> void:
 		anchor_top = 0.0
 		anchor_right = 1.0
 		anchor_bottom = 0.0
-		offset_left = -178.0
-		offset_top = 14.0
-		offset_right = -14.0
-		offset_bottom = 178.0
+		offset_left = COMPACT_OFFSETS[0]
+		offset_top = COMPACT_OFFSETS[1]
+		offset_right = COMPACT_OFFSETS[2]
+		offset_bottom = COMPACT_OFFSETS[3]
 		z_index = 0
-
-	_seen_version = -1
-	_seen_exploration_version = -1
-	_rebuild()
 	queue_redraw()
 
 
@@ -205,320 +108,21 @@ func is_expanded() -> bool:
 	return _expanded
 
 
-func _process(delta: float) -> void:
-	if not is_instance_valid(_manager) or not is_instance_valid(_player):
-		return
-	if not _sync_generator():
-		return
-	_update_focus()
-	_capture_loaded_chunks()
-	_refresh_timer -= delta
-	var compact_changed: bool = not _expanded and _window_origin() != _map_origin
-	var full_map_changed: bool = _expanded and _exploration_version != _seen_exploration_version
-	if _refresh_timer <= 0.0 and (_texture == null or compact_changed or full_map_changed):
-		_refresh_timer = REFRESH_INTERVAL
-		_rebuild()
-	_seen_version = _manager.version
-
-	# 主角、当前箱庭标签与相机框每帧重画；区块版本不触发 compact 重采样。
-	queue_redraw()
-
-
-## 只保存当前可见地图的 loaded_chunks，不能把隐藏预加载邻图当作探索。
-func _capture_loaded_chunks() -> void:
-	if not is_instance_valid(_manager):
-		return
-	if _terrain_rgb.is_empty():
-		_build_palette()
-	var spec: MapSpec = _manager.get_map_spec()
-	var changed: bool = false
-	for coords: Vector2i in _manager.loaded_chunks():
-		var capture_key := Vector3i(coords.x, coords.y, spec.node_id if spec != null else -1)
-		if _captured_regions.has(capture_key):
-			continue
-		var data: ChunkData = _manager.get_cached_chunk(coords)
-		if data == null:
-			continue
-		if spec == null:
-			_explored_chunks[coords] = _build_chunk_pixels(data, FULL_MAP_TILES_PER_PIXEL)
-		else:
-			# 缓存包含整个边界区块；只拷贝当前箱庭，邻图以后访问时再补入。
-			var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
-			var bounds := Rect2i(spec.origin, spec.extent).intersection(
-				Rect2i(origin, Vector2i.ONE * WorldGenerator.CHUNK_SIZE)
-			)
-			if not bounds.has_area():
-				continue
-			var pixels: PackedByteArray
-			if _explored_chunks.has(coords):
-				pixels = _explored_chunks[coords]
-			else:
-				pixels = PackedByteArray()
-				pixels.resize(WorldGenerator.CHUNK_SIZE * WorldGenerator.CHUNK_SIZE * 3)
-				_fill_unknown(pixels)
-			for y: int in range(bounds.position.y, bounds.end.y):
-				for x: int in range(bounds.position.x, bounds.end.x):
-					var local: Vector2i = Vector2i(x, y) - origin
-					var index: int = local.y * WorldGenerator.CHUNK_SIZE + local.x
-					var rgb: int = _color_rgb(data.terrain[index], data.route[index])
-					pixels[index * 3] = (rgb >> 16) & 255
-					pixels[index * 3 + 1] = (rgb >> 8) & 255
-					pixels[index * 3 + 2] = rgb & 255
-			_explored_chunks[coords] = pixels
-		_captured_regions[capture_key] = true
-		changed = true
-	if changed:
-		_exploration_version += 1
-
-
-# ------------------------------------------------------------ 调色板
-
-## 颜色直接从图集上取，避免颜色表和图集两边各写一份而对不上。
-func _build_palette() -> void:
-	_terrain_rgb = _sample_atlas(TERRAIN_ATLAS, Terrain.COUNT)
-	_route_rgb = _sample_atlas(ROAD_ATLAS, Route.COUNT, ROAD_HIGHLIGHT, ROAD_HIGHLIGHT_STRENGTH)
-	_unknown_rgb = PackedByteArray()
-	_unknown_rgb.append(int(UNKNOWN_COLOR.r * 255.0))
-	_unknown_rgb.append(int(UNKNOWN_COLOR.g * 255.0))
-	_unknown_rgb.append(int(UNKNOWN_COLOR.b * 255.0))
-
-
-func _sample_atlas(
-	path: String,
-	count: int,
-	highlight: Color = Color(0, 0, 0, 0),
-	highlight_strength: float = 0.0
-) -> PackedByteArray:
-	var image: Image = (load(path) as Texture2D).get_image()
-	var rgb := PackedByteArray()
-	rgb.resize(count * 3)
-	for index: int in count:
-		var color: Color = image.get_pixel(ATLAS_PROBE, index * 16 + ATLAS_PROBE)
-		if highlight_strength > 0.0:
-			color = color.lerp(highlight, highlight_strength)
-		rgb[index * 3] = int(color.r * 255.0)
-		rgb[index * 3 + 1] = int(color.g * 255.0)
-		rgb[index * 3 + 2] = int(color.b * 255.0)
-	return rgb
-
-
-# ------------------------------------------------------------ 地图数据
-
-## compact 纯 RGB 接口；允许未进场景树时测试，不上传纹理、不增加探索记录。
-func build_pixels() -> PackedByteArray:
-	if not _expanded:
-		return _build_compact_pixels()
-	if not _sync_generator():
-		return PackedByteArray()
-	# 全屏打开时读取 compact 数据也不能改变全屏纹理的坐标与比例。
-	var origin: Vector2i = _map_origin
-	var image_size: Vector2i = _map_image_size
-	var map_size: int = _map_size
-	var pixels_per_chunk: int = _active_pixels_per_chunk
-	var tiles_per_pixel: int = _active_tiles_per_pixel
-	var bytes: PackedByteArray = _build_compact_pixels()
-	_map_origin = origin
-	_map_image_size = image_size
-	_map_size = map_size
-	_active_pixels_per_chunk = pixels_per_chunk
-	_active_tiles_per_pixel = tiles_per_pixel
-	return bytes
-
-
-func _build_compact_pixels() -> PackedByteArray:
-	var bytes := PackedByteArray()
-	if not is_instance_valid(_manager) or not is_instance_valid(_player):
-		return bytes
-	if not _sync_generator():
-		return bytes
-	if _terrain_rgb.is_empty():
-		_build_palette()
-
-	_map_origin = _window_origin()
-	_map_size = WINDOW_TILES
-	_map_image_size = Vector2i(TEXTURE_SIZE, TEXTURE_SIZE)
-	_compact_pixels_per_chunk = WorldGenerator.CHUNK_SIZE / TILES_PER_PIXEL
-	_active_pixels_per_chunk = _compact_pixels_per_chunk
-	_active_tiles_per_pixel = TILES_PER_PIXEL
-	# 预留整个新窗口的容量，确保插入过程中也不会超过缓存上限。
-	if _pixel_cache.size() + TEXTURE_SIZE * TEXTURE_SIZE > PIXEL_CACHE_LIMIT:
-		_trim_pixel_cache()
-
-	bytes.resize(TEXTURE_SIZE * TEXTURE_SIZE * 3)
-	var per_chunk: int = WorldGenerator.CHUNK_SIZE / TILES_PER_PIXEL
-	var min_chunk: Vector2i = WorldGenerator.tile_to_chunk(_map_origin)
-	var chunk_count: int = WINDOW_TILES / WorldGenerator.CHUNK_SIZE
-	for chunk_y: int in chunk_count:
-		for chunk_x: int in chunk_count:
-			var coords: Vector2i = min_chunk + Vector2i(chunk_x, chunk_y)
-			var data: ChunkData = _manager.get_cached_chunk(coords)
-			var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
-			for cell_y: int in per_chunk:
-				for cell_x: int in per_chunk:
-					var local := Vector2i(cell_x, cell_y) * TILES_PER_PIXEL
-					var tile: Vector2i = origin + local
-					var rgb: int
-					if data != null:
-						# 缓存数据始终优先于先前的像素采样。
-						var index: int = local.y * WorldGenerator.CHUNK_SIZE + local.x
-						rgb = _color_rgb(data.terrain[index], data.route[index])
-						_pixel_cache[tile] = rgb
-					elif _pixel_cache.has(tile):
-						rgb = _pixel_cache[tile]
-					elif _sampler != null:
-						rgb = _color_rgb(_sampler.sample_terrain(tile), _sampler.sample_route(tile))
-						_pixel_cache[tile] = rgb
-					else:
-						# 没有生成器的旧 fixture 保留未知色，不凭空生成另一个世界。
-						rgb = (int(_unknown_rgb[0]) << 16) | (int(_unknown_rgb[1]) << 8) | int(_unknown_rgb[2])
-
-					var pixel_x: int = chunk_x * per_chunk + cell_x
-					var pixel_y: int = chunk_y * per_chunk + cell_y
-					var offset: int = (pixel_y * TEXTURE_SIZE + pixel_x) * 3
-					bytes[offset] = (rgb >> 16) & 255
-					bytes[offset + 1] = (rgb >> 8) & 255
-					bytes[offset + 2] = rgb & 255
-	return bytes
-
-
-func _color_rgb(terrain: int, road: int) -> int:
-	var palette: PackedByteArray = _terrain_rgb
-	var entry: int = terrain * 3
-	if road != Route.Kind.NONE:
-		palette = _route_rgb
-		entry = Route.atlas_row(road) * 3
-	return (int(palette[entry]) << 16) | (int(palette[entry + 1]) << 8) | int(palette[entry + 2])
-
-
-func _trim_pixel_cache() -> void:
-	# 留当前窗口与半个窗口的周边，转身时仍可复用。
-	var margin := Vector2i(WINDOW_TILES / 2, WINDOW_TILES / 2)
-	var keep := Rect2i(_map_origin - margin, Vector2i(WINDOW_TILES, WINDOW_TILES) + margin * 2)
-	for tile: Vector2i in _pixel_cache.keys():
-		if not keep.has_point(tile):
-			_pixel_cache.erase(tile)
-	if _pixel_cache.size() + TEXTURE_SIZE * TEXTURE_SIZE > PIXEL_CACHE_LIMIT:
-		var window := Rect2i(_map_origin, Vector2i(WINDOW_TILES, WINDOW_TILES))
-		for tile: Vector2i in _pixel_cache.keys():
-			if not window.has_point(tile):
-				_pixel_cache.erase(tile)
-
-
-## 全屏地图至少覆盖 15x7 区块，并在此基础上包含全部已探索区块。
-func _build_explored_pixels() -> PackedByteArray:
-	var bytes := PackedByteArray()
-	var min_chunk: Vector2i = _focus_chunk - FULL_MAP_HALF_CHUNKS
-	var max_chunk: Vector2i = _focus_chunk + FULL_MAP_HALF_CHUNKS
-	for coords: Vector2i in _explored_chunks.keys():
-		min_chunk.x = mini(min_chunk.x, coords.x)
-		min_chunk.y = mini(min_chunk.y, coords.y)
-		max_chunk.x = maxi(max_chunk.x, coords.x)
-		max_chunk.y = maxi(max_chunk.y, coords.y)
-
-	var chunk_span: Vector2i = max_chunk - min_chunk + Vector2i.ONE
-	var width: int = chunk_span.x * _full_pixels_per_chunk
-	var height: int = chunk_span.y * _full_pixels_per_chunk
-	_map_origin = min_chunk * WorldGenerator.CHUNK_SIZE
-	_map_image_size = Vector2i(width, height)
-	_map_size = width * FULL_MAP_TILES_PER_PIXEL
-	_active_pixels_per_chunk = _full_pixels_per_chunk
-	_active_tiles_per_pixel = FULL_MAP_TILES_PER_PIXEL
-	bytes.resize(width * height * 3)
-	_fill_unknown(bytes)
-
-	for coords: Vector2i in _explored_chunks.keys():
-		if coords.x < min_chunk.x or coords.y < min_chunk.y:
-			continue
-		if coords.x > max_chunk.x or coords.y > max_chunk.y:
-			continue
-		var local_chunk: Vector2i = coords - min_chunk
-		var chunk_pixels: PackedByteArray = _explored_chunks[coords]
-		_copy_chunk_pixels(
-			bytes, width, chunk_pixels, _full_pixels_per_chunk,
-			local_chunk.x, local_chunk.y
-		)
-
-	return bytes
-
-
-func _build_chunk_pixels(data: ChunkData, tiles_per_pixel: int) -> PackedByteArray:
-	var pixels_per_chunk: int = WorldGenerator.CHUNK_SIZE / tiles_per_pixel
-	var bytes := PackedByteArray()
-	bytes.resize(pixels_per_chunk * pixels_per_chunk * 3)
-	for pixel_y: int in pixels_per_chunk:
-		var local_row: int = pixel_y * tiles_per_pixel * WorldGenerator.CHUNK_SIZE
-		for pixel_x: int in pixels_per_chunk:
-			var source_index: int = local_row + pixel_x * tiles_per_pixel
-			var road: int = data.route[source_index]
-			var palette: PackedByteArray = _terrain_rgb
-			var entry: int = data.terrain[source_index] * 3
-			if road != Route.Kind.NONE:
-				palette = _route_rgb
-				entry = Route.atlas_row(road) * 3
-
-			var target: int = (pixel_y * pixels_per_chunk + pixel_x) * 3
-			bytes[target] = palette[entry]
-			bytes[target + 1] = palette[entry + 1]
-			bytes[target + 2] = palette[entry + 2]
-	return bytes
-
-
-func _copy_chunk_pixels(
-	target: PackedByteArray,
-	target_width: int,
-	chunk_pixels: PackedByteArray,
-	pixels_per_chunk: int,
-	chunk_x: int,
-	chunk_y: int
-) -> void:
-	for pixel_y: int in pixels_per_chunk:
-		for pixel_x: int in pixels_per_chunk:
-			var source: int = (pixel_y * pixels_per_chunk + pixel_x) * 3
-			var target_x: int = chunk_x * pixels_per_chunk + pixel_x
-			var target_y: int = chunk_y * pixels_per_chunk + pixel_y
-			var destination: int = (target_y * target_width + target_x) * 3
-			target[destination] = chunk_pixels[source]
-			target[destination + 1] = chunk_pixels[source + 1]
-			target[destination + 2] = chunk_pixels[source + 2]
-
-
-func _fill_unknown(bytes: PackedByteArray) -> void:
-	for offset: int in range(0, bytes.size(), 3):
-		bytes[offset] = _unknown_rgb[0]
-		bytes[offset + 1] = _unknown_rgb[1]
-		bytes[offset + 2] = _unknown_rgb[2]
-
-
-func _rebuild() -> void:
-	if not is_instance_valid(_manager) or not is_instance_valid(_player):
-		return
-	if not _sync_generator():
-		return
-	if _terrain_rgb.is_empty():
-		_build_palette()
-	_update_focus()
+## 当前窗口里画出来的房间编号（紧凑模式 = 当前房间前后几列）；供测试与调试。
+func visible_nodes() -> Array[int]:
+	if _graph == null or _slots.is_empty():
+		return []
 	if _expanded:
-		_capture_loaded_chunks()
-	var bytes: PackedByteArray = (
-		_build_explored_pixels() if _expanded else _build_compact_pixels()
-	)
-	if bytes.is_empty():
-		_texture = null
-		_image = null
-		queue_redraw()
-		return
+		var all: Array[int] = []
+		for node_id: int in _slots:
+			all.append(node_id)
+		all.sort()
+		return all
+	return MinimapLayout.window_nodes(_slots, _current_node, COMPACT_DEPTH_RADIUS)
 
-	_seen_version = _manager.version
-	_seen_exploration_version = _exploration_version
-	var width: int = _map_image_size.x
-	var height: int = _map_image_size.y
 
-	if _texture == null or _image == null or _image.get_size() != _map_image_size:
-		_image = Image.create_from_data(width, height, false, Image.FORMAT_RGB8, bytes)
-		_texture = ImageTexture.create_from_image(_image)
-	else:
-		_image.set_data(width, height, false, Image.FORMAT_RGB8, bytes)
-		_texture.update(_image)
+func _process(_delta: float) -> void:
+	# 只画几十个房间，直接每帧重画，省掉一套脏标记。
 	queue_redraw()
 
 
@@ -526,110 +130,257 @@ func _rebuild() -> void:
 
 func _draw() -> void:
 	if _expanded:
-		draw_rect(Rect2(Vector2.ZERO, size), FULL_MAP_BACKGROUND, true)
-	if _texture == null or _image == null:
-		return
-
-	var map_rect: Rect2 = _calculate_map_rect()
-	draw_texture_rect(_texture, map_rect, false)
-
-	var scale_x: float = map_rect.size.x / float(_image.get_width())
-	var scale_y: float = map_rect.size.y / float(_image.get_height())
-	var scale_factor := Vector2(scale_x, scale_y)
-	if _expanded:
-		var chunk_width: float = float(_active_pixels_per_chunk) * scale_x
-		var chunk_height: float = float(_active_pixels_per_chunk) * scale_y
-		var offset_x: float = 0.0
-		while offset_x <= map_rect.size.x:
-			var x: float = map_rect.position.x + offset_x
-			draw_line(Vector2(x, map_rect.position.y), Vector2(x, map_rect.end.y), GRID_COLOR, 1.0)
-			offset_x += chunk_width
-		var offset_y: float = 0.0
-		while offset_y <= map_rect.size.y:
-			var y: float = map_rect.position.y + offset_y
-			draw_line(Vector2(map_rect.position.x, y), Vector2(map_rect.end.x, y), GRID_COLOR, 1.0)
-			offset_y += chunk_height
-
-	if is_instance_valid(_player):
-		if show_camera_view:
-			_draw_camera_view(map_rect, scale_factor)
-		if not _expanded:
-			_draw_regions(map_rect, scale_factor)
-		var tile: Vector2 = _player.global_position / float(WorldGenerator.TILE_SIZE)
-		var player_position: Vector2 = _tile_to_minimap(tile, map_rect, scale_factor)
-		if map_rect.has_point(player_position):
-			var marker_radius: float = 6.0 if _expanded else 3.5
-			draw_circle(player_position, marker_radius, PLAYER_COLOR)
-			draw_arc(player_position, marker_radius, 0.0, TAU, 20, PLAYER_OUTLINE, 1.5)
-
-	draw_rect(map_rect, BORDER_COLOR, false, 1.0)
+		_draw_expanded()
+	else:
+		_draw_compact()
 
 
-func _tile_to_minimap(tile: Vector2, map_rect: Rect2, scale_factor: Vector2) -> Vector2:
-	return map_rect.position + (tile - Vector2(_map_origin)) / float(_active_tiles_per_pixel) * scale_factor
-
-
-func _draw_regions(map_rect: Rect2, scale_factor: Vector2) -> void:
-	var player_tile: Vector2i = WorldGenerator.world_to_tile(_player.global_position)
-	_map_node = -1
-	for spec: MapSpec in _specs:
-		if Rect2i(spec.origin, spec.extent).has_point(player_tile):
-			_map_node = spec.node_id
-			break
-
+func _draw_compact() -> void:
+	var rect := Rect2(Vector2.ZERO, size)
+	draw_rect(rect, PANEL_COLOR)
+	draw_rect(rect, BORDER_COLOR, false, 1.0)
 	var font: Font = get_theme_default_font()
-	for spec: MapSpec in _specs:
-		var center: Vector2 = _tile_to_minimap(Vector2(spec.origin) + Vector2(spec.center), map_rect, scale_factor)
-		if not map_rect.has_point(center):
-			continue
-		var label: String = str(RunGraph.floor_of(spec.node_id) + 1)
-		if RunGraph.variant_of(spec.node_id) == RunGraph.BRANCH_VARIANT:
-			label += "·岔"
-		var color: Color = ACTIVE_LABEL_COLOR if spec.node_id == _map_node else LABEL_COLOR
-		var label_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE)
-		var position: Vector2 = center + Vector2(-label_size.x * 0.5, -7.0)
-		position.x = clampf(position.x, map_rect.position.x + 2.0, maxf(map_rect.position.x + 2.0, map_rect.end.x - label_size.x - 2.0))
-		position.y = clampf(position.y, map_rect.position.y + font.get_ascent(LABEL_FONT_SIZE) + 2.0, map_rect.end.y - 2.0)
-		draw_string_outline(font, position, label, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE, 3, PLAYER_OUTLINE)
-		draw_string(font, position, label, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE, color)
+
+	draw_string(font, Vector2(8.0, 18.0), _current_room_title(), HORIZONTAL_ALIGNMENT_LEFT, size.x - 16.0, 13, TEXT_COLOR)
+
+	var area := Rect2(Vector2(6.0, 26.0), Vector2(size.x - 12.0, maxf(size.y - 26.0 - 52.0, 10.0)))
+	if _graph == null or _slots.is_empty():
+		draw_string(font, area.position + Vector2(4.0, 18.0), "未开局", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, DIM_TEXT)
+	else:
+		_draw_graph(area, visible_nodes(), COMPACT_CELL, COMPACT_GAP, font, false)
+	_draw_alchemy(rect, font)
 
 
-func _draw_camera_view(map_rect: Rect2, scale_factor: Vector2) -> void:
-	if not _player.is_inside_tree():
+func _draw_expanded() -> void:
+	var rect := Rect2(Vector2.ZERO, size)
+	draw_rect(rect, EXPANDED_BACKGROUND)
+	var font: Font = get_theme_default_font()
+	var title: String = "本层房间图　·　种子 %d　·　M 收起" % _graph.plan_seed if _graph != null else "本层房间图"
+	draw_string(font, Vector2(EXPANDED_MARGIN, 40.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, TEXT_COLOR)
+	if _graph == null or _slots.is_empty():
+		draw_string(font, Vector2(EXPANDED_MARGIN, 84.0), "未开局", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, DIM_TEXT)
 		return
-	var viewport: Viewport = _player.get_viewport()
-	if viewport.get_camera_2d() == null:
+
+	var legend_height: float = 58.0
+	var alchemy_height: float = 52.0
+	var area := Rect2(
+		Vector2(EXPANDED_MARGIN, 62.0),
+		Vector2(
+			maxf(rect.size.x - EXPANDED_MARGIN * 2.0, 10.0),
+			maxf(rect.size.y - 62.0 - legend_height - alchemy_height - 16.0, 10.0)
+		)
+	)
+	_draw_graph(area, visible_nodes(), EXPANDED_CELL, EXPANDED_GAP, font, true)
+	_draw_legend(Rect2(Vector2(EXPANDED_MARGIN, rect.size.y - legend_height - alchemy_height), Vector2(maxf(rect.size.x - EXPANDED_MARGIN * 2.0, 10.0), legend_height)), font)
+	_draw_alchemy(rect, font)
+
+
+## 画一批房间：先连线再画格子，保证线被格子盖住。
+func _draw_graph(area: Rect2, nodes: Array[int], cell: float, gap: float, font: Font, with_labels: bool) -> void:
+	if nodes.is_empty() or area.size.x <= 0.0 or area.size.y <= 0.0:
 		return
-	# 相机实际画布变换包含平滑、偏移和缩放。
-	var inverse: Transform2D = viewport.get_canvas_transform().affine_inverse()
-	var screen := Rect2(Vector2.ZERO, viewport.get_visible_rect().size)
-	var top_left: Vector2 = inverse * screen.position
-	var world_rect := Rect2(top_left, Vector2.ZERO)
-	world_rect = world_rect.expand(inverse * Vector2(screen.end.x, screen.position.y))
-	world_rect = world_rect.expand(inverse * screen.end)
-	world_rect = world_rect.expand(inverse * Vector2(screen.position.x, screen.end.y))
-	var start: Vector2 = _tile_to_minimap(world_rect.position / WorldGenerator.TILE_SIZE, map_rect, scale_factor)
-	var finish: Vector2 = _tile_to_minimap(world_rect.end / WorldGenerator.TILE_SIZE, map_rect, scale_factor)
-	var visible: Rect2 = Rect2(start, finish - start).intersection(map_rect)
-	if visible.has_area():
-		draw_rect(visible, CAMERA_COLOR, false, 1.0)
+	var sub: Rect2i = MinimapLayout.bounds_of(_slots, nodes)
+	if sub.size == Vector2i.ZERO:
+		return
+	var step: float = cell + gap
+	var graph_size := Vector2(sub.size) * step - Vector2(gap, gap)
+	var scale: float = 1.0
+	if graph_size.x > area.size.x or graph_size.y > area.size.y:
+		scale = minf(area.size.x / maxf(graph_size.x, 1.0), area.size.y / maxf(graph_size.y, 1.0))
+		scale = clampf(scale, 0.30, 1.0)
+	var drawn: Vector2 = graph_size * scale
+	var origin: Vector2 = area.position + (area.size - drawn) * 0.5 - Vector2(sub.position) * step * scale
+	var drawn_cell: float = cell * scale
+	var drawn_step: float = step * scale
+
+	for node_id: int in nodes:
+		var from: Vector2 = _cell_center(node_id, origin, drawn_step, drawn_cell)
+		for target: int in MinimapLayout.links_of(_graph, node_id):
+			if not nodes.has(target):
+				continue
+			draw_line(from, _cell_center(target, origin, drawn_step, drawn_cell), LINK_COLOR, maxf(1.0, 1.6 * scale), true)
+	for node_id: int in nodes:
+		var from: Vector2 = _cell_center(node_id, origin, drawn_step, drawn_cell)
+		for target: int in MinimapLayout.secret_targets_of(_graph, node_id):
+			if not nodes.has(target):
+				continue
+			draw_dashed_line(from, _cell_center(target, origin, drawn_step, drawn_cell), SECRET_LINK_COLOR, maxf(1.0, 1.6 * scale), 4.0, true)
+	for node_id: int in nodes:
+		_draw_room(_cell_center(node_id, origin, drawn_step, drawn_cell), drawn_cell, node_id, font, with_labels)
 
 
-func _calculate_map_rect() -> Rect2:
-	if not _expanded:
-		var side: float = minf(size.x, size.y)
-		return Rect2(Vector2.ZERO, Vector2(side, side))
+## 槽位 → 格子中心。origin 已经把窗口包围盒的偏移折算进去。
+func _cell_center(node_id: int, origin: Vector2, step: float, cell: float) -> Vector2:
+	var slot: Vector2i = _slots[node_id]
+	return origin + Vector2(slot) * step + Vector2(cell, cell) * 0.5
 
-	var available := Vector2(
-		maxf(size.x - FULL_MAP_MARGIN * 2.0, 1.0),
-		maxf(size.y - FULL_MAP_MARGIN * 2.0, 1.0)
+
+func _draw_room(center: Vector2, cell: float, node_id: int, font: Font, with_labels: bool) -> void:
+	var visited: bool = _visited.has(node_id)
+	var kind: int = MinimapLayout.kind_of(_graph, node_id)
+	var theme_id: StringName = MinimapLayout.theme_of(_graph, node_id)
+	var fill: Color = MinimapLayout.fill_color(kind, theme_id, visited)
+	var border: Color = MinimapLayout.border_color(kind, theme_id, visited)
+	var radius: float = cell * 0.5
+	_draw_shape(center, radius, MinimapLayout.shape_for(kind, visited), fill, border)
+	if node_id == _current_node:
+		draw_arc(center, radius + 3.0, 0.0, TAU, 28, MinimapLayout.CURRENT_BORDER, 2.0, true)
+
+	var glyph: String = MinimapLayout.glyph_for(kind, visited)
+	var font_size: int = int(maxf(cell * 0.56, 9.0))
+	var glyph_size: Vector2 = font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size)
+	draw_string(
+		font,
+		center + Vector2(-glyph_size.x * 0.5, glyph_size.y * 0.32),
+		glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size,
+		GLYPH_ON_LIGHT if visited else GLYPH_ON_DARK
 	)
-	var scale_factor: float = minf(
-		available.x / float(_image.get_width()),
-		available.y / float(_image.get_height())
+	if not with_labels:
+		return
+	var label: String = MinimapLayout.label_for(kind, theme_id, visited)
+	var label_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13)
+	draw_string(
+		font,
+		center + Vector2(-label_size.x * 0.5, radius + 17.0),
+		label, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13,
+		TEXT_COLOR if visited else DIM_TEXT
 	)
-	var map_size := Vector2(
-		float(_image.get_width()) * scale_factor,
-		float(_image.get_height()) * scale_factor
+
+
+## 房型外形：形状 + 汉字双重区分，色弱也能读图。
+func _draw_shape(center: Vector2, radius: float, shape: int, fill: Color, border: Color) -> void:
+	match shape:
+		MinimapLayout.Shape.CIRCLE:
+			draw_circle(center, radius, fill)
+			draw_arc(center, radius, 0.0, TAU, 28, border, 1.6, true)
+		MinimapLayout.Shape.RING:
+			draw_circle(center, radius, Color(fill.r, fill.g, fill.b, 0.35))
+			draw_arc(center, radius - 1.0, 0.0, TAU, 28, border, 3.0, true)
+		_:
+			var points: PackedVector2Array = _shape_points(center, radius, shape)
+			draw_colored_polygon(points, fill)
+			var outline: PackedVector2Array = points.duplicate()
+			outline.append(points[0])
+			draw_polyline(outline, border, 1.6, true)
+
+
+func _shape_points(center: Vector2, radius: float, shape: int) -> PackedVector2Array:
+	match shape:
+		MinimapLayout.Shape.DIAMOND:
+			return PackedVector2Array([
+				center + Vector2(0.0, -radius),
+				center + Vector2(radius, 0.0),
+				center + Vector2(0.0, radius),
+				center + Vector2(-radius, 0.0),
+			])
+		MinimapLayout.Shape.HEX:
+			var hex := PackedVector2Array()
+			for index: int in 6:
+				var angle: float = -PI * 0.5 + TAU * float(index) / 6.0
+				hex.append(center + Vector2(cos(angle), sin(angle)) * radius)
+			return hex
+		_:
+			var inset: float = radius * 0.94
+			return PackedVector2Array([
+				center + Vector2(-inset, -inset),
+				center + Vector2(inset, -inset),
+				center + Vector2(inset, inset),
+				center + Vector2(-inset, inset),
+			])
+
+
+## 展开模式的图例：全部 10 种房型 + 未探索。
+func _draw_legend(rect: Rect2, font: Font) -> void:
+	var entries: Array[Dictionary] = MinimapLayout.legend()
+	if entries.is_empty():
+		return
+	var per_row: int = 6
+	var column_width: float = maxf(rect.size.x / float(per_row), 60.0)
+	var swatch: float = 9.0
+	for index: int in entries.size():
+		var entry: Dictionary = entries[index]
+		var row: int = index / per_row
+		var column: int = index % per_row
+		var base := rect.position + Vector2(float(column) * column_width, 12.0 + float(row) * 22.0)
+		var visited: bool = int(entry["kind"]) >= 0
+		var fill: Color = fill_color_for_legend(int(entry["kind"]), visited)
+		_draw_shape(base + Vector2(swatch, 0.0), swatch, int(entry["shape"]), fill, BORDER_COLOR)
+		draw_string(
+			font, base + Vector2(swatch * 2.0 + 5.0, 4.0),
+			"%s %s" % [String(entry["glyph"]), String(entry["name"])],
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, TEXT_COLOR if visited else DIM_TEXT
+		)
+
+
+func fill_color_for_legend(kind: int, visited: bool) -> Color:
+	if not visited:
+		return MinimapLayout.UNKNOWN_COLOR
+	return MinimapLayout.fill_color(kind, _legend_theme_id(kind), true)
+
+
+## 图例用色：从本层房间图里找同类型房间的主题色，找不到就用中性色。
+func _legend_theme_id(kind: int) -> StringName:
+	for node_id: int in _slots:
+		if MinimapLayout.kind_of(_graph, node_id) == kind:
+			return MinimapLayout.theme_of(_graph, node_id)
+	return &""
+
+
+## 当前房间的标题：进过的显示「房型 · 主题」，没进过显示问号。
+func _current_room_title() -> String:
+	if _graph == null or _current_node < 0 or _slots.is_empty():
+		return "房间图"
+	var visited: bool = _visited.has(_current_node)
+	return MinimapLayout.label_for(
+		MinimapLayout.kind_of(_graph, _current_node),
+		MinimapLayout.theme_of(_graph, _current_node),
+		visited
 	)
-	return Rect2((size - map_size) * 0.5, map_size)
+
+
+## 底部常驻：当前炼金效果 + 倒计时 + 热量条。只读炼金台的公开接口。
+func _draw_alchemy(rect: Rect2, font: Font) -> void:
+	var bar := Rect2(Vector2(8.0, rect.size.y - 22.0), Vector2(maxf(rect.size.x - 16.0, 10.0), 9.0))
+	var swatch_pos := Vector2(8.0, rect.size.y - 46.0)
+
+	var effect_color: Color = AlchemyStatusRing.IDLE_COLOR
+	var effect_label: String = "无炼金效果"
+	var remaining: float = 0.0
+	var heat_ratio: float = 0.0
+	var disabled: bool = false
+	var station: AlchemyStation = _station()
+	if station != null:
+		var combo: BrewCombo = station.active_combo()
+		effect_color = AlchemyStatusRing.effect_color(combo)
+		if AlchemyStatusRing.is_active(combo):
+			var element: StringName = AlchemyStatusRing.dominant_element(combo)
+			effect_label = TraitCatalog.display_name_of(element) if element != &"" else combo.describe()
+			remaining = station.session.duration.remaining
+		heat_ratio = clampf(station.heat() / AlchemyRules.HEAT_MAX, 0.0, 1.0)
+		disabled = station.session.weapon_disabled()
+
+	draw_rect(Rect2(swatch_pos, Vector2(11.0, 11.0)), effect_color)
+	draw_rect(Rect2(swatch_pos, Vector2(11.0, 11.0)), BORDER_COLOR, false, 1.0)
+	var text: String = effect_label
+	if remaining > 0.0:
+		text = "%s　%.1fs" % [effect_label, remaining]
+	if disabled:
+		text = "武器失效"
+	draw_string(font, swatch_pos + Vector2(16.0, 10.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, ALERT_COLOR if disabled else TEXT_COLOR)
+
+	draw_rect(bar, HEAT_TRACK)
+	if heat_ratio > 0.0:
+		var heat_color: Color = HEAT_LOW
+		if heat_ratio >= HEAT_HIGH_THRESHOLD:
+			heat_color = HEAT_HIGH
+		elif heat_ratio >= HEAT_MID_THRESHOLD:
+			heat_color = HEAT_MID
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * heat_ratio, bar.size.y)), heat_color)
+	draw_rect(bar, BORDER_COLOR, false, 1.0)
+
+
+## 主角的随身炼金台；没有时返回 null。
+func _station() -> AlchemyStation:
+	if _player is PlayerCharacter:
+		return (_player as PlayerCharacter).alchemy_station
+	return null

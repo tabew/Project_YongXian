@@ -89,7 +89,7 @@
 
 不合格时在**同一主种子下换布局变体**重试（`variant`，最多 `max_retries` 次），世界身份不变；超过上限用问题最少的候选兜底。
 
-地形与材料专项 [验收脚本](../tools/test_transitions_materials.gd) 已在 Godot 4.6 通过 7,388 项带截图检查，覆盖四个种子、2,374 个材料点位，验证边沿掩码与圆角、跨区块 halo、入口混色不改变群系、材料点位确定性与合法性、真实 E 键拾取、返回不补刷、背包保留，以及投放区模型和坩埚反应。连续通路、26 项切图状态和小地图模式回归也通过。添加 `-- --capture` 可保存 `.godot/transitions-materials-preview.png`。
+地形与材料专项 [验收脚本](../tools/test_transitions_materials.gd) 已在 Godot 4.6 通过 7,388 项带截图检查，覆盖四个种子、2,374 个材料点位，验证边沿掩码与圆角、跨区块 halo、入口混色不改变群系、材料点位确定性与合法性、真实 E 键拾取、返回不补刷、背包保留，以及投放区模型和坩埚反应。连续通路、26 项切图状态和房间小地图接线回归也通过。添加 `-- --capture` 可保存 `.godot/transitions-materials-preview.png`。
 
 [协作者兼容验收](../tools/test_inventory_material_compatibility.gd) 通过 225 项检查，验证新旧物品/属性 ID 保留、背包与快捷栏数量同步、整堆交换和同类多格、返还背包、真实 GUI 拖拽中 E 只旋转不拾取，以及原治疗升级与持续治疗配方。四个种子各两个变体逐房核对所有正敌人预算区域，均可使用现有怪物定义；实际游戏战斗房可实例化怪物，追加群系与不限制群系的定义均自动适配，森林单一池不会被雨林保障覆盖。直接首次调用通用刷怪接口时也会创建带类型的空怪物数组，避免首次登记的类型错误。
 
@@ -125,4 +125,4 @@ godot --headless --path . --script res://tools/test_inventory_material_compatibi
 godot --path . --script res://tools/test_cottage_biomes.gd -- --capture
 ```
 
-在 `RenderingServer.frame_post_draw` 后读取真实 viewport，保存 `.godot/cottage-preview.png` 和 `.godot/region-biome-preview.png`（非初始热带雨林区域），并检查图片非空、保存错误码与文件存在。本轮已使用 Godot 4.6 实际运行：生成验收采样 3,138,467 格和 4,282 个区块，12 次整图 BFS 的出生连通块覆盖率为 99.85%–100%，邻格地形变更率为 0.97%–2.75%；另外 29 项带截图运行时检查通过，覆盖小屋显隐、状态保留和已释放怪物的感知队列清理。截图已确认屋内玩家位于地板绘制层之上。既有连续箱庭回归通过 69,457 个通路采样；种子确定性、地图校验（100/100）、内容、26 项切图状态检查、小地图模式及怪物四状态 AI 检查均通过。仅需截图或运行时复核时可加 `-- --capture --runtime-only`，避免重复已通过的完整区块采样。
+在 `RenderingServer.frame_post_draw` 后读取真实 viewport，保存 `.godot/cottage-preview.png` 和 `.godot/region-biome-preview.png`（非初始热带雨林区域），并检查图片非空、保存错误码与文件存在。本轮已使用 Godot 4.6 实际运行：生成验收采样 3,138,467 格和 4,282 个区块，12 次整图 BFS 的出生连通块覆盖率为 99.85%–100%，邻格地形变更率为 0.97%–2.75%；另外 29 项带截图运行时检查通过，覆盖小屋显隐、状态保留和已释放怪物的感知队列清理。截图已确认屋内玩家位于地板绘制层之上。既有连续箱庭回归通过 69,457 个通路采样；种子确定性、地图校验（100/100）、内容、26 项切图状态检查、房间小地图接线及怪物四状态 AI 检查均通过。仅需截图或运行时复核时可加 `-- --capture --runtime-only`，避免重复已通过的完整区块采样。

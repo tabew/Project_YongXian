@@ -6,6 +6,8 @@ extends RefCounted
 
 var id: StringName = &""
 var name: String = ""
+## 小地图 / UI 用的主题代表色。
+var color: Color = Color(0.5, 0.5, 0.5)
 var element_traits: Array[StringName] = []
 var material_ids: PackedInt32Array = PackedInt32Array()
 var scene_elements: Array[StringName] = []
@@ -17,6 +19,7 @@ static func create(entry: Dictionary) -> RegionTheme:
 	var theme := RegionTheme.new()
 	theme.id = StringName(entry.get("id", &""))
 	theme.name = String(entry.get("name", ""))
+	theme.color = entry.get("color", theme.color)
 	for trait_id: StringName in entry.get("elements", []):
 		theme.element_traits.append(trait_id)
 	for material_id: int in entry.get("materials", []):
