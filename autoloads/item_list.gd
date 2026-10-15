@@ -30,6 +30,39 @@ extends Node
 ##id -> 模板
 var table: Dictionary[int, ItemData] = {}
 
+##id -> 运行时实例。药水每瓶 id 唯一、属性在装瓶时才算出来，
+##登记在这里之后，所有"按 id 取数据"的地方(背包/格子/拖拽/使用/悬停提示)都能取回正确的那一瓶。
+var runtime_instances: Dictionary[int, ItemData] = {}
+
+
+##登记一个运行时实例，键就是它自己的 id。id 无效或已被占用时返回 false。
+func register_instance(instance: ItemData) -> bool:
+
+	if instance == null or instance.id < 0:
+		return false
+
+	if runtime_instances.has(instance.id):
+		push_warning("ItemList: 运行时实例 id %d 已被占用，登记失败" % instance.id)
+		return false
+
+	runtime_instances[instance.id] = instance
+
+	return true
+
+
+##注销运行时实例：物品真正用掉之后调用，避免表只增不减。
+##已经交出去的引用(比如砸在路上的药水模型、碎点上的圆形范围)各自持有 Resource，不受影响。
+func unregister_instance(id: int) -> void:
+
+	if runtime_instances.has(id):
+		runtime_instances.erase(id)
+
+
+##这个 id 是不是登记过的运行时实例
+func has_runtime_instance(id: int) -> bool:
+
+	return runtime_instances.has(id)
+
 const POTION_ID_STRAT:int = 300
 
 func _ready() -> void:
@@ -37,6 +70,10 @@ func _ready() -> void:
 
 ##是否注册过该id
 func has_template(id: int) -> bool:
+
+	if runtime_instances.has(id):
+		return true
+
 	if id>=POTION_ID_STRAT:
 		return true
 
@@ -45,6 +82,10 @@ func has_template(id: int) -> bool:
 
 ##取模板
 func get_template(id: int) -> ItemData:
+
+	if runtime_instances.has(id):
+		return runtime_instances[id]
+
 
 	if id >=POTION_ID_STRAT:
 		return table[POTION_ID_STRAT]
@@ -65,8 +106,15 @@ func create(id: int) -> ItemData:
 	if template == null:
 		return null
 
-	#物品模板在运行期只读，浅拷贝就够
 	var instance: ItemData = template.duplicate()
+
+	var attribute_copy: Array[AlchemicalData] = []
+	attribute_copy.assign(template.alchemical_attribute)
+	instance.alchemical_attribute = attribute_copy
+
+	var physical_copy: Array[PhysicalData] = []
+	physical_copy.assign(template.physical_attribute)
+	instance.physical_attribute = physical_copy
 
 	return instance
 

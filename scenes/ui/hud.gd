@@ -150,7 +150,7 @@ func _refresh() -> void:
 	stats_lines.append("共生成 %d　缓存命中 %d" % [stats["generated"], stats["cache_hits"]])
 	var spawner := _world.get_parent().get_node_or_null("MonsterSpawner") as MonsterSpawner
 	if spawner != null:
-		stats_lines.append("本区域怪物 %d" % spawner.get_spawned_monster_count())
+		stats_lines.append("本区域怪物 %d　待生成 %d" % [spawner.get_spawned_monster_count(), spawner.get_pending_spawn_count()])
 	stats_lines.append("FPS %d" % Engine.get_frames_per_second())
 	stats_label.text = "\n".join(stats_lines)
 

@@ -9,6 +9,9 @@ extends Resource
 ##最大效果等级，无法强化的默认0级,一般效果最高暂定3级
 @export var max_level:int = 0;
 
+#施加效果是否需要对象
+@export var need_target:bool = true
+
 ##可反应属性名单
 @export var can_be_interacted_attribute:Array[int];
 
@@ -41,5 +44,5 @@ func can_upgrade_level(attribute:AlchemicalData) -> bool:
 		return false
 
 ##产生使用效果
-func use_effect(object:Node) -> void:
+func use_effect(object:Node = null) -> void:
 	pass

@@ -47,6 +47,10 @@ func _physics_process(delta: float) -> void:
 				velocity = Vector2.ZERO
 				play_monster_animation(&"Rest", true)
 
+func is_distance_sleep_blocked() -> bool:
+	return _hop_active or screaming or fleeing or super.is_distance_sleep_blocked()
+
+
 func movement_speed() -> float:
 	if screaming or _hop_rest > 0.0:
 		return 0.0

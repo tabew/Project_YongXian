@@ -1,13 +1,11 @@
-[gd_resource type="Resource" script_class="Explosive" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="Explosive" format=3 uid="uid://culll21xgf8xm"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/explosive.gd" id="1_explosive"]
+[ext_resource type="Script" uid="uid://d215mgiwgbdot" path="res://scripts/alchemical_attribute/explosive.gd" id="1_0i5uc"]
 
 [resource]
-script = ExtResource("1_explosive")
+script = ExtResource("1_0i5uc")
 attribute_id = 6
-name = "爆裂"
+name = "爆炸"
 max_level = 3
-can_be_interacted_attribute = Array[int]([])
-blast_radius = 96.0
-blast_damage = 30.0
-blast_knockback = 220.0
+need_target = false
+metadata/_custom_type_script = "uid://d215mgiwgbdot"

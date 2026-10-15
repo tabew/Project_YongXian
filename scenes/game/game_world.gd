@@ -24,6 +24,7 @@ var _transitioning: bool = false
 var _base_zoom: Vector2 = Vector2(2.0, 2.0)
 var _hud_bound: bool = false
 var _monster_map: int = -1
+var _combat_entry_count: int = 0
 ## 怪物已释放到地上的道具按地图保存，离图暂停，回图继续。
 var _map_entity_roots: Dictionary = {}
 ## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
@@ -128,6 +129,7 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 ## 用指定种子重建整个世界；只有重建世界才恢复玩家生命。
 func build_world(seed_value: int) -> void:
 	_hud_bound = false
+	_combat_entry_count = 0
 	_clear_map_entities()
 	_generator = MapScorer.build_best(seed_value, _map_config_for_monsters())
 	GameState.world_seed = _generator.world_seed
@@ -171,6 +173,8 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
+	if monster_spawner.content != null and monster_spawner.content.budget_of(map_node_id, MapContent.ENEMY) > 0:
+		_combat_entry_count += 1
 	if _cottage_view == null:
 		_cottage_view = CottageView.new()
 		_cottage_view.name = "CottageView"
@@ -269,10 +273,9 @@ func _setup_map_monsters() -> void:
 		root.visible = is_active
 		root.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
 	_monster_map = _current_node
-	monster_spawner.setup(_generator, chunk_manager, player, player.active_map)
-	# 新加载器长期保留整张地图，不能沿用旧版按距离卸载且等区块重铺才刷新的逻辑。
-	# 只关闭 spawner 的距离回收；怪物子节点仍正常处理，切图由 setup 统一回收。
-	monster_spawner.set_process(false)
+	# 箱庭保留整图怪物；spawner 自身只运行限额生成与远处休眠，不做距离回收。
+	monster_spawner.set_process(true)
+	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count, _transitioning)
 	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
 	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
 	_on_monster_chunk_applied(Vector2i.ZERO)
