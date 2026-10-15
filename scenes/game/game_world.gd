@@ -473,7 +473,11 @@ func _spawn_secret_door(spec: MapSpec, entity_root: Node2D) -> void:
 	var room: RoomData = _current_room()
 	if room == null or not room.has_secret_door():
 		return
-	var target: int = int(room.secret_door.get("target", -1))
+	# secret_door 里存的是局内地图编号，出口用的是世界编号，这里必须换算一次。
+	var data_target: int = int(room.secret_door.get("target", -1))
+	if data_target < 0:
+		return
+	var target: int = _generator.run.world_node_of(data_target)
 	if target < 0 or _opened_secret_doors.has(target) or _secret_doors.has(target):
 		return
 	var kind: int = int(room.secret_door.get("kind", SecretDoor.Kind.EXPLODE))

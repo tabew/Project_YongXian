@@ -223,6 +223,7 @@ godot --headless --path . --script res://tests/test_inspiration.gd         # 213
 godot --headless --path . --script res://tests/test_permanent_upgrades.gd  # 264 项
 godot --headless --path . --script res://tests/test_room_props.gd          # 2290 项
 godot --headless --path . --script res://tests/test_secret_door.gd         # 231 项
+godot --headless --path . --script res://tests/test_secret_door_world.gd   # 15 项
 godot --headless --path . --script res://tests/test_run_settlement.gd      # 21 项
 godot --headless --path . --script res://tests/test_weapon_catalog.gd      # 123 项
 # 场景 / 世界集成
