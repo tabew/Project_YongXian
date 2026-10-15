@@ -53,6 +53,7 @@ func _enter_chunk(coords: Vector2i) -> void:
 func _run() -> void:
 	_generator = FlatGenerator.new(24681357)
 	_player = PLAYER.instantiate() as PlayerCharacter
+	_player.inventory = Inventory.new()
 	_manager = VisibleChunkManager.new()
 	_spawner = MonsterSpawner.new()
 	_spawner.spawn_definitions = [GIVE_DATA]

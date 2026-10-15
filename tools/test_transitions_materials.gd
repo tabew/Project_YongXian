@@ -89,10 +89,10 @@ func _check_plans(seed_value: int) -> void:
 			var local: Vector2i = tile - spec.origin
 			_check(not seen.has(tile) and spec.contains_local(local.x, local.y) and generator.is_walkable(tile), "材料重复或落在阻挡/区域外")
 			_check(spec.cottage == null or not spec.cottage.bounds.has_point(local), "材料出现在屋内")
-			_check(int(entry["amount"]) > 0 and int(entry["item_id"]) in [2, 3], "材料数据无效")
+			_check(int(entry["amount"]) > 0 and int(entry["item_id"]) in [GroundMaterials.STONE_ID, GroundMaterials.STICK_ID], "材料数据无效")
 			seen[tile] = true
 			kinds[entry["item_id"]] = true
-		_check(kinds.has(2) and kinds.has(3), "区域缺少石头或木棍")
+		_check(kinds.has(GroundMaterials.STONE_ID) and kinds.has(GroundMaterials.STICK_ID), "区域缺少石头或木棍")
 
 
 func _settle(manager: ChunkManager) -> void:
@@ -178,15 +178,15 @@ func _check_runtime() -> void:
 		found = found or WorldGenerator.world_to_tile(child.global_position) == tile
 	_check(not found, "已拾取点位返回后重新出现")
 	_check(player.inventory.get_count(item_id) == original_count + amount, "切图未保留拾取材料")
-	for id: int in [2, 3]:
+	for id: int in [GroundMaterials.STONE_ID, GroundMaterials.STICK_ID]:
 		var data: IngredientData = registry.get_template(id) as IngredientData
 		_check(data != null and not data.alchemical_attribute.is_empty(), "材料没有炼金属性")
 		var model: ItemModel = data.create_model()
 		_check(model != null and model.data == data, "材料不能创建炼金投放模型")
 		if model != null:
 			model.free()
-	var mineral: AlchemicalData = registry.get_template(2).alchemical_attribute[0]
-	var woody: AlchemicalData = registry.get_template(3).alchemical_attribute[0]
+	var mineral: AlchemicalData = registry.get_template(GroundMaterials.STONE_ID).alchemical_attribute[0]
+	var woody: AlchemicalData = registry.get_template(GroundMaterials.STICK_ID).alchemical_attribute[0]
 	_check(mineral.can_interact_with(woody) and woody.can_interact_with(mineral), "石头与木棍属性不能反应")
 	var ingredients: Array[AlchemicalData] = [woody]
 	_check(not mineral.interact(ingredients).is_empty(), "材料组合没有产出炼金属性")
@@ -194,17 +194,17 @@ func _check_runtime() -> void:
 	var zone: Control = alchemy.get_node("Cauldon/LeftDropZone")
 	var cauldron: Node = alchemy.get_node("Cauldon")
 	var spawned: Node2D = alchemy.get_node("SpawnedItems")
-	cauldron.attribute.clear()
-	for id: int in [2, 3]:
+	cauldron.attributes.clear()
+	for id: int in [GroundMaterials.STONE_ID, GroundMaterials.STICK_ID]:
 		var payload: Dictionary = {"item_id": id, "count": 1, "rotation": 0.2}
 		_check(zone._can_drop_data(Vector2.ZERO, payload), "炼金投放区拒绝新材料")
 		zone._drop_data(Vector2.ZERO, payload)
 		var model: ItemModel = spawned.get_child(spawned.get_child_count() - 1) as ItemModel
 		_check(model != null and model.data.id == id and is_equal_approx(model.global_rotation, 0.2), "实际投放模型/旋转错误")
 		cauldron._get_attributes(model)
-	_check(cauldron.attribute.size() == 2, "坩埚未接收两种材料的属性")
+	_check(cauldron.attributes.size() == 2, "坩埚未接收两种材料的属性")
 	cauldron.start_transform()
-	_check(cauldron.attribute.size() == 1 and cauldron.attribute[0].attribute_id == 5, "矿物与木质未在实际坩埚中反应为固结")
+	_check(cauldron.attributes.size() == 1 and cauldron.attributes[0].attribute_id == 5, "矿物与木质未在实际坩埚中反应为固结")
 	await process_frame
 	_check(spawned.get_child_count() == 0, "炼金消耗后模型未释放")
 	game.build_world(97231)

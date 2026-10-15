@@ -17,6 +17,8 @@ var node_id: int = 0
 ## size 保留为最大边长；实际范围必须使用 extent。
 var size: int = MIN_SIZE
 var extent: Vector2i = Vector2i(MIN_SIZE, MIN_SIZE)
+## 模板最初抽样的大小；列贴合只会调整最终绘制宽度。
+var template_extent: Vector2i = Vector2i(MIN_SIZE, MIN_SIZE)
 var origin: Vector2i = Vector2i.ZERO
 var center: Vector2 = Vector2.ZERO
 var radius: float = 100.0
@@ -74,6 +76,7 @@ static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_
 	if width == height and high > low:
 		height = height + 1 if height < high else height - 1
 	spec.extent = Vector2i(width, height)
+	spec.template_extent = spec.extent
 	spec.size = maxi(width, height)
 	spec.axes = Vector2(spec.extent) * 0.4
 	spec.radius = minf(spec.axes.x, spec.axes.y)
@@ -105,6 +108,30 @@ static func create(world_seed: int, map_node_id: int, has_west_gate: bool, east_
 	if spec.cottage == null:
 		spec._build_water(rng)
 	return spec
+
+
+## 同一列等宽，屋内尺寸不缩放；其它箱庭的庭室和池塘一起平移伸展。
+func fit_column_width(width: int) -> void:
+	if extent.x == width:
+		return
+	var scale_x: float = float(width) / float(extent.x)
+	for index: int in chambers.size():
+		var room: Rect2 = chambers[index]
+		room.position.x *= scale_x
+		room.size.x *= scale_x
+		chambers[index] = room
+	for index: int in side_centers.size():
+		var side: Vector2 = side_centers[index]
+		side.x *= scale_x
+		side_centers[index] = side
+	center.x *= scale_x
+	for base: int in range(0, ponds.size(), 4):
+		ponds[base] *= scale_x
+		ponds[base + 2] *= scale_x
+	extent.x = width
+	size = maxi(extent.x, extent.y)
+	axes = Vector2(extent) * 0.4
+	radius = minf(axes.x, axes.y)
 
 
 func _build_start_chambers() -> void:

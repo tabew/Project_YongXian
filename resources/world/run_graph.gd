@@ -3,12 +3,15 @@ extends RefCounted
 
 ## 一局游戏的关卡图：一层一层往前推，主干之外带岔路。
 ##
-## 节点 id = 层号 * 2 + 分支号。主干（分支 0）可以走主路，也可以拐进岔路；
-## 岔路（分支 1）只汇回下一层的主干。所以玩法是"一条路串到底，中途可以拐弯"。
+## 原节点仍是层号 * 2 + 分支号；第三列额外分支使用独立编号。
+## 保留主线和原岔路汇流关系，新分支经下侧岔路返回主线。
 
 const FLOOR_COUNT: int = 8
 const MAIN_VARIANT: int = 0
 const BRANCH_VARIANT: int = 1
+const THIRD_VARIANT: int = 2
+## 保留原 floor*2+variant 的节点编号；第三列的额外节点另用保留区间。
+const THIRD_NODE_BASE: int = 100
 
 ## 第几层有哪些节点，索引 = 层号
 var floors: Array[PackedInt32Array] = []
@@ -17,15 +20,15 @@ var next_nodes: Dictionary = {}
 
 
 static func node_id(floor_index: int, variant: int) -> int:
-	return floor_index * 2 + variant
+	return THIRD_NODE_BASE + floor_index if variant == THIRD_VARIANT else floor_index * 2 + variant
 
 
 static func floor_of(map_node_id: int) -> int:
-	return map_node_id / 2
+	return map_node_id - THIRD_NODE_BASE if map_node_id >= THIRD_NODE_BASE else map_node_id / 2
 
 
 static func variant_of(map_node_id: int) -> int:
-	return map_node_id % 2
+	return THIRD_VARIANT if map_node_id >= THIRD_NODE_BASE else map_node_id % 2
 
 
 static func create() -> RunGraph:
@@ -42,9 +45,9 @@ static func default_branch_floors(floor_count: int) -> Array[int]:
 	return result
 
 
-## 按配置重建拓扑：每层一个主干，branch_floors 里的层再挂一个岔路。
-## 主干可以走主路或拐进同层岔路，岔路汇回下一层主干，所以每条岔路都构成一个环。
-func build_topology(floor_count: int, branch_floors: Array[int]) -> void:
+## 每层一个主干及可选岔路；默认第三列还有一个可选分支。
+## 原岔路仍可直接汇回主干，额外分支通过下一列下侧岔路回到主线。
+func build_topology(floor_count: int, branch_floors: Array[int], third_branch: bool = false) -> void:
 	floors.clear()
 	next_nodes.clear()
 	var branch_set: Dictionary = {}
@@ -56,6 +59,8 @@ func build_topology(floor_count: int, branch_floors: Array[int]) -> void:
 		ids.append(node_id(floor_index, MAIN_VARIANT))
 		if branch_set.has(floor_index):
 			ids.append(node_id(floor_index, BRANCH_VARIANT))
+			if third_branch and floor_index == 2 and floor_count >= 5 and branch_set.has(1):
+				ids.append(node_id(floor_index, THIRD_VARIANT))
 		floors.append(ids)
 
 	for floor_index: int in maxi(floor_count - 1, 0):
@@ -63,12 +68,18 @@ func build_topology(floor_count: int, branch_floors: Array[int]) -> void:
 		for current: int in floors[floor_index]:
 			var targets := PackedInt32Array()
 			if variant_of(current) == MAIN_VARIANT:
-				# 主干：既可以直接往前走，也可以拐进下一层的岔路
+				# 主干保留通往下一层主干和原岔路的出口。
 				for target: int in upcoming:
-					targets.append(target)
-			else:
-				# 岔路：只汇回下一层的主干
+					if variant_of(target) != THIRD_VARIANT:
+						targets.append(target)
+			elif variant_of(current) == BRANCH_VARIANT:
+				# 原有汇流不变；第三列下侧新区域由第二列岔路进入。
 				targets.append(upcoming[0])
+				if upcoming.size() > 2:
+					targets.append(upcoming[2])
+			else:
+				# 第三列的新岔路从下侧回到下一列，保留原关卡主路径。
+				targets.append(upcoming[1] if upcoming.size() > 1 else upcoming[0])
 			next_nodes[current] = targets
 
 

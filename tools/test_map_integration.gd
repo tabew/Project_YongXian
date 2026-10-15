@@ -40,7 +40,7 @@ func _run() -> void:
 	_check(player.weapon_controller.equipped_weapon != null and player.weapon_controller.equipped_weapon.id == &"longsword", "开局按起始选中装备了长剑")
 
 	player.inventory.select_handy_slot(1)
-	player.inventory.use_handy_slot()
+	# 新版快捷栏在选中时自动装备武器，不再提供 use_handy_slot。
 	var equipped: WeaponDefinition = player.weapon_controller.equipped_weapon
 	_check(equipped.id == &"long_staff", "原长棍配置仍可装备")
 

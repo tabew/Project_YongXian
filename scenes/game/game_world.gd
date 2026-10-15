@@ -1,7 +1,7 @@
 class_name GameWorld
 extends Node2D
 
-## 传统 RPG 箱庭：触及出口立即换到目标入口，主视图只显示当前区域。
+## 箱庭出口保留双向传送关系，切换画面使用黑屏淡入淡出。
 
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
@@ -20,6 +20,7 @@ var _training_dummy: TrainingDummy
 var _training_dummy_map: int = -1
 var _generator: WorldGenerator = null
 var _current_node: int = -1
+var _transitioning: bool = false
 var _base_zoom: Vector2 = Vector2(2.0, 2.0)
 var _hud_bound: bool = false
 var _monster_map: int = -1
@@ -41,7 +42,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _generator == null or player.active_map == null:
+	if _generator == null or player.active_map == null or _transitioning:
 		return
 	_sync_training_dummy()
 	_confine_map_monsters()
@@ -57,16 +58,41 @@ func _process(_delta: float) -> void:
 		if absi(local.y - int(link["y"])) > MapSpec.GATE_HALF_HEIGHT:
 			continue
 		if (side < 0 and local.x <= 1) or (side > 0 and local.x >= spec.extent.x - 2):
-			var carried_velocity: Vector2 = player.velocity
-			_enter_map(link["target"], link["arrival_side"], link["arrival_y"])
-			AudioManager.play_sfx(&"gate_transition")
-			# 落点与出口带分离，按住同方向即可走进新箱庭，不会立即弹回。
-			player.velocity = carried_velocity
-			EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
+			_transition_to_map(link)
 			return
 
 
+func _transition_to_map(link: Dictionary) -> void:
+	if _transitioning or SceneManager.is_transitioning():
+		return
+	_transitioning = true
+	var carried_velocity: Vector2 = player.velocity
+	var was_physics_processing: bool = player.is_physics_processing()
+	var was_handling_input: bool = player.is_processing_unhandled_input()
+	var monster_mode: Node.ProcessMode = monster_spawner.process_mode
+	player.weapon_controller.cancel_attack()
+	player.set_physics_process(false)
+	player.set_process_unhandled_input(false)
+	monster_spawner.process_mode = Node.PROCESS_MODE_DISABLED
+	var swap: Callable = func() -> void:
+		_enter_map(int(link["target"]), int(link["arrival_side"]), int(link["arrival_y"]))
+	await SceneManager.transition_in_place(swap)
+	if not is_inside_tree():
+		return
+	# 出口落点向里八格，保留前进方向也不会当帧触发回程。
+	player.velocity = carried_velocity
+	player.set_physics_process(was_physics_processing)
+	player.set_process_unhandled_input(was_handling_input)
+	monster_spawner.process_mode = monster_mode
+	AudioManager.play_sfx(&"gate_transition")
+	EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
+	_transitioning = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _transitioning:
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("regenerate_world"):
 		regenerate_world()
 	elif event.is_action_pressed("kill_all_monsters"):

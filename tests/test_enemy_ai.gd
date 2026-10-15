@@ -26,6 +26,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	_player = PLAYER_SCENE.instantiate() as PlayerCharacter
+	_player.inventory = Inventory.new()
 	get_tree().root.add_child(_player)
 	await get_tree().process_frame
 	_player.spawn_on(_terrain, WorldGenerator.tile_to_world(Vector2i(0, 40)))

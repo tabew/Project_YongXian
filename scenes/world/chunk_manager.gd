@@ -585,9 +585,12 @@ func _paint_chunk(data: ChunkData, map_id: int = -1) -> void:
 				index += 1
 				continue
 			var road: int = data.route[index]
-			var edge: Vector2i = TerrainTransitions.edge_at(samples, cell)
+			var kind: int = TerrainTransitions.display_kind(data.terrain[index], road)
+			var edge: Vector2i = TerrainTransitions.seam_at(_generator, spec, tile_origin + cell, kind)
 			if edge == TerrainTransitions.NO_BLEND:
-				edge = TerrainTransitions.gate_at(_generator, spec, tile_origin + cell, TerrainTransitions.display_kind(data.terrain[index], road))
+				edge = TerrainTransitions.edge_at(samples, cell)
+			if edge == TerrainTransitions.NO_BLEND:
+				edge = TerrainTransitions.gate_at(_generator, spec, tile_origin + cell, kind)
 			if edge != TerrainTransitions.NO_BLEND:
 				layer.set_cell(cell, TerrainTransitions.SOURCE_ID, edge)
 			elif road == Route.Kind.NONE:
