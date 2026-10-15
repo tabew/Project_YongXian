@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://b8cycihbhg3xb" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="Texture2D" uid="uid://u06kukyu6do6" path="res://assets/player_placeholder.png" id="2_texture"]
 [ext_resource type="Script" uid="uid://b156kbas52xen" path="res://scripts/weapons/weapon_controller.gd" id="3_weapons"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_holder.gd" id="4_buffs"]
+[ext_resource type="Script" uid="uid://ds5nf5huvk0pl" path="res://scripts/buffs/buff_holder.gd" id="4_buffs"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(10, 8)
@@ -26,5 +26,5 @@ zoom = Vector2(2, 2)
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
 
-[node name="Buffs" type="Node" parent="."]
+[node name="Buffs" type="Node" parent="." unique_id=1816534401]
 script = ExtResource("4_buffs")

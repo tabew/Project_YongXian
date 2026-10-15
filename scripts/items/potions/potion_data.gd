@@ -31,6 +31,9 @@ static func next_potion_id() -> int:
 
 
 func left_use(player:PlayerCharacter) -> int:
+
+	for attribute: AlchemicalData in alchemical_attribute:
+			attribute.use_effect(player)
 	return 1
 
 ##投掷药水，朝准心抛出去，撞到受击盒或地形才碎

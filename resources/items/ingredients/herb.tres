@@ -8,6 +8,7 @@
 
 [resource]
 script = ExtResource("1_j1o5l")
+can_be_used = true
 name = "herb"
 texture = ExtResource("2_mb1bl")
 alchemical_attribute = Array[ExtResource("1_hnmoy")]([ExtResource("2_ctiy6")])

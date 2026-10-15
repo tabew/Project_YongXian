@@ -16,7 +16,7 @@ var explode:PackedScene = preload("res://scenes/effects/explode.tscn")
 ##受击盒所在层：和 weapon_definition.hit_mask 默认值一致(4 = EnemyHurtbox)
 @export_flags_2d_physics var hit_mask: int = 7
 
-var effect_level:int = level+1
+var effect_level:int = level + 1
 
 func use_effect(object:Node = null) -> void:
 

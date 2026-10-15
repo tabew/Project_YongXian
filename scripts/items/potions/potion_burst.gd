@@ -127,6 +127,8 @@ func _apply_to(bodies: Array) -> void:
 		for attribute: AlchemicalData in attributes:
 			if attribute != null and attribute.has_method("use_effect"):
 				attribute.use_effect(target)
+				if attribute.is_take_only_one == true:
+					attributes.erase(attribute)
 
 
 

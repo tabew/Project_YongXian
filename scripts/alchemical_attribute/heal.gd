@@ -1,6 +1,10 @@
 class_name Heal
 extends AlchemicalData
 
+@export var min_heal = 1
+
+var heal = min_heal * (level + 1)
+
 func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalData]:
 	var result:Array[AlchemicalData]
 
@@ -34,4 +38,16 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 			
 
 func use_effect(object:Node = null) -> void:
-	pass
+	
+	var health: Node = object.get_node_or_null("Health")
+
+	if object.has_method("heal"):
+		object.call("heal", heal)
+	#怪物恢复
+	elif health != null:
+		var maximum: float = float(health.get("max_health"))
+		var current: float = float(health.get("current_health"))
+		if current > 0.0:
+			health.set("current_health", minf(current + heal, maximum))
+			if health.has_signal("health_changed"):
+				health.emit_signal("health_changed", health.get("current_health"), maximum)

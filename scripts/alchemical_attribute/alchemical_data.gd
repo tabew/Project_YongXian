@@ -12,6 +12,9 @@ extends Resource
 #施加效果是否需要对象
 @export var need_target:bool = true
 
+#效果是否是瞬时触发且只触发一次
+@export var is_take_only_one:bool = false
+
 ##可反应属性名单
 @export var can_be_interacted_attribute:Array[int];
 

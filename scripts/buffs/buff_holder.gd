@@ -187,6 +187,7 @@ func _tick(entry: Dictionary) -> void:
 	if heal > 0.0:
 		if host.has_method("heal"):
 			host.call("heal", heal)
+		#怪物恢复
 		elif health != null:
 			var maximum: float = float(health.get("max_health"))
 			var current: float = float(health.get("current_health"))
