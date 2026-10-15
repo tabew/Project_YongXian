@@ -403,10 +403,10 @@ func _check_runtime() -> void:
 	var bag: Node = game.get_node("GameHUD/BagUi")
 	var alchemy: Node = game.get_node("GameHUD/Alchemy")
 	var controller: Variant = player.get("weapon_controller")
-	_check(controller.equipped_weapon == null, "开局不再自带武器")
-	player.inventory.select_handy_slot(0)
-	player.inventory.use_handy_slot(player)
-	_check(controller.equipped_weapon != null, "物品栏装备接口未保留")
+	_check(controller.equipped_weapon != null, "新版快捷栏开局选中武器未装备")
+	var initial_weapon: Variant = controller.equipped_weapon
+	player.inventory.select_handy_slot(1)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon != initial_weapon, "切换物品栏未自动装备另一把武器")
 	var equipped: Variant = controller.equipped_weapon
 	player.take_damage(3)
 	var health: int = player.get("health")

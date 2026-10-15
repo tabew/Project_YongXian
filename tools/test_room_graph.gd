@@ -46,10 +46,19 @@ func _run() -> void:
 		_check(graph.nodes_of_type(RoomType.Kind.REWARD).size() >= graph.config.min_rewards, "奖励房不足 seed=%d" % seed_value)
 		_check(graph.nodes_of_type(RoomType.Kind.REST).size() >= graph.config.min_rests, "休息点不足 seed=%d" % seed_value)
 
-		# 每条岔路都汇回主干，构成可返回的环；不存在只进不出的死路。
+		# 原岔路仍直接汇回主干；第三列下侧新岔路经下一层岔路汇入主干。
 		for node_id: int in graph.branch_nodes:
 			var targets: PackedInt32Array = graph.next_nodes.get(node_id, PackedInt32Array())
-			_check(targets.size() == 1 and graph.is_main_path(targets[0]), "岔路没有汇回主干 seed=%d node=%d" % [seed_value, node_id])
+			var reaches_main: bool = false
+			for target: int in targets:
+				if graph.is_main_path(target):
+					reaches_main = true
+				else:
+					for onward: int in graph.next_nodes.get(target, PackedInt32Array()):
+						reaches_main = reaches_main or graph.is_main_path(onward)
+			_check(reaches_main, "岔路未汇回主干 seed=%d node=%d" % [seed_value, node_id])
+			if RunGraph.variant_of(node_id) == RunGraph.BRANCH_VARIANT:
+				_check(graph.is_main_path(targets[0]), "原岔路主线出口丢失 seed=%d node=%d" % [seed_value, node_id])
 		for node_id: int in graph.main_path:
 			_check(not graph.next_nodes.get(node_id, PackedInt32Array()).is_empty()
 				or node_id == graph.main_path[graph.main_path.size() - 1],

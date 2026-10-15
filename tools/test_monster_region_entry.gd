@@ -27,6 +27,12 @@ func _cross_gate(world: Node2D, link: Dictionary) -> void:
 	world.player.global_position = WorldGenerator.tile_to_world(link["point"])
 	world.player.velocity = Vector2(float(link["side"]) * world.player.max_speed, 0)
 	world._process(0.01)
+	_check(world._transitioning, "entering_gate_starts_black_fade")
+	for frame: int in 160:
+		if not world._transitioning:
+			return
+		await process_frame
+	_check(false, "gate_fade_did_not_finish")
 
 
 func _wait_map(world: Node2D) -> void:
@@ -56,7 +62,7 @@ func _run() -> void:
 		quit(1)
 		return
 	var target_id: int = link["target"]
-	_cross_gate(world, link)
+	await _cross_gate(world, link)
 	_check(world._current_node == target_id, "normal_gameplay_gate_enters_actual_rainforest_branch")
 	await _wait_map(world)
 	var count_before: int = world.monster_spawner.monsters.size()
@@ -94,10 +100,10 @@ func _run() -> void:
 	_check(loot != null and loot.data in victim.death_loot.items, "actual_combat_death_keeps_exclusive_loot")
 	for back: Dictionary in world._generator.gate_links(target_id):
 		if back["target"] == 0:
-			_cross_gate(world, back)
+			await _cross_gate(world, back)
 			break
 	_check(world._current_node == 0, "return_gate_reaches_initial_safe_region")
-	_cross_gate(world, link)
+	await _cross_gate(world, link)
 	await _wait_map(world)
 	_check(world.monster_spawner.monsters.size() == count_before - 1, "actual_gate_return_preserves_empty_dead_slot_without_replacement")
 	for actor: BaseMonster in world.monster_spawner.monsters:
@@ -109,7 +115,7 @@ func _run() -> void:
 	var noncombat: Dictionary = _rainforest_gate(world)
 	_check(not noncombat.is_empty(), "noncombat_fixture_has_second_layer_rainforest_gate")
 	if not noncombat.is_empty():
-		_cross_gate(world, noncombat)
+		await _cross_gate(world, noncombat)
 		await _wait_map(world)
 		var spec: MapSpec = world.player.active_map
 		var room_kind: int = world._generator.run.type_of(spec.node_id)

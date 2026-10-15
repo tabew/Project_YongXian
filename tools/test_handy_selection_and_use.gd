@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## 物品栏选中与使用的验收：
-## 选中只改状态不动物品、左键点格子不触发使用、use() 的返回值决定扣多少、
+## 选中只改状态不动物品、左键点格子不触发使用、left_use() 的返回值决定扣多少、
 ## 武器走武器系统装备且不消耗、物品用光后选中自动清掉。
 ##
 ## 运行：godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
@@ -76,8 +76,11 @@ func _key_event(keycode: int) -> InputEventKey:
 	return event
 
 
-func _attack_event() -> InputEventMouseButton:
-	return _mouse_event(MOUSE_BUTTON_LEFT)
+func _attack_event() -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = "attack"
+	event.pressed = true
+	return event
 
 
 func _run() -> void:
@@ -103,7 +106,7 @@ func _run() -> void:
 	_check(once != null and over != null and freebie != null, "测试道具都登记好了")
 
 	_test_selection(inventory, hotbar)
-	_test_use_consumption(inventory)
+	_test_use_consumption(inventory, player)
 	_test_weapon(inventory, items, controller, player)
 	_test_input(hotbar, inventory)
 	await _test_drag_guard(hotbar, inventory)
@@ -151,35 +154,35 @@ func _test_selection(inventory: Inventory, hotbar: Control) -> void:
 	_check(inventory.get_selected_handy() == 0, "清空选中格后选中位置保留")
 
 
-## 使用选中的格子：消耗数量由 ItemData.use() 的返回值决定，扣数只由 Inventory 执行
-func _test_use_consumption(inventory: Inventory) -> void:
+## 使用选中的格子：消耗数量由 ItemData.left_use() 的返回值决定，扣数只由 Inventory 执行
+func _test_use_consumption(inventory: Inventory, player: PlayerCharacter) -> void:
 	# 选中空格：什么都不该发生，也不该去动别的格子
 	_fill(inventory, 3, STUB_ONCE_ID, 5)
 	inventory.select_handy_slot(3)
 	inventory.clear_handy_slot(3)
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_id(3) == -1, "选中空格时使用不会凭空造出物品")
 
 	# once 桩声明一次消耗 2 个
 	var per_use: int = STUB_ONCE_CONSUME
 	_fill(inventory, 3, STUB_ONCE_ID, 5)
 	inventory.select_handy_slot(3)
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(3) == 5 - per_use, "按 use() 返回值扣掉 %d 个" % per_use)
 	_check(inventory.get_selected_handy() == 3, "还有剩余时保持选中")
 
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(3) == 5 - per_use * 2, "第二次同样按返回值扣")
 
 	# 用光之后格子消失
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(3) == 0, "用光后数量归零")
 	_check(inventory.handy_items_pos.has(3) == false, "用光的格子被清掉")
 
 	# 超量消耗：只剩 1 个时用一次就整格清掉（不会扣成负数）
 	_fill(inventory, 4, STUB_OVER_ID, 1)
 	inventory.select_handy_slot(4)
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(4) == 0 and inventory.handy_items_pos.has(4) == false, "最后一个用完清格")
 
 	# 声明不消耗的道具：用多少次都还在
@@ -187,7 +190,7 @@ func _test_use_consumption(inventory: Inventory) -> void:
 	inventory.clear_handy_slot(5)
 	inventory.add_handy_slot(5, STUB_FREE_ID, 2)
 	inventory.select_handy_slot(5)
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(5) == 2, "use() 返回 0 的道具不会被扣掉")
 
 ## 武器物品走 WeaponData.weapon；当前实现是"选中即装备"（handy_item_changed 里直接 equip）
@@ -214,14 +217,14 @@ func _test_weapon(inventory: Inventory, items: Node, controller: WeaponControlle
 	_check(changed.size() == 1, "装备武器发出了 weapon_changed")
 
 	# 对武器格再按一次使用：不消耗，装备不变
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(6) == 3, "武器不会被 use() 消耗")
 	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "使用武器格后装备不变")
 
 	# 选中空格：把武器卸下，且不会去动别的格子
 	inventory.select_handy_slot(7)
 	_check(controller.equipped_weapon == null, "选中空格会卸下武器")
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(6) == 3, "选中空格使用不会扣别的格子")
 	_check(controller.equipped_weapon == null, "选中空格使用后仍是空手")
 
@@ -229,10 +232,10 @@ func _test_weapon(inventory: Inventory, items: Node, controller: WeaponControlle
 	_fill(inventory, 8, STUB_FREE_ID, 3)
 	inventory.select_handy_slot(8)
 	_check(controller.equipped_weapon == null, "选中非武器格时卸下武器")
-	inventory.use_handy_slot()
+	inventory.left_use_handy_slot(player)
 	_check(inventory.get_handy_slot_count(8) == 3, "不消耗的道具按一次也不会少")
 
-	# 左键：当前 player.gd 是"先 use_handy_slot()，再无条件下发按下给武器控制器"，
+	# 左键：当前 player.gd 是"先 left_use_handy_slot()，再无条件下发按下给武器控制器"，
 	# 没有"必须选中武器才挥"的门槛。这里按实际行为验收，并把这一点记下来。
 	inventory.clear_handy_slot(8)
 	_fill(inventory, 0, STUB_ONCE_ID, STUB_ONCE_CONSUME * 2)

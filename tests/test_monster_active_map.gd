@@ -65,6 +65,7 @@ func _run() -> void:
 	content.entries[2] = [{"kind": MapContent.ENEMY, "budget": 3}]
 	content.entries[3] = [{"kind": MapContent.ENEMY, "budget": 3}]
 	var player := PLAYER.instantiate() as PlayerCharacter
+	player.inventory = Inventory.new()
 	var manager := ChunkManager.new()
 	var spawner := MonsterSpawner.new()
 	spawner.spawn_definitions = [DATA]

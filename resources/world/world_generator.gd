@@ -2,7 +2,7 @@ class_name WorldGenerator
 extends RefCounted
 
 ## 传统 RPG 陆地箱庭：随机庭院、山谷和林间空地，以山壁 / 密林围合。
-## 主干与岔路通过出入口瞬间切换，周围仍是陆地，水域只作为少量河流与池塘。
+## 主干与岔路按列贴合、通过带黑幕的出入口切换；水域只作为少量河流与池塘。
 ## 同种子同坐标的布局、地形与道路确定一致，工作线程使用独立生成器。
 
 const CHUNK_SIZE: int = 32
@@ -45,7 +45,8 @@ var _specs: Array[MapSpec] = []
 var _connections: Array[Dictionary] = []
 var _map_bins: Dictionary = {}
 var _gate_cache: Dictionary = {}
-const REGION_GAP: int = 12
+## 各列贴合，世界地图上不再留空白断层。
+const REGION_GAP: int = 0
 
 # _classify 的输出缓冲，避免为每个格子分配对象
 var _last_terrain: int = Terrain.Kind.DEEP_WATER
@@ -69,34 +70,34 @@ func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int
 
 
 func _configure_noise() -> void:
-	_temperature.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_temperature.noise_type = FastNoiseLite.TYPE_PERLIN
 	_temperature.seed = rng.noise_seed(0)
 	_temperature.frequency = 0.0035
 	_temperature.fractal_octaves = 2
 
-	_humidity.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_humidity.noise_type = FastNoiseLite.TYPE_PERLIN
 	_humidity.seed = rng.noise_seed(1)
 	_humidity.frequency = 0.0042
 	_humidity.fractal_octaves = 2
 
-	_variation.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_variation.noise_type = FastNoiseLite.TYPE_PERLIN
 	_variation.seed = rng.noise_seed(2)
 	# 细节尺度拉大：一个噪声簇占几十格，避免彩色小碎片铺满箱庭。
 	_variation.frequency = 0.007
 	_variation.fractal_octaves = 1
 
-	_groves.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_groves.noise_type = FastNoiseLite.TYPE_PERLIN
 	_groves.seed = rng.noise_seed(3)
-	_groves.frequency = 0.009
-	_groves.fractal_octaves = 2
-	_ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_groves.frequency = 0.006
+	_groves.fractal_octaves = 1
+	_ridges.noise_type = FastNoiseLite.TYPE_PERLIN
 	_ridges.seed = rng.noise_seed(4)
-	_ridges.frequency = 0.013
-	_ridges.fractal_octaves = 2
-	_edges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_ridges.frequency = 0.007
+	_ridges.fractal_octaves = 1
+	_edges.noise_type = FastNoiseLite.TYPE_PERLIN
 	_edges.seed = rng.noise_seed(5)
-	_edges.frequency = 0.018
-	_edges.fractal_octaves = 2
+	_edges.frequency = 0.010
+	_edges.fractal_octaves = 1
 
 
 static func random_seed() -> int:
@@ -164,33 +165,41 @@ func _build_layout() -> void:
 
 	_assign_region_biomes()
 	var cursor_x: int = 0
-	var main_y: int = 0
+	var column_y: int = 0
 	for floor_index: int in run.floors.size():
-		var main: MapSpec = map_spec(run.floors[floor_index][0])
+		var ids: PackedInt32Array = run.floors[floor_index]
+		var order: PackedInt32Array = ids.duplicate()
+		# 双房列主线在上；第三列分支-主线-新增分支从上到下。
+		if ids.size() == 3:
+			order = PackedInt32Array([ids[1], ids[0], ids[2]])
+		var height: int = 0
+		for id: int in order:
+			var spec: MapSpec = map_spec(id)
+			spec.fit_column_width(floor_widths[floor_index])
+			height += spec.extent.y
 		if floor_index > 0:
-			main_y = clampi(main_y + layout_rng.randi_range(-28, 28), -64, 64)
-		main.origin = Vector2i(cursor_x, main_y - int(main.center.y))
-		for id: int in run.floors[floor_index]:
-			if id == main.node_id:
-				continue
-			var branch: MapSpec = map_spec(id)
-			var separation: int = layout_rng.randi_range(6, 14)
-			var y: int = main.origin.y - branch.extent.y - separation
-			if layout_rng.randf() < 0.5:
-				y = main.origin.y + main.extent.y + separation
-			branch.origin = Vector2i(cursor_x + layout_rng.randi_range(0, floor_widths[floor_index] - branch.extent.x), y)
-		cursor_x += floor_widths[floor_index] + layout_rng.randi_range(6, REGION_GAP)
+			column_y = clampi(column_y + layout_rng.randi_range(-4, 4), -12, 12)
+		var top: int = column_y - height / 2
+		for id: int in order:
+			var spec: MapSpec = map_spec(id)
+			spec.origin = Vector2i(cursor_x, top)
+			top += spec.extent.y
+		cursor_x += floor_widths[floor_index] + REGION_GAP
 
-	# 出口靠向小地图里的目标方向，两端只保存瞬切关系，不生成中间道路。
+	# 连接仍沿用原有双向出口；共享边优先把两端落在相同世界高度。
 	for spec: MapSpec in _specs:
 		for exit_index: int in run.exit_count(spec.node_id):
 			var target: MapSpec = map_spec(run.target_of(spec.node_id, exit_index))
-			var source_y: int = int(spec.center.y)
-			if RunGraph.variant_of(target.node_id) == RunGraph.BRANCH_VARIANT:
-				source_y = int(spec.extent.y * (0.25 if target.origin.y < spec.origin.y else 0.75))
-			var target_y: int = int(target.center.y)
-			if RunGraph.variant_of(spec.node_id) == RunGraph.BRANCH_VARIANT:
-				target_y = int(target.extent.y * (0.25 if spec.origin.y < target.origin.y else 0.75))
+			var margin: int = MapSpec.GATE_HALF_HEIGHT + 4
+			var overlap_top: int = maxi(spec.origin.y, target.origin.y) + margin
+			var overlap_bottom: int = mini(spec.origin.y + spec.extent.y, target.origin.y + target.extent.y) - margin - 1
+			var gateway_y: int = (overlap_top + overlap_bottom) / 2 if overlap_top <= overlap_bottom else target.origin.y + int(target.center.y)
+			var source_y: int = clampi(gateway_y - spec.origin.y, margin, spec.extent.y - margin - 1)
+			var target_y: int = clampi(spec.origin.y + source_y - target.origin.y, margin, target.extent.y - margin - 1)
+			# 汇流时错开相邻西门，避免同一组门触发错误的返回边。
+			for existing_y: int in target.west_gates:
+				if absi(target_y - existing_y) < margin * 2:
+					target_y = clampi(existing_y + margin * 2, margin, target.extent.y - margin - 1)
 			spec.east_gates[exit_index] = source_y
 			target.west_gates.append(target_y)
 			target.west_gate_y = target.west_gates[0]

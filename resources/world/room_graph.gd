@@ -29,7 +29,7 @@ var key_nodes: Dictionary = {}
 static func plan(seed_value: int, config: MapConfig = null, variant: int = 0) -> RoomGraph:
 	var graph := RoomGraph.new()
 	graph.config = config if config != null else MapConfig.new()
-	graph.build_topology(graph.config.floor_count, graph.config.resolved_branch_floors())
+	graph.build_topology(graph.config.floor_count, graph.config.resolved_branch_floors(), graph.config.pyramid_third_branch)
 	graph.plan_seed = seed_value
 	graph.variant_index = variant
 	graph._build_plan(seed_value, variant)
@@ -90,8 +90,8 @@ func _build_plan(seed_value: int, variant: int) -> void:
 	for floor_index: int in floors.size():
 		var ids: PackedInt32Array = floors[floor_index]
 		main_path.append(ids[0])
-		if ids.size() > 1:
-			branch_nodes.append(ids[1])
+		for index: int in range(1, ids.size()):
+			branch_nodes.append(ids[index])
 
 	for node_id: int in main_path:
 		types[node_id] = RoomType.Kind.COMBAT

@@ -28,7 +28,7 @@ static func display_kind(terrain: int, route: int) -> int:
 	return terrain if route == Route.Kind.NONE else Terrain.COUNT + Route.atlas_row(route)
 
 
-static func halo(generator: WorldGenerator, data: ChunkData, spec: MapSpec) -> PackedByteArray:
+static func halo(generator: WorldGenerator, data: ChunkData, _spec: MapSpec) -> PackedByteArray:
 	var side: int = WorldGenerator.CHUNK_SIZE + 2
 	var result := PackedByteArray()
 	result.resize(side * side)
@@ -37,10 +37,11 @@ static func halo(generator: WorldGenerator, data: ChunkData, spec: MapSpec) -> P
 	for y: int in range(-1, WorldGenerator.CHUNK_SIZE + 1):
 		for x: int in range(-1, WorldGenerator.CHUNK_SIZE + 1):
 			var tile: Vector2i = origin + Vector2i(x, y)
-			var local: Vector2i = tile - spec.origin
-			if not spec.contains_local(local.x, local.y):
+			var neighbor: MapSpec = generator.sample_map(tile)
+			if neighbor == null:
 				continue
-			if spec.cottage != null and spec.cottage.bounds.has_point(local):
+			var local: Vector2i = tile - neighbor.origin
+			if neighbor.cottage != null and neighbor.cottage.bounds.has_point(local):
 				continue
 			var kind: int
 			if x >= 0 and y >= 0 and x < WorldGenerator.CHUNK_SIZE and y < WorldGenerator.CHUNK_SIZE:
@@ -85,6 +86,40 @@ static func edge_at(samples: PackedByteArray, cell: Vector2i) -> Vector2i:
 				mask = 16 + corner
 				break
 	return Vector2i(mask, base * KIND_COUNT + other) if other >= 0 else NO_BLEND
+
+
+## 地图贴边处缓慢混入邻图围合地貌；只动图集，不改碰撞与区域归属。
+static func seam_at(generator: WorldGenerator, spec: MapSpec, tile: Vector2i, base: int) -> Vector2i:
+	if base != RegionBiomes.boundary_for(spec.biome_id):
+		return NO_BLEND
+	var local: Vector2i = tile - spec.origin
+	var neighbor_tile: Vector2i = tile
+	var distance: int = 9
+	if local.x < 8:
+		neighbor_tile = Vector2i(spec.origin.x - 1, tile.y)
+		distance = local.x
+	if spec.extent.x - 1 - local.x < distance:
+		neighbor_tile = Vector2i(spec.origin.x + spec.extent.x, tile.y)
+		distance = spec.extent.x - 1 - local.x
+	if local.y < distance:
+		neighbor_tile = Vector2i(tile.x, spec.origin.y - 1)
+		distance = local.y
+	if spec.extent.y - 1 - local.y < distance:
+		neighbor_tile = Vector2i(tile.x, spec.origin.y + spec.extent.y)
+		distance = spec.extent.y - 1 - local.y
+	if distance > 7:
+		return NO_BLEND
+	var other_spec: MapSpec = generator.sample_map(neighbor_tile)
+	if other_spec == null or other_spec == spec:
+		return NO_BLEND
+	var other: int = RegionBiomes.boundary_for(other_spec.biome_id)
+	if other == base:
+		return NO_BLEND
+	var wobble: float = generator._edges.get_noise_2d(float(tile.x), float(tile.y)) * 1.5
+	var strength: float = clampf((8.0 - float(distance) + wobble) / 8.0, 0.0, 1.0)
+	if strength < 0.125:
+		return NO_BLEND
+	return Vector2i(19 + clampi(roundi(strength * 4.0), 1, 4), base * KIND_COUNT + other)
 
 
 ## 出入口附近用目标区域的地面色渐变；两端在边界混合各半，群系身份保持不变。
