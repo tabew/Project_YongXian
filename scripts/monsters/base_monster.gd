@@ -62,6 +62,29 @@ var navigation_speed: float:
 		else:
 			_pending_navigation_speed = value
 
+
+##BuffHolder 读当前属性值。速度借用 navigation_speed（底层是每只怪物独立的副本），
+##所以 AI 自己改过导航速度后，holder 下一次重算会把这个改动认成新基准，不会踩掉它。
+func read_stat(stat: StringName) -> float:
+	match stat:
+		&"move_speed":
+			return navigation_speed
+		&"defense":
+			var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
+			return health_component.defense if health_component != null else 0.0
+	return 0.0
+
+
+##BuffHolder 把算好的值写回属性
+func apply_stat(stat: StringName, value: float) -> void:
+	match stat:
+		&"move_speed":
+			navigation_speed = value
+		&"defense":
+			var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
+			if health_component != null:
+				health_component.defense = value
+
 ## 共享占位动画轨道；子类可替换动画库和 Visual 下的外形。
 var _visual_height: float = 0.0:
 	set(value):

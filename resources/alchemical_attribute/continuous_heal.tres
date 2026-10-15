@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ContinuousHeal" format=3 uid="uid://8ugmywcuoule"]
 
 [ext_resource type="Script" uid="uid://lqt074b7iugc" path="res://scripts/alchemical_attribute/continuous_heal.gd" id="1_55llq"]
+[ext_resource type="Resource" path="res://resources/buffs/regen.tres" id="1_v0mah"]
 
 [resource]
 script = ExtResource("1_55llq")

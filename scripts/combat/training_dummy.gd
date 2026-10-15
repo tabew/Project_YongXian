@@ -22,6 +22,21 @@ func _ready() -> void:
 	queue_redraw()
 
 
+
+##BuffHolder 读当前属性值
+func read_stat(stat: StringName) -> float:
+	if stat == &"defense":
+		return health.defense
+	return 0.0
+
+
+##BuffHolder 把算好的值写回属性（其它属性训练靶不支持，直接忽略）
+func apply_stat(stat: StringName, value: float) -> void:
+	if stat == &"defense":
+		health.defense = value
+
+
+
 func _physics_process(delta: float) -> void:
 	if not health.is_alive():
 		_respawn_remaining -= delta

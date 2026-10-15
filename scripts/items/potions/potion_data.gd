@@ -17,7 +17,7 @@ const POTION_SPEED:float = 400.0
 @export var burst_radius: float = 32.0
 
 ##作用效果范围存在时间(秒)：0＝立刻结算一次就消失
-@export var burst_duration: float = 0
+@export var burst_duration: float = 10
 
 ##本局已经发到哪个药水id了：必须放在静态段，
 ##静态的 create_from_attributes 只能碰静态成员，实例方法的计数器在它里面用不了
