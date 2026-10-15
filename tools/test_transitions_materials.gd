@@ -172,7 +172,11 @@ func _check_runtime() -> void:
 	_check(not start_root.is_visible_in_tree() and not start_root.can_process(), "离图后材料仍可见/处理")
 	game._enter_map(0)
 	await process_frame
-	_check(start_root.is_visible_in_tree() and start_root.get_child_count() == pickups.size() - 1, "返回地图重复生成了已拾取材料")
+	var remaining_pickups: int = 0
+	for child: Node in start_root.get_children():
+		if child is GroundPickup:
+			remaining_pickups += 1
+	_check(start_root.is_visible_in_tree() and remaining_pickups == pickups.size() - 1, "返回地图重复生成了已拾取材料")
 	var found: bool = false
 	for child: Node2D in start_root.get_children():
 		found = found or WorldGenerator.world_to_tile(child.global_position) == tile

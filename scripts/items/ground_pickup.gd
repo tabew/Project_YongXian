@@ -219,6 +219,11 @@ func _update_visual() -> void:
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sprite.position = Vector2(0, -2)
 	_sprite.texture = data.texture if data != null else null
+	# 宝箱可掉落不同原始分辨率的图标；世界内统一限制为一格大小。
+	_sprite.scale = Vector2.ONE
+	if _sprite.texture != null:
+		var icon_size: Vector2 = _sprite.texture.get_size()
+		_sprite.scale = Vector2.ONE * minf(1.0, 16.0 / maxf(icon_size.x, icon_size.y))
 	visible = data != null and amount > 0 and not _collected
 	_update_throwable_group()
 	queue_redraw()

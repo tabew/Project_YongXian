@@ -23,7 +23,7 @@ var _pickup_label: Label = null
 func _ready() -> void:
 	# ==========================================================================
 	# ↓↓↓↓ 改动：操作提示跟着新的物品栏选中/使用方式走 ↓↓↓↓
-	hint_label.text = "WASD 移动　·　E 拾取　·　左键 使用选中物品　·　1-9/滚轮/点格子 选中　·　右键格子 使用　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
+	hint_label.text = "WASD 移动　·　E 拾取/开箱　·　左键 使用选中物品　·　1-9/滚轮/点格子 选中　·　右键格子 使用　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
 	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
 	# ==========================================================================
 	_pickup_label = Label.new()
@@ -73,6 +73,14 @@ func show_pickup(pickup: GroundPickup) -> void:
 func _on_weapon_changed(weapon: WeaponDefinition) -> void:
 	weapon_icon.texture = weapon.icon if weapon != null else null
 	weapon_label.text = "%s\n%s 伤害  ·  %.1f 次/秒" % [weapon.display_name, str(weapon.damage), weapon.attacks_per_second()] if weapon != null else ""
+
+
+func show_chest(chest: WorldChest) -> void:
+	if _pickup_label == null:
+		return
+	_pickup_label.visible = chest != null and not chest.opened
+	if _pickup_label.visible:
+		_pickup_label.text = "E · 打开%s" % chest.display_name()
 
 
 func _unhandled_input(event: InputEvent) -> void:

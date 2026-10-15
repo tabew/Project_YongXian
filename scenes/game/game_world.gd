@@ -29,6 +29,8 @@ var _map_entity_roots: Dictionary = {}
 ## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
 var _material_maps: Dictionary = {}
 var _nearby_pickup: GroundPickup = null
+var _nearby_chest: WorldChest = null
+var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
 
 
@@ -99,7 +101,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		kill_all_monsters()
 	elif event.is_action_pressed("pickup_item") and not event.is_echo():
 		_refresh_pickup()
-		if is_instance_valid(_nearby_pickup):
+		if is_instance_valid(_nearby_chest):
+			if _nearby_chest.open():
+				EventBus.notification.emit("已打开%s，靠近掉落物按 E 拾取" % _nearby_chest.display_name())
+			_refresh_pickup()
+		elif is_instance_valid(_nearby_pickup):
 			var material_name: String = _nearby_pickup.data.name
 			var quantity: int = _nearby_pickup.amount
 			if _nearby_pickup.collect(player):
@@ -175,6 +181,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	player.spawn_on(_generator, _generator.entry_position(map_node_id, side, gate_y), spec, reset_health)
 	_limit_camera(spec)
 	chunk_manager.load_map(map_node_id)
+	_setup_world_population(spec)
 	_setup_ground_materials(spec)
 	_refresh_pickup()
 	if _hud_bound:
@@ -282,6 +289,10 @@ func _map_entity_root(map_node_id: int) -> Node2D:
 
 
 func _clear_map_entities() -> void:
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(false)
+	_nearby_chest = null
+	_population_maps.clear()
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
@@ -295,6 +306,37 @@ func _clear_map_entities() -> void:
 			monster_spawner.remove_child(child)
 			child.queue_free()
 	_monster_map = -1
+
+
+func _setup_world_population(spec: MapSpec) -> void:
+	if _population_maps.has(spec.node_id):
+		return
+	var entity_root: Node2D = _map_entity_root(spec.node_id)
+	var population: Dictionary = _generator.population_for(spec.node_id)
+	for entry: Dictionary in population.get("structures", []):
+		var structure := WorldStructure.new()
+		structure.name = "Structure_%s_%d_%d" % [entry["kind"], entry["tile"].x, entry["tile"].y]
+		structure.kind = entry["kind"]
+		structure.variant = int(entry["variant"])
+		structure.biome_id = spec.biome_id
+		structure.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(structure)
+	for entry: Dictionary in population.get("chests", []):
+		var chest := WorldChest.new()
+		chest.name = "Chest_%d_%d" % [entry["tile"].x, entry["tile"].y]
+		chest.bind(entry, _generator)
+		chest.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(chest)
+	for entry: Dictionary in population.get("drops", []):
+		var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
+		if data == null:
+			continue
+		var pickup := GroundPickup.new()
+		pickup.name = "WorldLoot_%d_%d" % [entry["tile"].x, entry["tile"].y]
+		pickup.bind(data, int(entry["amount"]), _generator)
+		pickup.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(pickup)
+	_population_maps[spec.node_id] = true
 
 
 func _setup_ground_materials(spec: MapSpec) -> void:
@@ -317,6 +359,9 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 
 
 func _refresh_pickup() -> void:
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(false)
+	_nearby_chest = null
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
@@ -331,6 +376,13 @@ func _refresh_pickup() -> void:
 	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
 	for pickup_root: Node2D in pickup_roots:
 		for child: Node in pickup_root.get_children():
+			if child is WorldChest and not child.opened and not child.is_queued_for_deletion():
+				var chest_distance: float = player.global_position.distance_squared_to(child.global_position)
+				if chest_distance < closest and _can_reach_pickup(child.global_position):
+					closest = chest_distance
+					_nearby_chest = child
+					_nearby_pickup = null
+				continue
 			if not child is GroundPickup or child.is_queued_for_deletion():
 				continue
 			var pickup := child as GroundPickup
@@ -340,9 +392,13 @@ func _refresh_pickup() -> void:
 			if distance < closest and _can_reach_pickup(pickup.global_position):
 				closest = distance
 				_nearby_pickup = pickup
+				_nearby_chest = null
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(true)
 	hud.show_pickup(_nearby_pickup)
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(true)
+		hud.show_chest(_nearby_chest)
 
 
 func _can_reach_pickup(target: Vector2) -> bool:

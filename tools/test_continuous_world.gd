@@ -81,6 +81,8 @@ func _check_layout(seed_value: int) -> void:
 	_check(not Terrain.is_water(generator.sample_terrain(boundary_tile)), "世界外围仍被生成成海")
 	_check_reachable_ground(generator, generator.map_spec(0))
 	_check_reachable_ground(generator, generator.map_spec(3))
+	# 结构最密集、可走地面最紧张的岔路箱庭也要保证完全连通。
+	_check_reachable_ground(generator, generator.map_spec(13))
 	var chunk: ChunkData = generator.generate_chunk(Vector2i(6, -4))
 	var copy: ChunkData = replica.generate_chunk(Vector2i(6, -4))
 	_check(chunk.terrain == copy.terrain and chunk.route == copy.route and chunk.biome == copy.biome, "线程独立生成器数据不一致")
@@ -139,7 +141,9 @@ func _check_land_box(generator: WorldGenerator, spec: MapSpec) -> void:
 	var water_ratio: float = float(water) / samples
 	var ground_ratio: float = float(walkable) / samples
 	_check(water_ratio < 0.10, "水域占比过高 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, water_ratio])
-	_check(ground_ratio > 0.50, "可探索陆地过少 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, ground_ratio])
+	# 地表结构（营地/遗迹/石阵/补给点）会有意占用少量可走格，最紧张的箱庭真值约 50.5%。
+	# 阈值留出该余量；连通性由 _check_reachable_ground 单独保证，不靠这个比例兜底。
+	_check(ground_ratio > 0.48, "可探索陆地过少 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, ground_ratio])
 	_check(float(walls) / samples > 0.03, "箱庭缺少山林围合边界")
 	print("LAND_BOX: seed=%d node=%d biome=%d water=%.1f%% walkable=%.1f%%" % [generator.world_seed, spec.node_id, spec.biome_id, water_ratio * 100.0, ground_ratio * 100.0])
 
