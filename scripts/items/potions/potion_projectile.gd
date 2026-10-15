@@ -1,32 +1,27 @@
-# ===== AI 新增文件 (药水投射物：匀速、无限射程、只由碰撞终止) =====
+
 class_name PotionProjectile
 extends Node
 
-## 挂在药水模型下的飞行控制器：每物理帧把模型按固定速度往前推，不再用 Tween 插值。
-## 判定与破碎收尾都是从 PotionData.right_use 搬过来的，规则没变：
-##  - 一条射线打受击盒(Area2D，collide_with_areas)，4 像素逐格问地形与箱庭边界，取更早的当碎点；
-##  - 碎点按 need_target 分流：需要的交给 PotionBurst 圆形范围，不需要的直接对药水模型调用一次。
-## 无限射程：没有最大距离、没有固定时长，只由碰撞结束。
-## 唯一的安全阀是"飞出玩家最远可视范围之后再飞 OUT_OF_VIEW_GRACE 秒"就碎，
-## 免得极端开阔的地形里留一个永远在飞的节点。
+##药水弹幕
 
 ##飞出玩家最远可视范围后还能存在的时间(秒)
 const OUT_OF_VIEW_GRACE: float = 2.0
 ##拿不到相机时的兜底可视半径(像素)
 const FALLBACK_VIEW_RADIUS: float = 512.0
-##自转角速度：接近以前"整段转一圈"的观感(旧时长上限 0.6 秒)
-const SPIN_RADIANS_PER_SECOND: float = TAU / 0.6
+##自转角速度=
+const SPIN_RADIANS_PER_SECOND: float = TAU
 ##地形逐格扫描步长(像素)
 const TERRAIN_STEP: float = 4.0
 
 var _potion: ItemModel = null
 var _player: PlayerCharacter = null
 var _direction: Vector2 = Vector2.RIGHT
-var _speed: float = 320.0
+var _speed: float = 400.0
 var _burst_radius: float = 32.0
 var _burst_duration: float = 0.0
 var _attributes: Array[AlchemicalData] = []
 var _spin: float = SPIN_RADIANS_PER_SECOND
+
 var _view_radius: float = FALLBACK_VIEW_RADIUS
 var _out_of_view_seconds: float = 0.0
 var _done: bool = false
@@ -75,7 +70,7 @@ func _first_block(from: Vector2, to: Vector2) -> float:
 
 	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from, to, _potion.collision_mask)
 
-	#投掷者自己不算障碍，否则药水出手就碎
+	#投掷者自己不算障碍
 	if is_instance_valid(_player):
 		query.exclude = [_player.get_rid()]
 
@@ -87,7 +82,7 @@ func _first_block(from: Vector2, to: Vector2) -> float:
 	if not contact.is_empty():
 		impact = from.distance_to(contact["position"]) / span
 
-	#地形没有物理层，只能逐格问生成器；停在最后一个可走的点上，不留在墙里
+	#地形没有物理层，逐格问生成器
 	var segments: int = maxi(1, ceili(span / TERRAIN_STEP))
 	var last_ok: float = 0.0
 
@@ -122,8 +117,7 @@ func _blocked(point: Vector2) -> bool:
 	return not _player.terrain_source.is_walkable(WorldGenerator.world_to_tile(point))
 
 
-##破碎收尾：不需要目标的属性直接结算(把碎点上的药水模型交出去)，
-##需要目标的属性交给碎点上的圆形范围，由它对圈内每个目标各调用一次
+##药水效果结算
 func _break_at(at: Vector2) -> void:
 	if _done:
 		return

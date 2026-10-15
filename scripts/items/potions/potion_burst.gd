@@ -1,24 +1,32 @@
-# ===== AI 新增文件 (药水砸碎后的圆形范围：圈内每个目标各调用一次 use_effect) =====
 class_name PotionBurst
 extends Area2D
 
-## 药水砸碎后留下的圆形范围：圈内每个目标各调用一次 use_effect。
+## 药水砸碎后留下的圆形作用范围：圈内每个目标各调用一次 use_effect。
 ## 只处理需要目标的属性(need_target = true)；不需要目标的属性由药水在破碎时直接结算。
-## duration 为 0：生成这一帧立刻结算一次就消失；大于 0：持续存在，
-## 期间进入圈里的目标同样各生效一次，出圈或一直待在圈里都不会重复触发。
+## duration 为 0：生成这一帧立刻结算一次就消失；
+## duration 大于 0，留在世界里按 pulse_interval 定时放脉冲，每个脉冲对"当时在圈里的每个目标"
+## 期间进入圈里的目标从下一个脉冲开始吃效果，离开圈就不再被作用。
 
-##检测层：1=World(玩家) 2=怪物。按角色身体判定，不查受击盒(Area2D)
-const TARGET_MASK: int = 3
+##检测层：2=玩家 3=怪物。按角色身体判定，不查受击盒(Area2D)
+const TARGET_MASK: int = 7
 
-##范围半径(像素)：由药水模板在 setup 时传进来
+##范围半径(像素)
 var radius: float = 32.0
-##存在时间(秒)：0＝立刻结算一次
+##存在时间(秒)
 var duration: float = 1.0
 ##要作用到目标上的属性，只放 need_target 为 true 的
 var attributes: Array[AlchemicalData] = []
 
-##已经生效过的目标：同一个目标只调用一次
-var _applied: Array[Node] = []
+##脉冲间隔(秒)，定时对当时在圈里的每个目标各调用一次 use_effect
+@export_range(0.05, 10.0, 0.05) var pulse_interval: float = 0.05
+##间隔下限
+const MIN_PULSE_INTERVAL: float = 0.05
+
+##下一个脉冲的时间点(相对 _elapsed)
+var _next_pulse_at: float = 0.0
+##最近一次脉冲的时间点，用来画脉冲闪光
+var _last_pulse_at: float = 0.0
+
 ##形状按实例建：场景里的形状资源会被所有实例共用，改半径会互相影响
 var _shape: CircleShape2D = null
 var _elapsed: float = 0.0
@@ -34,7 +42,7 @@ func _ready() -> void:
 	set_physics_process(false)
 
 
-##由药水在碎点调用：设置范围参数并立刻开始结算
+##由药水在碎点调用，设置范围参数并立刻放第一个脉冲
 func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attributes: Array[AlchemicalData]) -> void:
 	radius = burst_radius
 	duration = burst_duration
@@ -43,11 +51,14 @@ func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attrib
 	if _shape != null:
 		_shape.radius = maxf(radius, 1.0)
 	_started = true
+	_elapsed = 0.0
+	
 	#生成时就在圈里的目标先结算：Area2D 的重叠要等物理帧同步，这里直接查一次更稳
-	_apply_to(_query_bodies())
+	pulse_interval = maxf(pulse_interval, MIN_PULSE_INTERVAL)
+	_pulse()
+	_next_pulse_at = pulse_interval
+
 	if duration > 0.0:
-		if not body_entered.is_connected(_on_body_entered):
-			body_entered.connect(_on_body_entered)
 		set_physics_process(true)
 		queue_redraw()
 	else:
@@ -67,14 +78,27 @@ func _build_shape() -> void:
 
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
+
+	if _elapsed >= _next_pulse_at:
+		_pulse()
+		_next_pulse_at += pulse_interval
+		if _next_pulse_at <= _elapsed:
+			_next_pulse_at = _elapsed + pulse_interval
+
 	if _elapsed >= duration:
 		queue_free()
 		return
 	queue_redraw()
 
 
-func _on_body_entered(body: Node2D) -> void:
-	_apply_to([body])
+
+##发出脉冲，对当时在圈里的每个目标各调用一次 use_effect
+func _pulse() -> void:
+	if not _started:
+		return
+	_last_pulse_at = _elapsed
+	_apply_to(_query_bodies())
+
 
 
 ##直接按形状查一次圈内的角色，不依赖 Area2D 的重叠是否已经同步
@@ -94,32 +118,22 @@ func _query_bodies() -> Array:
 	return bodies
 
 
-##每个目标只生效一次
+##一次脉冲内对每个目标各作用一次
 func _apply_to(bodies: Array) -> void:
-	if not _started:
-		return
-	_prune()
 	for body: Variant in bodies:
 		var target: Node = body as Node
-		if target == null or _applied.has(target):
+		if target == null:
 			continue
-		_applied.append(target)
 		for attribute: AlchemicalData in attributes:
 			if attribute != null and attribute.has_method("use_effect"):
 				attribute.use_effect(target)
 
 
-##清掉已经释放的目标，避免数组越攒越大，也避免留着已释放对象的引用
-func _prune() -> void:
-	for index: int in range(_applied.size() - 1, -1, -1):
-		if not is_instance_valid(_applied[index]):
-			_applied.remove_at(index)
 
-
-##存在时间大于 0 时把范围画出来，越接近消失越淡
 func _draw() -> void:
 	if duration <= 0.0 or not _started:
 		return
+	var flash: float = 1.0
 	var left: float = clampf(1.0 - _elapsed / duration, 0.0, 1.0)
-	draw_circle(Vector2.ZERO, radius, Color(1.0, 0.86, 0.58, 0.08 + 0.10 * left))
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.93, 0.74, 0.22 + 0.48 * left), 1.0)
+	draw_circle(Vector2.ZERO, radius, Color(1.0, 0.86, 0.58, 0.06 + 0.10 * flash * left))
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.93, 0.74, 0.18 + 0.55 * flash * left), 1.0)

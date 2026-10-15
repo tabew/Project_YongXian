@@ -5,8 +5,6 @@ radius = 19.026299
 
 [node name="Explode" type="Node2D" unique_id=928932771]
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2016570354]
-
 [node name="Area2D" type="Area2D" parent="." unique_id=108448509]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=819767008]

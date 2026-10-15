@@ -1,16 +1,13 @@
-# ===== AI 新增文件 (爆炸属性 use_effect 的落点：范围伤害 + 击退 + 表现) =====
 class_name ExplodeEffect
 extends Node2D
 
-## 爆炸：生成当帧对范围内所有受击盒(敌人)和玩家各结算一次伤害与击退，然后播放表现并自毁。
+## 爆炸：生成当帧对范围内所有受击盒(敌人)和玩家各结算一次伤害与击退
 ## 击退强度按到爆心的距离衰减：爆心满值，圈边衰减到 edge_scale。
-## 由 Explosive.use_effect 实例化 explode.tscn 后把本脚本挂到它的根节点上，
-## 所以不需要改动那个场景；范围形状直接用它自带的 Area2D/CollisionShape2D。
 
-##爆炸图集：6 帧 32x32
+##爆炸图集
 const EXPLOSION_SHEET: Texture2D = preload("res://assets/effects/explosion.png")
 const SHEET_FRAMES: int = 6
-##玩家阵营，和 WeaponAttack.wielder_team 一致：受击盒 team 不同才会吃这一下
+##玩家阵营
 const SOURCE_TEAM: int = 1
 ##命中来源标识，只用于 CombatHit 记录
 const WEAPON_ID: StringName = &"explosive"
@@ -32,8 +29,8 @@ var _playing: bool = false
 
 
 ##在当前位置炸一次：radius 内的敌人(受击盒)与玩家都吃伤害与击退。
-##击退按到爆心的距离衰减：爆心满值，圈边衰减到 edge_scale(见 Explosive 的同名参数)。
-func detonate(radius: float, enemy_damage: float, player_damage: float, knockback: float, hit_mask: int, source: Node,
+##击退按到爆心的距离衰减：爆心满值，圈边衰减到 edge_scale
+func detonate(radius: float, enemy_damage: float, player_damage: float, knockback: float,  source: Node,hit_mask: int = 7,
 		edge_scale: float = 0.3, falloff_power: float = 1.0) -> void:
 	_prepare_shape(radius)
 	_hit_hurtboxes(enemy_damage, knockback, hit_mask, _resolve_source(source), edge_scale, falloff_power)
