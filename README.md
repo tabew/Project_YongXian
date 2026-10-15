@@ -131,6 +131,7 @@ Project_YongXian/
 godot --headless --path . --script res://tools/test_transitions_materials.gd
 godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
 godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
+godot --headless --path . --script res://tools/test_bomb_material.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
 godot --headless --path . --script res://tools/test_map_integration.gd
