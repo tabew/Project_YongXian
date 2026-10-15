@@ -108,6 +108,9 @@ static func _can_place(generator: WorldGenerator, spec: MapSpec, tile: Vector2i,
 		return false
 	if spec.cottage != null and spec.cottage.bounds.has_point(local):
 		return false
+	for reserved: Rect2i in generator.population_for(spec.node_id).get("reserved", []):
+		if reserved.has_point(tile):
+			return false
 	for point: Vector2i in exclusions:
 		var delta: Vector2i = tile - point
 		if maxi(absi(delta.x), absi(delta.y)) <= SAFE_RADIUS:

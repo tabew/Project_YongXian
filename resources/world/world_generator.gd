@@ -45,6 +45,8 @@ var _specs: Array[MapSpec] = []
 var _connections: Array[Dictionary] = []
 var _map_bins: Dictionary = {}
 var _gate_cache: Dictionary = {}
+var _populations: Dictionary = {}
+var _population_blockers: Dictionary = {}
 ## 各列贴合，世界地图上不再留空白断层。
 const REGION_GAP: int = 0
 
@@ -59,7 +61,7 @@ var _query_frame: int = -1
 var _query_tiles: Dictionary = {}
 
 
-func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0) -> void:
+func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int = 0, population_data: Dictionary = {}) -> void:
 	world_seed = seed_value if seed_value != 0 else random_seed()
 	config = map_config if map_config != null else MapConfig.new()
 	variant = variant_index
@@ -67,6 +69,16 @@ func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int
 	run = RoomGraph.plan(world_seed, config, variant)
 	_build_layout()
 	_configure_noise()
+	# 先在基础地形上规划所有兴趣点，再统一启用碰撞覆盖，避免规划顺序影响布局。
+	if population_data.is_empty():
+		for spec: MapSpec in _specs:
+			_populations[spec.node_id] = WorldPopulation.plan(self, spec)
+	else:
+		# 区块线程复用主生成器已完成的只读规划，不重复抽样整局兴趣点。
+		_populations = population_data
+	for population: Dictionary in _populations.values():
+		_population_blockers.merge(population["blocked"])
+	_query_tiles.clear()
 
 
 func _configure_noise() -> void:
@@ -131,6 +143,14 @@ static func tile_to_chunk(tile: Vector2i) -> Vector2i:
 
 func map_spec(map_node_id: int) -> MapSpec:
 	return _map_cache.get(map_node_id)
+
+
+func population_for(map_node_id: int) -> Dictionary:
+	return _populations.get(map_node_id, {})
+
+
+func population_snapshot() -> Dictionary:
+	return _populations
 
 
 func map_specs() -> Array[MapSpec]:
@@ -520,6 +540,9 @@ func _classify(tile_x: int, tile_y: int) -> void:
 		return
 	_last_biome = spec.biome_id
 	var local: Vector2i = tile - spec.origin
+	if _population_blockers.has(tile):
+		_last_terrain = Terrain.Kind.MOUNTAIN
+		return
 	# 木墙和家具先于道路判定，保证小屋只有门洞能进出。
 	if spec.cottage != null:
 		var cottage_terrain: int = spec.cottage.terrain_at(local)

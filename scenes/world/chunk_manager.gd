@@ -539,7 +539,7 @@ func _acquire_generator() -> WorldGenerator:
 
 	if worker != null:
 		return worker
-	return WorldGenerator.new(_world_seed, _config, _variant)
+	return WorldGenerator.new(_world_seed, _config, _variant, _generator.population_snapshot())
 
 
 func _release_generator(worker: WorldGenerator) -> void:
