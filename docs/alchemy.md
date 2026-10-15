@@ -240,7 +240,7 @@ godot --headless --path . --script res://tests/test_alchemy_station.gd   # 52 �
 godot --headless --path . --script res://tests/test_alchemy_pause.gd     # 11 项
 godot --headless --path . --script res://tests/test_alchemy_compendium.gd # 93 项
 godot --headless --path . --script res://tests/test_alchemy_presets.gd   # 38 项
-godot --headless --path . --script res://tests/test_alchemy_hud.gd       # 58 项（五页签 + 合金页 + 诅咒行）
+godot --headless --path . --script res://tests/test_alchemy_hud.gd       # 69 项（五页签 + 合金页 + 诅咒行 + 轮盘预览 / 当前生效）
 godot --headless --path . --script res://tests/test_alchemy_overload.gd  # 17 项
 godot --headless --path . --script res://tests/test_alchemy_vfx.gd       # 15 项
 godot --headless --path . --script res://tests/test_alchemy_materials.gd # 175 项（含 Boss 档与灵感结算桥接）
@@ -292,8 +292,8 @@ godot --headless --path . --editor --import --quit
 | 战斗中长按 E 25%（遗物 15%）慢动作 | `LONG_PRESS_SECONDS` + `slow_motion_scale` | `test_alchemy_input` 44、`test_alchemy_progression` 130 |
 | 受击打断：关轮盘 / 不丢材料 / +10 热量 / 1s 冷却 | `AlchemyInputState.interrupt()` + `session.notify_interrupt()` | `test_alchemy_input` 44、`test_alchemy_heat` 35 |
 | Esc 关闭不消耗材料 | `AlchemyInputState.close()` | `test_alchemy_input` 44、`test_alchemy_pause` 11 |
-| 左键选择 / 确认，右键取消 / 移除 | HUD 槽位 / 背包 / 合金页 `gui_input` | `test_alchemy_hud` 58 |
-| Tab 切换页签 | `TAB_NAMES` 五页签 + `cycle_tab()` | `test_alchemy_hud` 58 |
+| 左键选择 / 确认，右键取消 / 移除 | HUD 槽位 / 背包 / 合金页 `gui_input` | `test_alchemy_hud` 69 |
+| Tab 切换页签 | `TAB_NAMES` 五页签 + `cycle_tab()` | `test_alchemy_hud` 69 |
 | 素材槽默认 2、可扩到 3~4 | `DEFAULT_MATERIAL_SLOTS=2` / `MAX_MATERIAL_SLOTS=4` | `test_alchemy_station` 52、`test_alchemy_progression` 130 |
 | 词条等级倍率 1.0/1.3/1.6/2.0/2.5 | `AlchemyRules.LEVEL_MULTIPLIERS` | `test_alchemy_traits` 241 |
 | 同词条叠加 1/1.5/1.75/1.85/1.9 | `AlchemyRules.STACK_MULTIPLIERS` | `test_alchemy_traits` 241 |
@@ -309,10 +309,12 @@ godot --headless --path . --editor --import --quit
 | 全部 30+ 反应 | `reaction_catalog.gd` 32 条 | `test_alchemy_reactions` 178 |
 | 武器基底 10 种（剑 / 斧 / 锤 / 矛 / 匕首 / 镰刀 / 拳套 / 鞭 / 盾 / 巨剑） | `longsword.tres` + `weapon_catalog.gd`（9 种） | `test_weapon_catalog` 123 |
 | 武器炼金槽：1 临时槽 → 最大 2，永久槽仅非战斗合金 | `core/alchemy_weapon_slots.gd` + `alloy_permanent_slot()` | `test_alchemy_weapon_slots` 59 |
-| 非战斗完整界面 / 战斗轮盘 / 武器旁常驻 | `scripts/alchemy/alchemy_hud.gd` | `test_alchemy_hud` 58 |
+| 非战斗完整界面 / 战斗轮盘 / 武器旁常驻 | `scripts/alchemy/alchemy_hud.gd` | `test_alchemy_hud` 69 |
+| 非战斗界面操作按钮：实验 / 确认（炼金）/ 拆解（合金·重铸）/ 图鉴 / 预设 | `AlchemyHud` 页签 + 面板按钮 | `test_alchemy_hud` 69、`test_alchemy_forge` 71 |
+| 战斗轮盘：素材槽 / 词条池 / 预览（叠加·替换提示）/ 当前生效 / 热量条 | `AlchemyHud._wheel_preview_label` / `_wheel_active_label` | `test_alchemy_hud` 69 |
 | 武器旁常驻：效果图标色 + 倒计时环 + 热量条 | `core/alchemy_status_ring.gd` + `AlchemyHud.StatusRing` | `test_alchemy_status_ring` 46 |
 | 词条图鉴（元素 / 行为 / 触发 / 修饰 / 反应 + 完成度） | `core/alchemy_compendium.gd` | `test_alchemy_compendium` 93 |
-| 过热警告 50/75/90/100 四档表现 | `AlchemyHud._update_feedback()` | `test_alchemy_hud` 58 |
+| 过热警告 50/75/90/100 四档表现 | `AlchemyHud._update_feedback()` | `test_alchemy_hud` 69 |
 | 升级 19 条 + 遗物 30 件（含 13 元素遗物） | `resources/alchemy/progression_catalog.gd` | `test_alchemy_progression` 130 |
 | 预设系统 | `core/brew_presets.gd` | `test_alchemy_presets` 38 |
 | 实验系统（未解锁「？？？」/ 事故） | `core/alchemy_experiments.gd` | `test_alchemy_experiments` 40 |

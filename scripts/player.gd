@@ -10,6 +10,9 @@ signal defeated
 ## 生成器是纯函数式的（只由种子和坐标决定），所以判定结果和画面上看到的永远一致，
 ## 不需要等区块加载完。
 
+## 出发配置携带的材料数量：工坊里补充多少，进局内就带多少。
+const CARRIED_MATERIAL_AMOUNT: int = 3
+
 @export_group("移动手感")
 ## 最大速度（像素/秒）。
 @export var max_speed: float = 220.0
@@ -23,7 +26,7 @@ signal defeated
 @export var collide_with_terrain: bool = true
 
 @export_group("武器")
-## 按顺序循环装备；添加资源即可扩充，无需按武器类型分支。
+## 可选武器池：出发门选中的武器从这份列表里查，列表里没有才回退到武器配置表。
 @export var weapon_loadout: Array[WeaponDefinition] = []
 
 @export_group("生命")
@@ -155,10 +158,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
 		weapon_controller.set_trigger_pressed(true)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("cycle_weapon"):
-		equip_next_weapon()
-		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("alchemy_brew") and not event.is_echo():
+		# 按 E 的瞬间重新判定战斗状态：in_combat 由物理帧写入，
+		# 直接用会读到上一帧的旧值，非战斗时按 E 就打不开完整炼金台。
+		alchemy_station.in_combat = _has_living_monsters()
 		alchemy_station.press_brew()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("alchemy_cancel") and not event.is_echo():
@@ -166,14 +169,38 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-func equip_next_weapon() -> bool:
-	var current_index: int = weapon_loadout.find(weapon_controller.equipped_weapon)
-	for offset: int in range(1, weapon_loadout.size() + 1):
-		var candidate: WeaponDefinition = weapon_loadout[(current_index + offset) % weapon_loadout.size()]
-		if candidate != null and candidate != weapon_controller.equipped_weapon:
-			if weapon_controller.equip(candidate):
-				return true
-	return false
+## 按 id 装备武器：先在武器轮换列表里找，找不到再问武器配置表。
+## 未知 id / 无效定义时保持当前武器不变并返回 false。
+func equip_weapon_by_id(weapon_id: StringName) -> bool:
+	if weapon_id == &"":
+		return false
+	for definition: WeaponDefinition in weapon_loadout:
+		if definition != null and definition.id == weapon_id:
+			return weapon_controller.equip(definition)
+	var catalog_weapon: WeaponDefinition = WeaponCatalog.definition_of(weapon_id)
+	if catalog_weapon == null or catalog_weapon.id == &"":
+		return false
+	return weapon_controller.equip(catalog_weapon)
+
+
+## 装备出发配置里选中的武器（出发门 → 局内共用）。
+## 出发配置存在自动加载单例里；用运行期查找，保证本脚本仍能作为 --script 测试的编译依赖。
+func equip_selected_weapon() -> bool:
+	var manager: Node = get_node_or_null("/root/Inspiration")
+	if manager == null:
+		return false
+	return equip_weapon_by_id(StringName(manager.get("selected_weapon_id")))
+
+
+## 套用整套出发配置（武器 + 携带材料）。工坊与局内各调用一次：
+## 场景切换会重建主角，所以每次进新场景都要重新套用，否则出发门的选择会丢。
+func apply_run_loadout() -> void:
+	equip_selected_weapon()
+	var manager: Node = get_node_or_null("/root/Inspiration")
+	if manager == null or alchemy_station == null:
+		return
+	for material_id: int in manager.get("carried_material_ids"):
+		alchemy_station.absorb_material(material_id, CARRIED_MATERIAL_AMOUNT)
 
 
 func _input(event: InputEvent) -> void:

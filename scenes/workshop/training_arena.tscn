@@ -1,0 +1,17 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/workshop/training_arena.gd" id="1_arena"]
+[ext_resource type="PackedScene" path="res://scenes/game/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/combat/training_dummy.tscn" id="3_dummy"]
+[ext_resource type="Resource" path="res://resources/inventory/inventory.tres" id="4_inventory"]
+
+[node name="TrainingArena" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(0, 170)
+inventory = ExtResource("4_inventory")
+
+[node name="TrainingDummy" parent="." instance=ExtResource("3_dummy")]
+position = Vector2(-180, -40)
+immobile = true

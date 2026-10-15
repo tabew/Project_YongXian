@@ -403,7 +403,7 @@ func _check_runtime() -> void:
 	var bag: Node = game.get_node("GameHUD/BagUi")
 	var alchemy: Node = game.get_node("GameHUD/Alchemy")
 	var controller: Variant = player.get("weapon_controller")
-	_check(controller.equipped_weapon != null and player.equip_next_weapon(), "武器装备与切换接口未保留")
+	_check(controller.equipped_weapon != null and player.equip_weapon_by_id(&"long_staff"), "武器装备与按 id 切换接口未保留")
 	var equipped: Variant = controller.equipped_weapon
 	player.take_damage(3)
 	var health: int = player.get("health")

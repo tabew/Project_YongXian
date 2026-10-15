@@ -3,13 +3,11 @@ extends Node2D
 
 ## 传统 RPG 箱庭：触及出口立即换到目标入口，主视图只显示当前区域。
 
-const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 ## 死亡结算完成后回到的局外场景。
 const WORKSHOP_SCENE: String = "res://scenes/workshop/workshop.tscn"
 ## 死亡演出（爆散 + 飘字）到回工坊之间的等待。
 const DEATH_RETURN_DELAY: float = 1.6
 
-@export var spawn_training_dummy: bool = true
 ## 打开后每次生成世界都会打印完整地图报告（调试用）。
 @export var debug_map_report: bool = false
 
@@ -28,8 +26,6 @@ const DEATH_RETURN_DELAY: float = 1.6
 @onready var settlement: RunSettlementPanel = $GameHUD/Settlement
 
 var _cottage_view: CottageView = null
-var _training_dummy: TrainingDummy
-var _training_dummy_map: int = -1
 var _generator: WorldGenerator = null
 var _current_node: int = -1
 var _base_zoom: Vector2 = Vector2(2.0, 2.0)
@@ -79,12 +75,13 @@ func _ready() -> void:
 	if GameState.world_seed == 0:
 		GameState.start_new_world()
 	build_world(GameState.world_seed)
+	# 场景切换会重建主角，进局内必须重新套用出发门选的武器与携带材料。
+	player.apply_run_loadout()
 
 
 func _process(_delta: float) -> void:
 	if _generator == null or player.active_map == null:
 		return
-	_sync_training_dummy()
 	_confine_map_monsters()
 	_refresh_pickup()
 	_adsorb_pickups()
@@ -246,7 +243,6 @@ func build_world(seed_value: int) -> void:
 	monster_spawner.content = MapContent.build(_generator)
 	chunk_manager.setup(_generator, player)
 	_enter_map(_generator.run.start_node(), 0, -1, true)
-	_place_training_dummy(_generator, WorldGenerator.world_to_tile(player.global_position))
 	_setup_map_monsters()
 	# 初图落位并加载后才绑定，避免把上一局的位置记为已探索。
 	hud.bind_world(chunk_manager, player)
@@ -306,7 +302,6 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	_setup_room_props(spec)
 	_refresh_pickup()
 	if _hud_bound:
-		_sync_training_dummy()
 		_setup_map_monsters()
 		_sync_minimap()
 
@@ -338,41 +333,6 @@ func _on_viewport_resized() -> void:
 		return
 	_limit_camera(player.active_map)
 	chunk_manager.prepare_visible()
-
-
-func _place_training_dummy(generator: WorldGenerator, spawn_tile: Vector2i) -> void:
-	if is_instance_valid(_training_dummy):
-		remove_child(_training_dummy)
-		_training_dummy.queue_free()
-	_training_dummy = null
-	_training_dummy_map = -1
-	if not spawn_training_dummy:
-		return
-	# 保留开局附近训练靶，且候选落点必须属于初始地图。
-	for offset: Vector2i in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3), Vector2i(2, 0), Vector2i(-2, 0)]:
-		var tile: Vector2i = spawn_tile + offset
-		var local: Vector2i = tile - player.active_map.origin
-		if player.active_map.contains_local(local.x, local.y) and generator.is_walkable(tile):
-			_training_dummy = TRAINING_DUMMY.instantiate() as TrainingDummy
-			_training_dummy.position = WorldGenerator.tile_to_world(tile)
-			_training_dummy.terrain_source = generator
-			_training_dummy_map = _current_node
-			add_child(_training_dummy)
-			_sync_training_dummy()
-			return
-
-
-func _sync_training_dummy() -> void:
-	if not is_instance_valid(_training_dummy):
-		return
-	var spec: MapSpec = _generator.map_spec(_training_dummy_map)
-	if spec == null:
-		return
-	# 击退与回家仍由训练靶原脚本处理，外层只保证不越出所属箱庭。
-	_training_dummy.global_position = _clamp_to_map(_training_dummy.global_position, spec)
-	var is_active: bool = _training_dummy_map == _current_node
-	_training_dummy.visible = is_active
-	_training_dummy.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
 
 
 ## 切图重建存活实体，生成器保留本局击杀记录；旧区域怪物不会继续攻击。

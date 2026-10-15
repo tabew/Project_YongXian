@@ -9,7 +9,9 @@ extends Node2D
 ## 数值与规则都在 resources/workshop 与 resources/inspiration 里。
 
 const GAME_SCENE: String = "res://scenes/game/game_world.tscn"
-const DUMMY_SCENE: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
+## 训练场试验场：确认前往后切过去的独立空旷场地（假人 + 无限材料）。
+const TRAINING_ARENA_SCENE: String = "res://scenes/workshop/training_arena.tscn"
+const ALCHEMY_HUD: PackedScene = preload("res://scenes/ui/alchemy/alchemy_hud.tscn")
 const CAMERA_ZOOM: Vector2 = Vector2(1.4, 1.4)
 ## 玩家离墙的最小距离，避免贴到边界外。
 const WALL_MARGIN: float = 26.0
@@ -24,7 +26,8 @@ var _active_panel: WorkshopPanel = null
 var _current: WorkshopInteractable = null
 var _counter_label: Label = null
 var _prompt_label: Label = null
-var _dummy: TrainingDummy = null
+## 随身炼金台 HUD：工坊里没有怪物，按 E 会打开完整炼金台。
+var _alchemy_hud: AlchemyHud = null
 var _hud_root: Control = null
 
 
@@ -34,7 +37,6 @@ func _ready() -> void:
 	_build_interactables()
 	_build_hud()
 	_build_panels()
-	_spawn_training_dummy()
 	if _manager != null:
 		_manager.apply_to_alchemy_station(player.alchemy_station)
 		_manager.permanent_changed.connect(_refresh_counter)
@@ -131,6 +133,12 @@ func _build_hud() -> void:
 	hint.offset_right = 900.0
 	hint.offset_bottom = -8.0
 
+	# 随身炼金台：非战斗（工坊没有怪物）时按 E 打开完整炼金台。
+	_alchemy_hud = ALCHEMY_HUD.instantiate() as AlchemyHud
+	_alchemy_hud.name = "Alchemy"
+	root.add_child(_alchemy_hud)
+	_alchemy_hud.bind(player.alchemy_station)
+
 	_hud_root = root
 
 
@@ -144,21 +152,31 @@ func _build_panels() -> void:
 	var upgrade_panel: UpgradePanel = _panels[&"upgrade"] as UpgradePanel
 	upgrade_panel.purchased.connect(_on_upgrade_purchased)
 	var departure_panel: DepartureGatePanel = _panels[&"departure"] as DepartureGatePanel
-	departure_panel.weapon_ids = _available_weapon_ids()
+	departure_panel.weapon_definitions = _available_weapon_definitions()
 	departure_panel.start_run_requested.connect(start_run)
+	departure_panel.weapon_selected.connect(_on_weapon_selected)
 	var training_panel: TrainingGroundPanel = _panels[&"training"] as TrainingGroundPanel
-	training_panel.player = player
+	training_panel.travel_requested.connect(_on_training_travel)
 
 
-## 可选武器：主角当前轮换列表（长枪 / 法杖 / 溜溜球等 .tres）+ 武器配置表（矛 / 匕首…）。
-func _available_weapon_ids() -> Array[StringName]:
-	var result: Array[StringName] = []
+## 可选武器定义：主角轮换列表里的 .tres 真武器优先，再补武器配置表里还没有的。
+## 出发门要显示名字与数值，所以传定义本身；武器配置表查不到 .tres 真武器。
+func _available_weapon_definitions() -> Array[WeaponDefinition]:
+	var result: Array[WeaponDefinition] = []
 	for definition: WeaponDefinition in player.weapon_loadout:
-		if definition != null and not result.has(definition.id):
-			result.append(definition.id)
-	for weapon_id: StringName in WeaponCatalog.all_ids():
-		if not result.has(weapon_id):
-			result.append(weapon_id)
+		if definition == null or definition.id == &"":
+			continue
+		result.append(definition)
+	for definition: WeaponDefinition in WeaponCatalog.all_definitions():
+		if definition == null or definition.id == &"":
+			continue
+		var exists: bool = false
+		for entry: WeaponDefinition in result:
+			if entry.id == definition.id:
+				exists = true
+				break
+		if not exists:
+			result.append(definition)
 	return result
 
 
@@ -178,13 +196,6 @@ func _placeholder_panel(entry: Dictionary) -> WorkshopPanel:
 	panel.close_requested.connect(_on_panel_closed)
 	_hud_root.add_child(panel)
 	return panel
-
-
-func _spawn_training_dummy() -> void:
-	_dummy = DUMMY_SCENE.instantiate() as TrainingDummy
-	add_child(_dummy)
-	_dummy.global_position = WorkshopLayout.position_of(&"training_ground") + Vector2(96.0, 0.0)
-	_dummy.terrain_source = null
 
 
 ## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
@@ -283,12 +294,24 @@ func start_run() -> void:
 	SceneManager.change_scene(GAME_SCENE)
 
 
+## 出发配置（武器 + 携带材料）由主角自己套用：局内会重建主角，两处走同一份逻辑。
 func _apply_loadout() -> void:
-	var weapon: WeaponDefinition = WeaponCatalog.definition_of(_manager.selected_weapon_id)
-	if weapon != null:
-		player.weapon_controller.equip(weapon)
-	for material_id: int in _manager.carried_material_ids:
-		player.alchemy_station.absorb_material(material_id, 3)
+	player.apply_run_loadout()
+
+
+## 出发门选了武器：立刻套到工坊主角身上，选完当场就能看到生效（局内会再套一次）。
+func _on_weapon_selected(weapon_id: StringName) -> void:
+	player.equip_weapon_by_id(weapon_id)
+
+
+# ------------------------------------------------------------ 训练场
+
+## 训练场交互点：确认前往 → 切到独立的空旷试验场（返回与补材料都在那边）。
+func _on_training_travel() -> void:
+	_play_sfx(&"ui_click")
+	get_tree().paused = false
+	_active_panel = null
+	SceneManager.change_scene(TRAINING_ARENA_SCENE)
 
 
 func _draw() -> void:

@@ -2,9 +2,9 @@
 
 当前世界是俯视角，保留 WASD 移动。长剑参考泰拉瑞亚的挥砍节奏：鼠标决定本次攻击方向，左键挥剑，按住左键自动重复。攻击中仍能移动，但本次挥砍方向锁定；下一次攻击重新读取鼠标方向。
 
-开局自动装备长剑，出生点附近有一个训练靶，显示血条、伤害数字和暴击标记，击倒后 2 秒重生。`GameWorld.spawn_training_dummy` 可以关闭训练靶。R 重建世界时会取消正在进行的攻击并重建训练靶。
+开局自动装备工坊出发门选中的武器（默认长剑）。世界不再放训练靶：假人只在训练场试验场（[training_arena.tscn](../scenes/workshop/training_arena.tscn)）里，静止不动、血量高到打不死，旁边挂一个 DPS 计数器。R 重建世界时会取消正在进行的攻击。
 
-按 Q 在长剑与长棍之间切换。长棍朝鼠标选定方向做 40° 小扇形挥舞，同时从远处较短、较暗的姿态过渡到近处较长、较亮的姿态，并带短弧形拖尾。攻击开始后锁定本次方向，按住左键可连续挥击。切换会取消当前攻击，松开并重新按左键即可使用新武器。
+长棍朝鼠标选定方向做 40° 小扇形挥舞，同时从远处较短、较暗的姿态过渡到近处较长、较亮的姿态，并带短弧形拖尾。攻击开始后锁定本次方向，按住左键可连续挥击。换武器会取消当前攻击，松开并重新按左键即可使用新武器。
 
 ## 文件与职责
 
@@ -108,7 +108,9 @@
 
 复制 `templates/yoyo_weapon_template.tres` 即可添加同类武器；绳长用 `max_range`，球的大小用 `head_radius` 与贴图，跟随手感用 `follow_speed` 与 `return_speed`，输出节奏用 `hit_interval`。`recovery_seconds` 必须覆盖收回过程，否则装备时校验失败。
 
-玩家场景的 `weapon_loadout` 数组决定 Q 的切换顺序，默认包含长剑、长棍和溜溜球。向数组追加资源即可加入更多武器，起始装备仍由 `WeaponController.starting_weapon` 决定。空项和当前武器会被跳过，空列表不改变装备。
+玩家场景的 `weapon_loadout` 数组列出可选武器，默认包含长剑、长棍和溜溜球，工坊出发门的武器列表就取自这里。向数组追加资源即可加入更多武器；进局时 `apply_run_loadout()` 按出发门选中的 id 装备，未知 id 时回落到 `WeaponController.starting_weapon`。
+
+出发门面板拿到的是**武器定义本身**（`.tres` 或配置表生成的资源），不是 id：`WeaponCatalog.definition_of()` 对表外的 id 会返回空定义（`id` 为空、名字是默认的 `Weapon`），只传 id 再回头查表会把长剑 / 长棍 / 溜溜球全显示成「Weapon 伤害 18.0」，选哪把都看不出区别。
 
 ## 新增同类武器
 
@@ -123,7 +125,7 @@
 1. 将对应模板复制到 `resources/weapons/`，例如 `iron_longsword.tres` 或 `iron_staff.tres`。每把新武器使用独立文件。
 2. 在 Inspector 修改 `resource_name`（编辑器名称）、唯一的 `id`、`display_name`（游戏名称）、伤害、暴击、击退和各阶段时间。模板 ID 是占位值，需要替换，例如 `iron_longsword` 或 `iron_staff`。
 3. 修改该类型的长度、宽度、角度等专属参数，需要换外观时同时配置 `icon`、`texture`、`texture_grip`。保留模板原有的脚本与 `attack_scene` 配对。
-4. 打开 `scenes/game/player.tscn`，选中 Player，将新 `.tres` 加入 `weapon_loadout` 数组。运行后按 Q 即可切换到新武器。若希望开局使用它，将同一资源设为子节点 `WeaponController.starting_weapon`。
+4. 打开 `scenes/game/player.tscn`，选中 Player，将新 `.tres` 加入 `weapon_loadout` 数组，它就会出现在出发门的武器列表里，选中后进局即装备。若希望作为默认开局武器，将同一资源设为子节点 `WeaponController.starting_weapon`。
 
 也可直接调用 `player.weapon_controller.equip(new_weapon)`。模板用于复制成独立武器；修改副本的数值不会改变模板或其他武器，运行状态由各自的攻击实例管理。两类武器都无需改玩家、控制器或伤害组件。刀、斧等采用弧形横扫的武器也可以复用长剑类模板。
 
@@ -159,7 +161,7 @@ Enemy (Node2D / CharacterBody2D)
 
 将 Hurtbox 的 `health` 拖到 Health 节点，`team` 设为 2，`collision_layer` 勾选 EnemyHurtbox，`collision_mask` 清空。Hurtbox 保持 `monitorable = true`，不需要主动 monitoring。玩家控制器默认 team 为 1，相同阵营不互相伤害，武器持有者自身的子节点也会被排除。
 
-一个敌人的多个受击框共用一个 HealthComponent，避免一剑重复扣血。监听 `Health.damaged(hit, actual_damage)` 处理击退和受伤动画，监听 `Health.died(hit)` 处理死亡。`hit.knockback` 是速度向量，目标负责乘抗性、叠加速度并遵守自己的地形碰撞；HealthComponent 不直接移动角色。训练靶给出了血条、飘字、受伤变色、击退与重生的示例。
+一个敌人的多个受击框共用一个 HealthComponent，避免一剑重复扣血。监听 `Health.damaged(hit, actual_damage)` 处理击退和受伤动画，监听 `Health.died(hit)` 处理死亡。`hit.knockback` 是速度向量，目标负责乘抗性、叠加速度并遵守自己的地形碰撞；HealthComponent 不直接移动角色。训练场试验场里的假人给出了血条、飘字与受伤变色的示例：它静止不动、血量拉满，只用来量伤害。
 
 如果未来为玩家增加受击框，使用 PlayerHurtbox 层（第 2 层，掩码值 2）、team 1；敌方武器的 `hit_mask` 相应设为 2。
 
@@ -174,7 +176,7 @@ Enemy (Node2D / CharacterBody2D)
 - 松开按键停止后续连击；已经开始的攻击正常完成。失去应用焦点或重建世界会立即取消攻击。场景树暂停时物理更新与计时一起暂停。
 - UI 消耗的左键按下事件不会触发攻击；松开事件即使被 UI 消耗，也会清除按住状态。
 - 当前地形没有物理墙体，剑默认不会被地形格阻挡。后续需要墙体遮挡时，应在命中接口前增加地形或物理射线判断。
-- 当前提供长剑、长棍、溜溜球、武器切换和训练靶；背包、拾取、敌人 AI、音效与联网不属于这一层。
+- 当前提供长剑、长棍、溜溜球、出发门选武器，以及训练场试验场里的假人；背包、拾取、敌人 AI、音效与联网不属于这一层。
 
 ## 验证与美术再生成
 
@@ -186,7 +188,7 @@ godot --headless --path . --script res://tests/test_weapons.gd
 godot --headless --path . --script res://tests/test_combat_integration.gd
 ```
 
-测试覆盖三类模板的复制、独立调参、装备、正确动作类型、命中伤害和来源 ID，以及攻击阶段、方向、范围、阵营、碰撞层、多受击框去重、多目标、高速攻击、位移扫掠、数据快照、暴击、防御、击退、死亡重生、自动重复、快速点按、冷却、装备取消和不同攻击行为的扩展接口。溜溜球另外覆盖指针内定位、绳长边界、松手收回、重复命中冷却、跟随速度限制与无人按住的自动回收。集成测试另外验证模板副本加入武器列表后的 Q 切换、HUD 更新，以及玩家输入、世界重建和场景衔接。
+测试覆盖三类模板的复制、独立调参、装备、正确动作类型、命中伤害和来源 ID，以及攻击阶段、方向、范围、阵营、碰撞层、多受击框去重、多目标、高速攻击、位移扫掠、数据快照、暴击、防御、击退、死亡重生、自动重复、快速点按、冷却、装备取消和不同攻击行为的扩展接口。溜溜球另外覆盖指针内定位、绳长边界、松手收回、重复命中冷却、跟随速度限制与无人按住的自动回收。集成测试另外验证模板副本加入武器列表后的按 id 装备、HUD 更新、出发配置在局内的应用，以及玩家输入、世界重建和场景衔接。
 
 重新生成本次加入的原创像素占位素材（需要 Pillow）：
 

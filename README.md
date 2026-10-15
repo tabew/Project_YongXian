@@ -6,7 +6,7 @@
 
 ## 近战武器
 
-鼠标瞄准，左键挥击，按住连续攻击，Q 切换长剑 / 长棍 / 溜溜球。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾；溜溜球参考泰拉瑞亚，球停在指针处持续命中，指针超出绳长时贴在边界上，松手立刻收回。出生点附近的训练靶可验证伤害、暴击与击退。
+鼠标瞄准，左键挥击，按住连续攻击。长剑做大范围扇形横扫；长棍做 40° 小扇形挥舞，并带由远到近的大小、明暗过渡和短弧形拖尾；溜溜球参考泰拉瑞亚，球停在指针处持续命中，指针超出绳长时贴在边界上，松手立刻收回。武器在工坊**出发门**选择：列表显示每把武器的名字与数值，点「选择」当场换上，进局沿用；训练靶只在训练场试验场里出现。
 
 - **调整现有武器**：在 Inspector 编辑 `resources/weapons/longsword.tres`、`resources/weapons/long_staff.tres` 或 `resources/weapons/yoyo.tres`。
 - **长剑类通用模板**：[swing_weapon_template.tres](resources/weapons/templates/swing_weapon_template.tres)，150° 扇形横扫。
@@ -46,8 +46,8 @@
 | 炼金台 | 用灵感买永久升级 | 已实现 |
 | 材料库 | 解锁 / 选择开局携带材料（初始 1 格，可解锁到 3 格） | 已实现 |
 | 难度祭坛 | 学徒 1.0x / 炼金师 1.2x / 大师 1.5x，通关一次解锁下一档 | 已实现 |
-| 训练场 | 无限材料试炼金 + 假人 | 已实现 |
-| 出发门 | 选武器 → 携带材料 → 难度 → 开始 | 已实现 |
+| 训练场 | 按 E 打开面板，**确认前往**独立试验场（假人 + 无限材料 + DPS 计数器） | 已实现 |
+| 出发门 | 选武器（列表显示真名与数值，选完立刻生效）→ 携带材料 → 难度 → 开始 | 已实现 |
 | 图鉴台 / 遗物架 / 成就墙 / 商店 | 只留接口 | 占位面板 |
 
 **永久升级**共 14 项（素材槽、背包、堆叠、基础时长、替换爆发、热量冷却、热量上限、吸附范围、逐元素等级、反应效果、过热损失、过热失效、快速预设、灵感留存 I~V），全部升满 **29100 灵感**，配置表见 [resources/workshop/permanent_upgrade_catalog.gd](resources/workshop/permanent_upgrade_catalog.gd)。
@@ -243,6 +243,8 @@ godot --headless --path . --script res://tools/test_map_integration.gd
 godot --headless --path . --script res://tests/test_minimap_layout.gd
 godot --headless --path . --script res://tests/test_minimap_room_world.gd
 godot --headless --path . --script res://tests/test_weapons.gd
+godot --headless --path . --script res://tests/test_combat_integration.gd
+godot --headless --path . --script res://tests/test_training_arena.gd
 ```
 
 ---
@@ -291,13 +293,13 @@ godot --headless --path . --script res://tests/test_weapons.gd
 | `friction` | 1800 | 松开按键后每秒衰减的速度 |
 | `collide_with_terrain` | true | 是否阻挡深水 / 浅水 / 森林 / 针叶林 / 雨林 / 山地 / 雪峰（道路格除外） |
 | `max_health` | 10 | 新世界初始最大生命；切换箱庭保留当前生命 |
-| `weapon_loadout` | 武器资源数组 | 按数组顺序循环装备，沿用现有武器参数与配置 |
+| `weapon_loadout` | 武器资源数组 | 可作为出发门选武器的候选项；进局按出发门选中的 id 装备，沿用现有武器参数与配置 |
 
 按住方向键约 **0.16 秒**到达最大速度（每帧 +23.3），松开约 **0.12 秒**停下（每帧 −30）。位移按 X/Y 分轴推进，贴着海岸走不会卡住。
 
 碰撞不查区块，而是直接问 `WorldGenerator` 这一格能不能站——生成函数是纯的，所以判定结果和画面永远一致，也不用等区块加载完。查询结果按格子缓存，一帧最多算两次。角色同时受当前箱庭矩形约束，道路和空地可走，不能越过山林边界或步行进入区域间隙。
 
-切换箱庭不会回满血；只有重建新世界才恢复生命。训练靶保留在起始箱庭，离开后隐藏并暂停，返回时恢复，继续沿用原来的伤害、击退与重生行为。
+切换箱庭不会回满血；只有重建新世界才恢复生命。起始箱庭不再放训练靶：假人、无限材料补充与 DPS 计数器都在训练场试验场（[scenes/workshop/training_arena.tscn](scenes/workshop/training_arena.tscn)）里。
 
 ---
 
@@ -307,7 +309,6 @@ godot --headless --path . --script res://tests/test_weapons.gd
 |------|------|
 | W A S D / 方向键 | 移动主角 |
 | 鼠标 / 左键 | 瞄准 / 挥剑，按住连续攻击 |
-| Q | 循环切换长剑 / 长棍 / 溜溜球 |
 | E | 靠近工坊交互点打开界面；局内非战斗时打开炼金台，战斗中短按复用配方、长按进入轮盘 |
 | F | 长按吸附场景可吸附元素（火盆 / 毒池 / 冰柱 / 藤蔓……） |
 | Tab | 打开背包；炼金台内循环切换素材槽 |

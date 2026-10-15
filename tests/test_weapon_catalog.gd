@@ -85,8 +85,12 @@ func _run() -> void:
 			installed_ids.append(equipped.id)
 	for id: StringName in ids:
 		_check(installed_ids.has(id), "玩家可轮换到 %s" % id)
-	# 轮换接口仍然可用。
-	_check(player.equip_next_weapon(), "武器轮换接口可用")
+	# Q 轮换已删除：武器改为按 id 装备（出发门选择后套用同一条路径）。
+	_check(player.equip_weapon_by_id(&"long_staff"), "按 id 装备武器接口可用")
+	_check(player.weapon_controller.equipped_weapon.id == &"long_staff", "按 id 装备后控制器同步")
+	_check(not player.equip_weapon_by_id(&"not_a_weapon"), "未知武器 id 装备失败")
+	_check(not player.equip_weapon_by_id(&""), "空武器 id 装备失败")
+	_check(player.weapon_controller.equipped_weapon.id == &"long_staff", "装备失败时保持原武器")
 	player.free()
 
 	# ── 真实挥砍命中 ────────────────────────────────────────────────────

@@ -29,13 +29,12 @@ func _run() -> void:
 	world.monster_spawner.process_mode = Node.PROCESS_MODE_DISABLED
 	var player: PlayerCharacter = world.player
 	var minimap: Minimap = world.hud.minimap
-	var dummy: TrainingDummy = world._training_dummy
 	var bag: Node = world.get_node("GameHUD/BagUi")
 	var alchemy: Node = world.get_node("GameHUD/Alchemy")
-	_check(dummy != null and dummy.is_visible_in_tree(), "开局训练靶仍可见")
+	_check(_training_dummy_count(world) == 0, "局内不再生成训练靶")
 	_check(bag != null and alchemy != null, "背包和炼金界面保留")
 	_check(player.weapon_controller.equipped_weapon.id == &"longsword", "原长剑配置保留")
-	_check(player.equip_next_weapon(), "武器循环接口仍可用")
+	_check(player.equip_weapon_by_id(&"long_staff"), "按 id 装备武器接口仍可用")
 	var equipped: WeaponDefinition = player.weapon_controller.equipped_weapon
 	_check(equipped.id == &"long_staff", "原长棍配置仍可装备")
 	_check((world.hud.get_node("WeaponLabel") as Label).text.contains(equipped.display_name), "原武器HUD信号仍同步")
@@ -50,10 +49,9 @@ func _run() -> void:
 	world._enter_map(2)
 	_check(player.health == remaining_health, "切换箱庭不会恢复生命值")
 	_check(player.weapon_controller.equipped_weapon == equipped, "切换箱庭保留装备")
-	_check(not dummy.is_visible_in_tree() and not dummy.can_process(), "离开初图后训练靶隐藏并暂停")
 	_check(is_instance_valid(drop) and not drop.is_visible_in_tree() and not drop.can_process(), "离图保存掉落物并隐藏暂停")
 	_check(drop.global_position.is_equal_approx(drop_position), "保存掉落物不改变所属地图坐标")
-	_check(minimap.is_expanded() and minimap._active_tiles_per_pixel == 1, "切图保持全屏探索地图")
+	_check(minimap.is_expanded(), "切图保持全屏房间图")
 	_check(world.get_node("GameHUD/BagUi") == bag and world.get_node("GameHUD/Alchemy") == alchemy, "切图保留背包与炼金实例")
 	for _frame: int in range(20):
 		await process_frame
@@ -63,13 +61,15 @@ func _run() -> void:
 			var local: Vector2i = tile - player.active_map.origin
 			_check(player.active_map.contains_local(local.x, local.y), "隐藏邻居预加载不会留下跨图怪物")
 	world._enter_map(0)
-	_check(world._training_dummy == dummy and dummy.is_visible_in_tree() and dummy.can_process(), "回初图恢复原训练靶")
 	_check(drop.is_visible_in_tree() and drop.can_process(), "回原箱庭恢复地上掉落物")
 	_check(drop.global_position.is_equal_approx(drop_position), "返回后掉落物位置保持")
 	_check(player.health == remaining_health, "原路返回也不会补满生命")
 	minimap.set_expanded(false)
-	_check(minimap._image.get_size() == Vector2i(128, 128), "全屏模式返回箱庭总览小地图")
-	_check(minimap._sampler.world_seed == world._generator.world_seed, "独立总览采样与世界种子一致")
+	_check(
+		minimap.visible_nodes() == MinimapLayout.window_nodes(minimap._slots, world._current_node, 2),
+		"收起后回到当前房间前后各 2 列"
+	)
+	_check(minimap._graph == world._generator.run, "小地图始终绑当前局内房间图")
 	player.collide_with_terrain = false
 	var outside: Vector2 = WorldGenerator.tile_to_world(player.active_map.origin - Vector2i.ONE)
 	_check(not player.can_stand_at(outside), "关闭地形碰撞仍不能进入箱庭间隙")
@@ -84,8 +84,16 @@ func _run() -> void:
 	_check(player.weapon_controller.weapon_changed.get_connections().size() == 1, "重建地图不重复绑定武器HUD")
 	await process_frame
 	_check(not is_instance_valid(drop), "重建世界清理上一世界地图掉落物")
-	_check(world._training_dummy != dummy and world._training_dummy.is_visible_in_tree(), "重建世界产生新的可见训练靶")
+	_check(_training_dummy_count(world) == 0, "重建世界也不会生成训练靶")
 	world.queue_free()
 	await process_frame
 	print("MAP_INTEGRATION: checks=%d failures=%d" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
+
+
+func _training_dummy_count(node: Node) -> int:
+	var count: int = 0
+	for child: Node in node.get_children():
+		if child is TrainingDummy:
+			count += 1
+	return count

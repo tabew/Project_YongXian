@@ -26,6 +26,8 @@ func _run() -> void:
 	_test_save_round_trip()
 	_test_panels()
 	_test_interactable()
+	# 放在最后：这条会真的换场景，跑完自己收尾。
+	await _test_departure_weapon_run_flow()
 	print("WORKSHOP: %d checks, %d failures" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
 
@@ -245,10 +247,28 @@ func _test_panels() -> void:
 
 	var departure := DepartureGatePanel.new()
 	departure.setup(manager)
-	departure.weapon_ids = [&"longsword", &"yoyo"]
+	departure.weapon_definitions = _departure_weapons()
 	root.add_child(departure)
 	departure.open()
 	_check(departure.content().get_child_count() >= 6, "出发门列出四段内容")
+	# 武器行必须显示真名与真数值：武器配置表里没有 .tres 真武器，
+	# 早前这里退化成空定义，三把真武器全显示成 "Weapon 伤害 18.0"，选哪把都看不出区别。
+	var names: Array[String] = []
+	for row: Node in _weapon_rows(departure):
+		names.append(String((row.get_child(0) as Label).text))
+	_check(names.size() == 3, "出发门列出 3 把武器")
+	_check(names[0].contains("长剑") and names[1].contains("长棍") and names[2].contains("巨剑"), "武器行显示真名")
+	_check(not names[0].contains("Weapon") and names[0].contains("18"), "长剑行显示真数值而不是默认占位")
+	var selected: Array = []
+	departure.weapon_selected.connect(func(weapon_id: StringName) -> void: selected.append(weapon_id))
+	var pick: Button = _weapon_button(departure, "长棍")
+	_check(pick != null, "长棍行有选择按钮")
+	if pick != null:
+		pick.pressed.emit()
+	_check(manager.selected_weapon_id == &"long_staff", "点选择后出发配置记录长棍")
+	_check(selected.size() == 1 and selected[0] == &"long_staff", "点选择后广播 weapon_selected")
+	var subtitle: Label = departure.get("_subtitle_label") as Label
+	_check(subtitle != null and subtitle.text.contains("长棍"), "副标题显示当前武器")
 	var started: Array = []
 	departure.start_run_requested.connect(func() -> void: started.append(true))
 	var start_button: Button = _last_button(departure.content())
@@ -258,9 +278,15 @@ func _test_panels() -> void:
 	var training := TrainingGroundPanel.new()
 	training.setup(manager)
 	root.add_child(training)
+	var travels: Array = []
+	training.travel_requested.connect(func() -> void: travels.append(true))
 	training.open()
-	_check(training.content().get_child_count() == MaterialCatalog.all_ids().size() + 1, "训练场列出全部材料 + 提示")
-	_check(training.content().get_child(1).get_child(1).disabled, "未注入主角时补充按钮禁用")
+	_check(training.content().get_child_count() == 2, "训练场只有说明 + 确认前往")
+	var travel_button: Button = _last_button(training.content())
+	_check(travel_button != null and travel_button.text == "确认前往", "训练场有确认前往按钮")
+	if travel_button != null:
+		travel_button.pressed.emit()
+	_check(travels.size() == 1, "确认前往广播前往试验场")
 
 	var placeholder := PlaceholderPanel.new()
 	placeholder.point_name = "图鉴台"
@@ -310,3 +336,100 @@ func _find_button(parent: Node, from_end: bool) -> Button:
 		if found != null:
 			return found
 	return null
+
+
+## 出发门可选武器：真武器来自 .tres，扩展武器来自配置表（和 Workshop 里的组装方式一致）。
+func _departure_weapons() -> Array[WeaponDefinition]:
+	var result: Array[WeaponDefinition] = [
+		load("res://resources/weapons/longsword.tres") as WeaponDefinition,
+		load("res://resources/weapons/long_staff.tres") as WeaponDefinition,
+		WeaponCatalog.definition_of(&"greatsword"),
+	]
+	return result
+
+
+## 出发门武器列表里的行（每行 = 说明 + 按钮）。
+func _weapon_rows(panel: DepartureGatePanel) -> Array[Node]:
+	var rows: Array[Node] = []
+	var list: Node = panel.get_node_or_null("Column/Scroll/Content/WeaponList/Rows")
+	if list == null:
+		return rows
+	for row: Node in list.get_children():
+		rows.append(row)
+	return rows
+
+
+## 按武器名找那一行的「选择 / 已选择」按钮。
+func _weapon_button(panel: DepartureGatePanel, weapon_name: String) -> Button:
+	for row: Node in _weapon_rows(panel):
+		if row.get_child_count() < 2:
+			continue
+		var label: Label = row.get_child(0) as Label
+		if label != null and label.text.contains(weapon_name):
+			return row.get_child(1) as Button
+	return null
+
+
+func _find_departure(node: Node) -> DepartureGatePanel:
+	if node is DepartureGatePanel:
+		return node as DepartureGatePanel
+	for child: Node in node.get_children():
+		var found: DepartureGatePanel = _find_departure(child)
+		if found != null:
+			return found
+	return null
+
+
+## 用户路径回归：工坊 → 出发门选武器 → 开始游戏 → 局内装备这把武器。
+## 出发门的选择存在灵感单例里，但换场景会重建主角，所以这条链路必须端到端验证。
+func _test_departure_weapon_run_flow() -> void:
+	root.size = Vector2i(1280, 720)
+	var manager: Node = root.get_node_or_null("Inspiration")
+	_check(manager != null, "存在灵感单例")
+	if manager == null:
+		return
+	manager.set("selected_weapon_id", &"longsword")
+	var workshop: Node2D = (load("res://scenes/workshop/workshop.tscn") as PackedScene).instantiate() as Node2D
+	root.add_child(workshop)
+	current_scene = workshop
+	await process_frame
+	await process_frame
+	var panel: DepartureGatePanel = _find_departure(workshop)
+	_check(panel != null, "工坊里挂着出发门面板")
+	if panel == null:
+		workshop.queue_free()
+		current_scene = null
+		await process_frame
+		return
+	panel.open()
+	await process_frame
+	var button: Button = _weapon_button(panel, "巨剑")
+	_check(button != null, "出发门列出巨剑")
+	if button != null:
+		button.pressed.emit()
+	await process_frame
+	_check(String(manager.get("selected_weapon_id")) == "greatsword", "选巨剑后写进出发配置")
+	var workshop_player: PlayerCharacter = workshop.get_node("Player") as PlayerCharacter
+	_check(workshop_player.weapon_controller.equipped_weapon.id == &"greatsword", "工坊主角立刻换上巨剑")
+	var start_button: Button = _last_button(panel.content())
+	_check(start_button != null and start_button.text == "开始游戏", "出发门有开始游戏按钮")
+	if start_button != null:
+		start_button.pressed.emit()
+	for _index: int in range(240):
+		await process_frame
+		if current_scene != workshop:
+			break
+	await process_frame
+	var player: PlayerCharacter = current_scene.get_node_or_null("Player") as PlayerCharacter if current_scene != null else null
+	_check(player != null, "开始游戏后进入局内")
+	if player != null:
+		_check(player.weapon_controller.equipped_weapon.id == &"greatsword", "局内装备出发门选中的巨剑")
+		var label: Label = current_scene.get_node_or_null("GameHUD/HUD/WeaponLabel") as Label
+		_check(label != null and label.text.contains("巨剑"), "局内 HUD 显示巨剑")
+	# 收尾：别把局内世界和暂停状态留给后面的测试。
+	paused = false
+	if current_scene != null:
+		current_scene.queue_free()
+		current_scene = null
+		await process_frame
+	manager.set("selected_weapon_id", &"longsword")

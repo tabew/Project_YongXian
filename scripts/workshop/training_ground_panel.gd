@@ -1,44 +1,34 @@
 class_name TrainingGroundPanel
 extends WorkshopPanel
 
-## 训练场：无限材料试炼金 + 假人测试。
+## 训练场交互点：只做一件事——确认前往独立的空旷试验场。
+##
+## 工坊里不再直接刷材料 / 摆假人：假人与无限材料都在试验场（training_arena.tscn）里，
+## 本面板只负责把「确认前往」的意图广播给 Workshop。
 
-## 由 Workshop 注入，用于把材料直接塞进炼金背包。
-var player: PlayerCharacter = null
+signal travel_requested
 
-const GRANT_AMOUNT: int = 99
+const TITLE: String = "训练场"
+const SUBTITLE: String = "前往独立试验场：假人 + 无限材料，随便试炼金"
 
 
 func _build_content(parent: VBoxContainer) -> void:
-	set_titles("训练场", "无限材料试炼金，右侧假人可打")
-	_build_rows(parent)
+	set_titles(TITLE, SUBTITLE)
+	parent.add_child(make_info_row(
+		"试验场里有返回工坊的按钮，以及无限材料补充。",
+		"空旷场地", Color(0.72, 0.76, 0.84)))
+	parent.add_child(make_row(
+		"前往独立试验场：一只打不死的假人 + 无限材料。",
+		"确认前往", _on_travel, true))
 
 
-func _build_rows(parent: VBoxContainer) -> void:
-	parent.add_child(make_info_row("提示", "补充的材料直接进炼金背包", Color(0.72, 0.76, 0.84)))
-	for material_id: int in MaterialCatalog.all_ids():
-		var description: String = MaterialCatalog.display_name_of(material_id)
-		var owned: int = _owned(material_id)
-		parent.add_child(make_row("%s　（背包 %d）" % [description, owned], "补充 %d" % GRANT_AMOUNT, _on_grant.bind(material_id), player != null))
-
-
-func _owned(material_id: int) -> int:
-	if player == null or player.alchemy_station == null:
-		return 0
-	return player.alchemy_station.bag.count(material_id)
-
-
-func _on_grant(material_id: int) -> void:
-	if player == null:
-		return
-	player.alchemy_station.absorb_material(material_id, GRANT_AMOUNT)
-	play_sfx(&"pickup_material")
-	refresh()
+func _on_travel() -> void:
+	play_sfx(&"ui_click")
+	travel_requested.emit()
 
 
 func refresh() -> void:
 	if _content == null:
 		return
 	clear_content()
-	set_titles("训练场", "无限材料试炼金，右侧假人可打")
-	_build_rows(_content)
+	_build_content(_content)

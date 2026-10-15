@@ -3,6 +3,8 @@ extends Node2D
 
 @export_range(0.1, 30.0, 0.1) var respawn_seconds: float = 2.0
 @export_range(0.0, 1.0, 0.05) var knockback_multiplier: float = 0.35
+## 固定木桩：打开后原地不动、不吃击退，只当伤害计量器（训练场试验场用）。
+@export var immobile: bool = false
 
 @onready var health: HealthComponent = $Health
 @onready var sprite: Sprite2D = $Sprite2D
@@ -30,6 +32,8 @@ func _physics_process(delta: float) -> void:
 			sprite.show()
 			health.reset()
 		return
+	if immobile:
+		return
 	var next_position: Vector2 = global_position + _velocity * delta
 	if terrain_source == null or terrain_source.is_walkable(WorldGenerator.world_to_tile(next_position)):
 		global_position = next_position
@@ -48,7 +52,8 @@ func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
 
 func _on_damaged(hit: CombatHit, actual_damage: float) -> void:
 	_play_sfx(&"hit_critical" if hit.critical else &"hit_wood", hit.position)
-	_velocity += hit.knockback * knockback_multiplier
+	if not immobile:
+		_velocity += hit.knockback * knockback_multiplier
 	if _flash != null and _flash.is_valid():
 		_flash.kill()
 	sprite.modulate = Color(1.0, 0.45, 0.45)

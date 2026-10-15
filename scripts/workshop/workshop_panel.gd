@@ -30,12 +30,13 @@ func _ready() -> void:
 
 
 func _build_frame() -> void:
-	custom_minimum_size = PANEL_SIZE
+	var panel_size: Vector2 = self.panel_size()
+	custom_minimum_size = panel_size
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	offset_left = -PANEL_SIZE.x * 0.5
-	offset_top = -PANEL_SIZE.y * 0.5
-	offset_right = PANEL_SIZE.x * 0.5
-	offset_bottom = PANEL_SIZE.y * 0.5
+	offset_left = -panel_size.x * 0.5
+	offset_top = -panel_size.y * 0.5
+	offset_right = panel_size.x * 0.5
+	offset_bottom = panel_size.y * 0.5
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.07, 0.08, 0.12, 0.97)
@@ -82,6 +83,11 @@ func _build_frame() -> void:
 	_footer.text = "Esc 关闭"
 
 	_build_content(_content)
+
+
+## 面板尺寸：子类可覆写（内容多的面板用更大的尺寸）。
+func panel_size() -> Vector2:
+	return PANEL_SIZE
 
 
 ## 子类重写：构建内容区。

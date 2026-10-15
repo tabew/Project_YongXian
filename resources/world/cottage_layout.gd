@@ -80,7 +80,7 @@ func _place_furniture(rng: RandomNumberGenerator) -> void:
 
 
 func _can_place(footprint: Rect2i) -> bool:
-	# 出生点及默认训练靶（中心向右三格）周围各留三格净空。
+	# 出生点周围留出 10×7 的净空，避免家具贴脸。
 	var safe_area := Rect2i(spawn_tile - Vector2i(3, 3), Vector2i(10, 7))
 	var doorway_path := Rect2i(spawn_tile - Vector2i(0, 2), Vector2i(bounds.end.x - spawn_tile.x, 5))
 	if footprint.intersects(safe_area) or footprint.intersects(doorway_path):

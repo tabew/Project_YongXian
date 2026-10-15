@@ -204,7 +204,7 @@ roll(来源, rng):
 | 内容 | 状态 |
 |------|------|
 | 区域主题配置 + 材料掉落联动 | 已完成（`region_theme_catalog.gd`，13 个主题，含抗性 / 弱点） |
-| 训练场 / 材料库 / 难度祭坛 3 档 | 已完成（`training_ground_panel.gd`、`material_vault_panel.gd`、`difficulty_altar_panel.gd`） |
+| 训练场 / 材料库 / 难度祭坛 3 档 | 已完成（`training_ground_panel.gd` 确认前往 `training_arena.tscn` 独立试验场；`material_vault_panel.gd`、`difficulty_altar_panel.gd`） |
 | 秘密房 + 词条门（数据） | 已完成（`secret_door.gd` 8 种门 + `room_data.secret_door`） |
 | 秘密房入口运行时 | 已完成：宿主房出口生成词条门（`scripts/items/secret_door_prop.gd`），未开门时封路，带对应词条敲开或按 E 开门 |
 | 图鉴台 / 遗物架 / 成就墙 / 商店 | 只留接口（`placeholder_panel.gd`） |
