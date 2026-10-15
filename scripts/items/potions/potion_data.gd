@@ -30,8 +30,13 @@ static func next_potion_id() -> int:
 	return potion_id
 
 
-func left_use(player:PlayerCharacter) -> int:
-	return 1
+##左键：药水不喝，也不投掷——真正的使用入口是右键投掷。
+##以前这里返回 1，选中药水时左键会静默扣掉一瓶（没有任何效果），
+##玩家会以为“药水用掉了却没反应”。真正的使用入口是右键投掷。
+func left_use(_player:PlayerCharacter) -> int:
+
+	return 0
+
 
 ##投掷药水，朝准心抛出去，撞到受击盒或地形才碎
 ##飞行由 PotionProjectile 每物理帧推进(刚体保持冻结，不依赖世界有没有物理地板)

@@ -12,6 +12,12 @@ const FALLBACK_VIEW_RADIUS: float = 512.0
 const SPIN_RADIANS_PER_SECOND: float = TAU
 ##地形逐格扫描步长(像素)
 const TERRAIN_STEP: float = 4.0
+##命中探测半径(像素)：药水有体积，判定用一个这么粗的圆扫过本帧位移。
+##只用零宽射线时，瓶心必须几乎正中受击盒才算命中，木桩那种小受击盒(半径10)很容易整颗漏过去，
+##表现出来就是“药水直接穿过木桩飞走”。
+const HIT_RADIUS: float = 6.0
+##一帧最多采样几个圆：采样间隔压到小于圆直径，掉帧时也不会整段跨过目标
+const HIT_SAMPLES_MAX: int = 12
 
 var _potion: ItemModel = null
 var _player: PlayerCharacter = null
@@ -21,6 +27,9 @@ var _burst_radius: float = 32.0
 var _burst_duration: float = 0.0
 var _attributes: Array[AlchemicalData] = []
 var _spin: float = SPIN_RADIANS_PER_SECOND
+##命中探测用的圆与查询参数：开始投掷时建一次，之后每帧只改 transform
+var _probe: PhysicsShapeQueryParameters2D = null
+var _probe_shape: CircleShape2D = null
 
 var _view_radius: float = FALLBACK_VIEW_RADIUS
 var _out_of_view_seconds: float = 0.0
@@ -38,6 +47,7 @@ func start(player: PlayerCharacter, direction: Vector2, speed: float, burst_radi
 	_attributes = attributes
 	_spin = SPIN_RADIANS_PER_SECOND if _direction.x >= 0.0 else -SPIN_RADIANS_PER_SECOND
 	_view_radius = _measure_view_radius()
+	_build_probe()
 	_out_of_view_seconds = 0.0
 	_done = false
 	set_physics_process(true)
@@ -60,6 +70,47 @@ func _physics_process(delta: float) -> void:
 	_tick_out_of_view(delta)
 
 
+##建命中探测：圆、掩码、排除投掷者都只算一次，之后每帧只更新 transform
+func _build_probe() -> void:
+
+	if not is_instance_valid(_potion):
+		return
+
+	_probe_shape = CircleShape2D.new()
+	_probe_shape.radius = HIT_RADIUS
+
+	_probe = PhysicsShapeQueryParameters2D.new()
+	_probe.shape = _probe_shape
+	_probe.collision_mask = _potion.collision_mask
+	_probe.collide_with_areas = true   #受击盒是 Area2D，和武器判定走同一条查询路径
+	_probe.collide_with_bodies = true
+
+	#投掷者自己不算障碍
+	if is_instance_valid(_player):
+		_probe.exclude = [_player.get_rid()]
+
+
+##这一小段位移里最早撞到东西的位置(0~1)，没有撞到返回 -1。
+##用带半径的圆沿位移采样，而不是零宽射线：受击盒普遍比瓶子视觉小，
+##射线要求两个中心点几乎共线，木桩那种小受击盒会被整颗漏过去。
+func _first_hit_fraction(from: Vector2, to: Vector2, span: float) -> float:
+
+	if _probe == null or not is_instance_valid(_potion):
+		return -1.0
+
+	var space: PhysicsDirectSpaceState2D = _potion.get_world_2d().direct_space_state
+	var samples: int = clampi(ceili(span / (HIT_RADIUS * 2.0)), 1, HIT_SAMPLES_MAX)
+
+	for index: int in range(1, samples + 1):
+		var fraction: float = float(index) / float(samples)
+		_probe.transform = Transform2D(0.0, from.lerp(to, fraction))
+
+		if not space.intersect_shape(_probe, 1).is_empty():
+			return fraction
+
+	return -1.0
+
+
 ##本段里最早的阻挡位置(0~1)，这一段没被挡到返回 -1
 func _first_block(from: Vector2, to: Vector2) -> float:
 	var span: float = from.distance_to(to)
@@ -68,19 +119,7 @@ func _first_block(from: Vector2, to: Vector2) -> float:
 	if span <= 0.001:
 		return impact
 
-	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from, to, _potion.collision_mask)
-
-	#投掷者自己不算障碍
-	if is_instance_valid(_player):
-		query.exclude = [_player.get_rid()]
-
-	#受击盒是 Area2D，不打开这个开关射线只能打到身体，打不到怪物
-	query.collide_with_areas = true
-
-	var contact: Dictionary = _potion.get_world_2d().direct_space_state.intersect_ray(query)
-
-	if not contact.is_empty():
-		impact = from.distance_to(contact["position"]) / span
+	impact = _first_hit_fraction(from, to, span)
 
 	#地形没有物理层，逐格问生成器
 	var segments: int = maxi(1, ceili(span / TERRAIN_STEP))
