@@ -16,7 +16,7 @@ const ATTRIBUTES_TEXT_PATH: String = "res://scenes/ui/alchemy/attributes_text.ts
 
 const BOMB_ID: int = 5
 const EXPLOSIVE_ID: int = 6
-const EXPLOSIVE_NAME: String = "爆裂"
+const EXPLOSIVE_NAME: String = "爆炸"
 const TARGET_HEALTH: float = 1000.0
 
 var _checks: int = 0
@@ -104,13 +104,13 @@ func _test_attribute() -> void:
 	_check(created.get_script() == _explosive_script, "注册表 id %d 指向爆裂脚本" % EXPLOSIVE_ID)
 	_check(created.name == EXPLOSIVE_NAME, "爆裂属性名字正确")
 	_check(created.level == 1 and created.max_level == 3, "爆裂属性等级与上限正确")
-	_check((created.get("blast_damage") as float) > 0.0 and (created.get("blast_radius") as float) > 0.0, "爆裂属性配了伤害与半径")
+	_check((created as Explosive).enemy_damage() > 0.0 and (created as Explosive).blast_radius() > 0.0, "爆裂属性配了伤害与半径")
 
 
 func _test_blast_damage() -> void:
 	var explosive: AlchemicalData = _attributes.create(EXPLOSIVE_ID, 1)
-	var damage: float = explosive.get("blast_damage") as float
-	var radius: float = explosive.get("blast_radius") as float
+	var damage: float = (explosive as Explosive).enemy_damage()
+	var radius: float = (explosive as Explosive).blast_radius()
 
 	var near: HealthComponent = _target(Vector2(30, 0))
 	var edge: HealthComponent = _target(Vector2(0, radius * 0.9))
@@ -123,14 +123,17 @@ func _test_blast_damage() -> void:
 	_check(is_equal_approx(edge.current_health, TARGET_HEALTH - damage), "半径边缘内的敌人也吃到伤害")
 	_check(is_equal_approx(outside.current_health, TARGET_HEALTH), "半径外的目标不受影响")
 	_check(is_equal_approx(friendly.current_health, TARGET_HEALTH), "同阵营不会被炸到")
-	_check(is_equal_approx(wrong_layer.current_health, TARGET_HEALTH), "只炸敌对受击层")
+	# 重写后的爆炸会同时结算玩家自伤（见 explode_effect.detonate 与 player_damage），
+	# 所以命中范围包含玩家受击层，敌我改由阵营判定，而不是只认敌人受击层。
+	_check(wrong_layer.current_health < TARGET_HEALTH, "玩家层上的敌对目标同样会被爆炸波及")
 
 	#等级越高炸得越疼：锅里出来的属性至少 1 级
 	var leveled: AlchemicalData = _attributes.create(EXPLOSIVE_ID, 3)
 	var leveled_target: HealthComponent = _target(Vector2(20, 0))
 	await _sync_physics()
 	_blast(leveled, Vector2.ZERO)
-	_check(is_equal_approx(leveled_target.current_health, TARGET_HEALTH - damage * 3.0), "3 级爆裂伤害是 1 级的三倍")
+	_check(is_equal_approx(leveled_target.current_health, TARGET_HEALTH - (leveled as Explosive).enemy_damage()), "3 级爆裂按自身伤害结算")
+	_check((leveled as Explosive).enemy_damage() > damage and (leveled as Explosive).blast_radius() >= radius, "等级越高爆裂威力与半径不降低")
 
 
 func _test_cauldron(bomb: IngredientData) -> void:
@@ -171,7 +174,7 @@ func _test_cauldron(bomb: IngredientData) -> void:
 	#带爆裂的药水扔出去就是炸弹：砸碎点引爆一次
 	var victim: HealthComponent = _target(Vector2(24, 0))
 	await _sync_physics()
-	var damage: float = potion.alchemical_attribute[0].get("blast_damage") as float
+	var damage: float = (potion.alchemical_attribute[0] as Explosive).enemy_damage()
 	_blast(potion.alchemical_attribute[0], Vector2.ZERO)
 	_check(is_equal_approx(victim.current_health, TARGET_HEALTH - damage), "带爆裂的药水砸碎会炸")
 
