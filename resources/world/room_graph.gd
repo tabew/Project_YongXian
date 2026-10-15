@@ -128,6 +128,7 @@ func _assign_main_types(seed_value: int, variant: int) -> void:
 		assignment[floor_index] = kind
 
 	_reconcile_key_counts(assignment, displaced)
+	_ensure_main_combat(assignment)
 
 	for floor_index: int in assignment.keys():
 		types[main_node_at(floor_index)] = assignment[floor_index]
@@ -235,6 +236,29 @@ func _reconcile_key_counts(assignment: Dictionary, displaced: Dictionary) -> voi
 		if kind == RoomType.Kind.REWARD and _count_kind(assignment, kind) >= config.max_rewards:
 			continue
 		_place_kind(assignment, kind, int(displaced[kind]))
+
+
+## 至少一个非 Boss 主线战斗房；先让出超额关键房间，再考虑可选事件房。
+func _ensure_main_combat(assignment: Dictionary) -> void:
+	for floor_index: int in assignment.keys():
+		if floor_index < floors.size() - 2 and assignment[floor_index] == RoomType.Kind.COMBAT:
+			return
+	var minimums: Dictionary = {
+		RoomType.Kind.SHOP: config.shop_count,
+		RoomType.Kind.REST: config.min_rests,
+		RoomType.Kind.REWARD: config.min_rewards,
+	}
+	for floor_index: int in range(floors.size() - 3, 0, -1):
+		var kind: int = assignment.get(floor_index, RoomType.Kind.COMBAT)
+		if minimums.has(kind) and _count_kind(assignment, kind) > int(minimums[kind]):
+			assignment[floor_index] = RoomType.Kind.COMBAT
+			return
+	for floor_index: int in _interior_floors():
+		if floor_index >= floors.size() - 2:
+			continue
+		if assignment.get(floor_index, RoomType.Kind.COMBAT) == RoomType.Kind.EVENT:
+			assignment[floor_index] = RoomType.Kind.COMBAT
+			return
 
 
 func _count_kind(assignment: Dictionary, kind: int) -> int:

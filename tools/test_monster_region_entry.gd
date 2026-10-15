@@ -74,14 +74,24 @@ func _run() -> void:
 		await process_frame
 		quit(1)
 		return
-	var victim: BaseMonster = world.monster_spawner.monsters[0]
+	var victim: BaseMonster = null
+	for actor: BaseMonster in world.monster_spawner.monsters:
+		if actor is GiveMonster:
+			victim = actor
+			break
+	_check(victim != null, "rainforest_combat_has_give_for_exclusive_loot_check")
+	if victim == null:
+		world.queue_free()
+		await process_frame
+		quit(1)
+		return
 	var killed_tile: Vector2i = WorldGenerator.world_to_tile(victim.global_position)
 	victim.kill()
 	var loot: GroundPickup = null
 	for child: Node in world.monster_spawner.get_children():
 		if child is GroundPickup:
 			loot = child
-	_check(loot != null and loot.data.id in [4, 5], "actual_combat_death_keeps_exclusive_loot")
+	_check(loot != null and loot.data in victim.death_loot.items, "actual_combat_death_keeps_exclusive_loot")
 	for back: Dictionary in world._generator.gate_links(target_id):
 		if back["target"] == 0:
 			_cross_gate(world, back)

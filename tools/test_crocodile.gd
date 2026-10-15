@@ -258,7 +258,7 @@ func _test_actual_world() -> void:
 	for definition: MonsterSpawnData in world.monster_spawner.spawn_definitions:
 		registered.append(definition.monster_id)
 	_check(registered.has(&"give") and registered.has(&"crocodile"), "game_registers_give_and_crocodile_in_same_spawner")
-	_check(world._generator.config.combat_biomes == PackedInt32Array([4,5,6,7,8]), "combat_biome_pool_includes_swamp_and_preserves_give_habitats")
+	_check(world._generator.config.combat_biomes == PackedInt32Array([4,5,6,7,8,10,11]), "combat_biome_pool_includes_swamp_snow_and_preserves_give_habitats")
 	_check(world.monster_spawner.monsters.is_empty(), "starting_cottage_remains_safe")
 	var target: MapSpec = null
 	for spec: MapSpec in world._generator.map_specs():
