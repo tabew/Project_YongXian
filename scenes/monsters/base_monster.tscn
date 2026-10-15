@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/monsters/base_monster.gd" id="1_monster"]
 [ext_resource type="Script" path="res://scripts/combat/health_component.gd" id="2_health"]
@@ -7,6 +7,7 @@
 [ext_resource type="AnimationNodeStateMachine" path="res://resources/monsters/monster_animation_state_machine.tres" id="5_states"]
 
 [ext_resource type="Shader" path="res://resources/monsters/hit_flash.gdshader" id="6_hit_flash"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_holder.gd" id="7_buffs"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hit_flash"]
 resource_local_to_scene = true
@@ -101,3 +102,6 @@ theme_override_styles/background = SubResource("StyleBox_background")
 theme_override_styles/fill = SubResource("StyleBox_fill")
 value = 100.0
 show_percentage = false
+
+[node name="Buffs" type="Node" parent="."]
+script = ExtResource("7_buffs")

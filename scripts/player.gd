@@ -40,6 +40,11 @@ var terrain_source: WorldGenerator = null
 var active_map: MapSpec = null
 var health: float = 10.0
 
+##受到的伤害倍率：1.0 表示正常，减伤类 buff 会把它调小
+var damage_taken: float = 1.0
+##防御：直接减伤，含义与怪物 HealthComponent.defense 一致
+var defense: float = 0.0
+
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
 var _cached_walkable: bool = true
@@ -184,9 +189,45 @@ func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec
 		health_changed.emit(health, float(max_health))
 
 
+##BuffHolder 读当前属性值（认基准用）
+func read_stat(stat: StringName) -> float:
+	match stat:
+		&"move_speed":
+			return max_speed
+		&"defense":
+			return defense
+		&"damage_taken":
+			return damage_taken
+	return 0.0
+
+
+##BuffHolder 把算好的值写回属性
+func apply_stat(stat: StringName, value: float) -> void:
+	match stat:
+		&"move_speed":
+			max_speed = value
+		&"defense":
+			defense = value
+		&"damage_taken":
+			damage_taken = value
+
+
+##持续恢复之类的定时效果走这里
+func heal(amount: float) -> void:
+	if amount <= 0.0 or health <= 0.0:
+		return
+	health = minf(health + amount, float(max_health))
+	health_changed.emit(health, float(max_health))
+
+
 func take_damage(amount: float) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
+	#先过 buff 的减伤倍率与防御，再扣血
+	amount = maxf(amount * damage_taken - defense, 0.0)
+	if amount <= 0.0:
+		return
+
 	_play_sfx(&"player_hurt", global_position)
 	health = maxf(health - amount, 0.0)
 	health_changed.emit(health, float(max_health))

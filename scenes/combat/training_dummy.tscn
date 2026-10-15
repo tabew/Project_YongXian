@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/combat/training_dummy.gd" id="1_dummy"]
 [ext_resource type="Texture2D" path="res://assets/combat/training_dummy.png" id="2_texture"]
 [ext_resource type="Script" path="res://scripts/combat/health_component.gd" id="3_health"]
 [ext_resource type="Script" path="res://scripts/combat/combat_hurtbox.gd" id="4_hurtbox"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_holder.gd" id="5_buffs"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_hurtbox"]
 radius = 10.0
@@ -28,3 +29,6 @@ team = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
 shape = SubResource("CircleShape2D_hurtbox")
+
+[node name="Buffs" type="Node" parent="."]
+script = ExtResource("5_buffs")
