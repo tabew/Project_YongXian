@@ -101,6 +101,7 @@ func try_attack() -> bool:
 	_attack.hit_landed.connect(_on_hit_landed)
 	add_child(_attack)
 	_attack.start(equipped_weapon, actor, team, aim_direction)
+	_play_sfx(_swing_sfx_id(equipped_weapon), actor.global_position)
 	attack_started.emit(equipped_weapon)
 	return true
 
@@ -113,3 +114,22 @@ func _on_attack_finished() -> void:
 
 func _on_hit_landed(hit: CombatHit, hurtbox: CombatHurtbox) -> void:
 	hit_landed.emit(hit, hurtbox)
+
+
+## 挥砍音效按 id 命名（swing_<武器 id>）；没有专属素材时退回通用挥砍声。
+func _swing_sfx_id(weapon: WeaponDefinition) -> StringName:
+	var candidate: StringName = StringName("swing_%s" % weapon.id)
+	return candidate if _has_sfx(candidate) else &"swing_generic"
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
+
+
+func _has_sfx(id: StringName) -> bool:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	return manager != null and bool(manager.call("has_sfx", id))

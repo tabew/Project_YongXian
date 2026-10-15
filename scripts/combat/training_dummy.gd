@@ -39,6 +39,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_damaged(hit: CombatHit, actual_damage: float) -> void:
+	_play_sfx(&"hit_critical" if hit.critical else &"hit_wood", hit.position)
 	_velocity += hit.knockback * knockback_multiplier
 	if _flash != null and _flash.is_valid():
 		_flash.kill()
@@ -73,6 +74,14 @@ func _on_died(_hit: CombatHit) -> void:
 
 func _on_health_changed(_current: float, _maximum: float) -> void:
 	queue_redraw()
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
 
 
 func _draw() -> void:
