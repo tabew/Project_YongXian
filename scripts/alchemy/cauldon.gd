@@ -37,13 +37,17 @@ func _get_attributes(body: Node2D) -> void:
 		var ingredient_data := (body as ItemModel).data
 
 		for i in ingredient_data.alchemical_attribute.size():
-			var attr = normalize_level(ingredient_data.alchemical_attribute[i])
-
-			attributes.append(attr)
+			var attr: AlchemicalData = ingredient_data.alchemical_attribute[i].duplicate()
+			attr.level = ingredient_data.alchemical_attribute[i].level
+			attributes.append(normalize_level(attr))
 
 			attributes_text.add_text(attr)
 
 		body.queue_free()
+
+		#材料本来就不在表里，unregister_instance 对它们是空操作
+		if ingredient_data != null:
+			ItemListGlobal.unregister_instance(ingredient_data.id)
 
 		# 投了新料
 		has_started = false
@@ -159,15 +163,20 @@ func create_from_attributes() -> PotionData:
 	var potion:PotionData = (base as PotionData).duplicate() as PotionData
 
 	#属性各自复制一份
-	potion.alchemical_attribute.clear()
+	potion.alchemical_attribute = []
 
 	for attribute:AlchemicalData in attributes:
 		if attribute == null:
 			continue
 
-		potion.alchemical_attribute.append(attribute.duplicate())
+		var attr = attribute.duplicate()
+		attr.level = attribute.level
+		potion.alchemical_attribute.append(attr)
 
 	potion.id = PotionData.next_potion_id()
+
+	while not ItemListGlobal.register_instance(potion):
+		potion.id = PotionData.next_potion_id()
 
 	return potion
 

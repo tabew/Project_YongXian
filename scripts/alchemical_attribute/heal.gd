@@ -33,5 +33,5 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 	return result
 			
 
-func use_effect(object:Node) -> void:
+func use_effect(object:Node = null) -> void:
 	pass

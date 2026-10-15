@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Explosive" format=3 uid="uid://culll21xgf8xm"]
+
+[ext_resource type="Script" uid="uid://d215mgiwgbdot" path="res://scripts/alchemical_attribute/explosive.gd" id="1_0i5uc"]
+
+[resource]
+script = ExtResource("1_0i5uc")
+attribute_id = 6
+name = "爆炸"
+max_level = 3
+need_target = false
+metadata/_custom_type_script = "uid://d215mgiwgbdot"

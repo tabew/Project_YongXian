@@ -52,6 +52,8 @@ func bag_update() ->void:
 		slot_node.quick_move_signal.connect(_on_slot_quick_move) #shift+左键：整堆挪进快捷栏
 		slot_node.slot_insert(slot_item_)
 
+		slot_node.tooltip_text = _build_item_tooltip(item)
+
 		item_for_button[item_id] = slot_node
 
 
@@ -123,3 +125,29 @@ func _input_update():
 			item_for_button[item_id].queue_free()
 		item_for_button.clear()
 		bag_update()
+
+##鼠标悬停提示的物品名，空一行后列出炼金属性。
+func _build_item_tooltip(item: ItemData) -> String:
+
+	if item == null:
+		return ""
+
+	var attribute_text:String = ""
+
+	for attribute:AlchemicalData in item.alchemical_attribute:
+
+		if attribute == null:
+			continue
+
+		if attribute_text != "":
+			attribute_text += "\n"
+
+		if attribute.level > 0:
+			attribute_text += str(attribute.name) + str(attribute.level)
+		else:
+			attribute_text += str(attribute.name)
+
+	if attribute_text == "":
+		return str(item.name) + "\n\n无属性"
+
+	return str(item.name) + "\n\n" + attribute_text

@@ -142,6 +142,8 @@ func left_use_handy_slot(player:PlayerCharacter) -> void:
 
     if consume > 0:
         remove_handy_slot(pos,consume)
+        if item_id>=300:
+           _drop_runtime_instance_if_gone(item_id)
 
     return
 
@@ -167,9 +169,27 @@ func right_use_handy_slot(player:PlayerCharacter) -> void:
 
     if consume > 0:
         remove_handy_slot(pos,consume)
+        if item_id>=300:
+           _drop_runtime_instance_if_gone(item_id)
 
     return
 #//////////////////////////////
+
+func _drop_runtime_instance_if_gone(item_id:int) ->void:
+
+    var registry:Node = get_registry_node()
+
+    if registry == null or not registry.has_runtime_instance(item_id):
+        return
+
+    if get_count(item_id) > 0:
+        return
+
+    for pos:int in HANDY_SLOT_COUNT:
+        if get_handy_slot_id(pos) == item_id:
+            return
+
+    registry.unregister_instance(item_id)
 
 ##把物品放进物品栏某格
 func add_handy_slot(pos:int,item_id:int,num:int = 1) ->bool:
