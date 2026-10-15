@@ -36,7 +36,7 @@ func _physics_process(delta: float) -> void:
 	radius = minf(radius + SPEED * delta,MAX_RADIUS)
 	if not _hit and _crosses_player(previous,radius) and _clear_to_player():
 		_hit = true
-		_target.take_damage(1.0)
+		_target.take_damage(_host.outgoing_damage(1.0))
 	queue_redraw()
 	if radius >= MAX_RADIUS:
 		_spend()

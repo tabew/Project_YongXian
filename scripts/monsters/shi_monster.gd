@@ -74,6 +74,10 @@ func is_group_member() -> bool:
 	return is_instance_valid(group_leader) and group_leader != self
 
 
+func is_distance_sleep_blocked() -> bool:
+	return _hop_active or super.is_distance_sleep_blocked()
+
+
 func _physics_process(delta: float) -> void:
 	if _shi_dead or is_group_member():
 		return

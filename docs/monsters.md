@@ -67,20 +67,22 @@ BaseMonster (CharacterBody2D)
 
 ## 生成流程
 
-1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player, active_map)`。
-2. `setup()` 清空旧怪物，订阅 `ChunkManager.chunk_applied`，并立即为所有已加载区块生成怪物。
+1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player, active_map, combat_entry)`。
+2. `setup()` 清空旧怪物，订阅 `ChunkManager.chunk_applied`；箱庭入口组立即实例化，其余已加载区块先确定原始生成格，再按每帧预算实例化。
 3. 每个区块内遍历 `spawn_definitions`；RNG 种子由世界种子、区块坐标和 `monster_id` 共同产生。
 4. `MonsterSpawnData.can_spawn_at()` 要求当前格可通行，且当前格群系在 `allowed_biomes` 中或列表为空。
 5. 生成成功时把怪物加入 spawner 子节点、`monsters` 存活数组和 `_monsters_by_chunk` 字典，并调用 `monster.configure(player, generator, chunk_coords)`。
-6. `tree_exited` 一次性连接会从存活数组与区块字典移除怪物；死亡或外部清理后不会留下失效引用。
+6. `tree_exited` 一次性连接会从存活数组与区块字典移除怪物；当前箱庭的空区块标记保留至切图，以防尚在队列的名额因同块最后一只怪死亡而丢失。
 
-当前 `GameWorld` 会让整张地图长期加载，所以切图时调用 `setup()` 替换当前地图的存活怪物，并关闭 `MonsterSpawner._process()` 里的距离回收逻辑。生成器自带按 `unload_radius + despawn_margin_chunks` 回收怪物的设计，仍可用于未来的动态世界或独立测试。
+当前 `GameWorld` 会让整张地图长期加载，切图时调用 `setup()` 替换当前地图的存活怪物。箱庭模式的 `MonsterSpawner._process()` 不做距离回收：入口组同步出现，其余区块先确定原始生成格，每帧最多实例化4只；远离玩家36格、处于巡逻且无技能/击退/警报的怪物暂停处理，玩家进入24格、受击或听到警报时恢复。睡眠前清除待处理路径，切图时清空未生成队列而保留本局击杀身份。独立测试和不指定 `active_map` 的流式世界仍同步生成；流式世界仍按 `unload_radius + despawn_margin_chunks` 回收怪物。高密度场景（种子18473的沼泽战斗区域，43只）物理帧基线约28毫秒，远距休眠后约7至15毫秒；首次进入的可见区块同步铺图仍有单独开销。
+
+怪物难度按本局进入**有敌人预算**的房间次数计算，与地图显示的楼层不同；每次返图也推进一次，安全房间不推进，同种子新开一局归零。第1至7次的累计倍率依次为 `1、1.5、2、2.4、2.8、3.1、3.4`；第 `n >= 8` 次使用 `3.4 + 0.7 * ln(1 + (n - 7) / 3)`，持续增长而逐步放缓。`BaseMonster.difficulty_entry` 和 `difficulty_multiplier` 存放在每只怪物实例上：首次生成时按倍率调整满生命和最大生命，所有近战、投石、粘液弹、接触及音波伤害从攻击来源读取倍率；移动速度、防御、掉落不受影响。入口组及排队生成的怪物都使用本次入房档位，原始生成位置和本局死亡记录不受倍率影响。
 
 本局击杀记录保存在 `MonsterSpawner._defeated_spawn_ids`，身份为 `monster_id + 原始生成格坐标`，巡逻或追击后的位置不会改变身份。`BaseMonster.kill()` 只在真正死亡时发出一次 `killed`；正常伤害死亡和 K 调试击杀都会记录，切图清理、距离回收、隐藏邻图裁剪则不会记录。重放区块的确定性生成序列时，死怪仍占用原有名额，所以返回旧箱庭既不会复活，也不会在另一个位置补刷替代怪物；未击杀的生成名额仍正常出现。连续调用 `setup()` 且使用同一生成器时保留记录，`build_world()` 创建新生成器时清空，包括使用相同种子重开一局。记录目前仅在本局内存中保存。
 
 正式战斗箱庭可通过 `gate_encounter_count` 配置稳定入口遭遇：“给”为2只，“史”为3只，鳄鱼仍按水域栖地规则。锚点取真实弯曲道路的入口落位点，向地图内侧偏移10格，再在同一区块内挑可通行格。该区块使用入口组替代随机内部分布，仍受 `max_per_chunk` 上限约束，死亡格占用原名额；入口组不依赖内部区块的稀疏生成概率，非战斗预算0时不启用。用户种子1741004498的第六层沼泽原来26只均远离入口，最近约79格，入口画面0只；修正后两侧入口均有3只史，战斗雨林两侧有“给”。
 
-正式箱庭在生成前通过 `active_map` 剔除邻图候选格，避免两个区域共享一个区块时，邻图先占满 `max_per_chunk` 名额再被地图裁剪，导致当前入口无怪。未传此参数的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
+正式箱庭在生成前通过 `active_map` 剔除邻图候选格，避免两个区域共享一个区块时，邻图先占满 `max_per_chunk` 名额再被地图裁剪，导致当前入口无怪。未传此参数的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数与待生成数量；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
 
 地图切换时，非怪物掉落物会保存到所属地图的 `MapEntities_<map_id>` 根节点；离开当前箱庭后隐藏并暂停，返回后恢复。每帧 `GameWorld._confine_map_monsters()` 会把怪物位置限制在当前地图矩形内，已加载的隐藏邻图也不会留下跨图怪物。
 

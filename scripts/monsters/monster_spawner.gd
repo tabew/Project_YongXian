@@ -6,6 +6,11 @@ extends Node2D
 
 @export var spawn_definitions: Array[MonsterSpawnData] = []
 @export_range(0, 16, 1) var despawn_margin_chunks: int = 2
+@export_group("密集区域性能")
+@export_range(1, 16, 1) var spawns_per_frame: int = 4
+@export_range(8, 64, 1) var wake_distance_tiles: int = 24
+@export_range(8, 96, 1) var sleep_distance_tiles: int = 36
+const ACTIVITY_SCAN_INTERVAL: float = 0.25
 
 ## 当前仍有效的全部怪物；怪物退出场景树时自动移除引用。
 var monsters: Array[BaseMonster] = []
@@ -22,13 +27,20 @@ var _gate_encounter_anchors: Array[Vector2i] = []
 var _monsters_by_chunk: Dictionary = {}
 ## 本局死亡记录按原始生成位置保存，巡逻/追击后的位置不影响身份。
 var _defeated_spawn_ids: Dictionary = {}
+var _pending_spawns: Array[Dictionary] = []
+var _sleeping_monsters: Dictionary = {}
+var _activity_scan_remaining: float = 0.0
+var _defer_non_gate_spawns: bool = false
+var difficulty_entry: int = 1
 
 
 func setup(
 	generator: WorldGenerator,
 	chunk_manager: ChunkManager,
 	player: PlayerCharacter,
-	active_map: MapSpec = null
+	active_map: MapSpec = null,
+	combat_entry: int = 1,
+	defer_during_transition: bool = false
 ) -> void:
 	# 同一生成器代表同一局；切换箱庭保留记录，新开世界（包括相同种子）重置。
 	if generator != _generator:
@@ -37,6 +49,9 @@ func setup(
 	_generator = generator
 	_player = player
 	_active_map = active_map
+	difficulty_entry = maxi(combat_entry, 1)
+	_defer_non_gate_spawns = _active_map != null and is_processing() and (can_process() or defer_during_transition)
+	_activity_scan_remaining = 0.0
 	_gate_encounter_anchors.clear()
 	if _active_map != null:
 		_gate_encounter_anchors.append(WorldGenerator.world_to_tile(_generator.entry_position(_active_map.node_id, -1, _active_map.west_gate_y)) + Vector2i(10, 0))
@@ -52,8 +67,20 @@ func setup(
 		_on_chunk_applied(coords)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _chunk_manager == null or not is_instance_valid(_player):
+		return
+	if _active_map != null:
+		for index: int in mini(spawns_per_frame, _pending_spawns.size()):
+			var planned: Dictionary = _pending_spawns.pop_front()
+			var coords: Vector2i = planned["chunk"]
+			if _monsters_by_chunk.has(coords):
+				spawn_monster(planned["definition"], planned["tile"], coords)
+		_activity_scan_remaining -= delta
+		if _activity_scan_remaining <= 0.0:
+			_activity_scan_remaining = ACTIVITY_SCAN_INTERVAL
+			for monster: BaseMonster in monsters:
+				_update_monster_activity(monster)
 		return
 	var player_chunk: Vector2i = WorldGenerator.tile_to_chunk(
 		WorldGenerator.world_to_tile(_player.global_position)
@@ -63,6 +90,44 @@ func _process(_delta: float) -> void:
 		var distance: Vector2i = (coords - player_chunk).abs()
 		if maxi(distance.x, distance.y) > limit:
 			_remove_chunk_monsters(coords)
+
+
+func _update_monster_activity(monster: BaseMonster) -> void:
+	if not is_instance_valid(monster) or monster.is_queued_for_deletion() or not monster.visible:
+		return
+	var distance_squared: float = monster.global_position.distance_squared_to(_player.global_position)
+	var wake_pixels: float = float(wake_distance_tiles * WorldGenerator.TILE_SIZE)
+	var sleep_pixels: float = float(maxi(sleep_distance_tiles, wake_distance_tiles + 1) * WorldGenerator.TILE_SIZE)
+	var suspicious: bool = monster.blackboard != null and monster.blackboard.has_suspicious_event
+	if _sleeping_monsters.has(monster):
+		if distance_squared <= wake_pixels * wake_pixels or suspicious:
+			_wake_monster(monster)
+		return
+	if monster.process_mode != Node.PROCESS_MODE_INHERIT or distance_squared < sleep_pixels * sleep_pixels:
+		return
+	if monster.get_ai_state() != EnemyState.State.PATROL or monster.is_receiving_knockback() or monster.is_distance_sleep_blocked() or suspicious:
+		return
+	if monster.attack != null and monster.attack.is_busy():
+		return
+	if monster.navigator != null:
+		monster.navigator.clear()
+	monster.velocity = Vector2.ZERO
+	monster.process_mode = Node.PROCESS_MODE_DISABLED
+	_sleeping_monsters[monster] = true
+
+
+func _wake_monster(monster: BaseMonster) -> void:
+	if not _sleeping_monsters.erase(monster) or not is_instance_valid(monster):
+		return
+	monster.process_mode = Node.PROCESS_MODE_INHERIT
+
+
+func _on_monster_health_changed(_current: float, _maximum: float, monster: BaseMonster) -> void:
+	_wake_monster(monster)
+
+
+func wake_for_suspicious_event(monster: BaseMonster) -> void:
+	_wake_monster(monster)
 
 
 func _on_chunk_applied(coords: Vector2i) -> void:
@@ -112,11 +177,17 @@ func _spawn_definition_in_chunk(
 			occupied[tile] = true
 			spawned += 1
 			continue
-		var monster: BaseMonster = spawn_monster(definition, tile, coords)
-		if monster == null:
+		if not _place_non_gate_monster(definition, tile, coords):
 			continue
 		occupied[tile] = true
 		spawned += 1
+
+
+func _place_non_gate_monster(definition: MonsterSpawnData, tile: Vector2i, coords: Vector2i) -> bool:
+	if _defer_non_gate_spawns:
+		_pending_spawns.append({"definition": definition, "tile": tile, "chunk": coords})
+		return true
+	return spawn_monster(definition, tile, coords) != null
 
 
 ## 入口内侧10格、道路附近的确定遭遇点，使用原生成身份且占用区块名额。
@@ -170,7 +241,7 @@ func _spawn_independent_slots(definition: MonsterSpawnData, coords: Vector2i, oc
 				continue
 			occupied[tile] = true
 			if not _defeated_spawn_ids.has(_spawn_id(definition, tile)):
-				spawn_monster(definition, tile, coords)
+				_place_non_gate_monster(definition, tile, coords)
 			# 死亡的原始格也消耗本名额，切图后不会重新选择替代怪物。
 			break
 
@@ -200,8 +271,14 @@ func spawn_monster(
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
 	monster.killed.connect(_on_monster_killed.bind(spawn_id), CONNECT_ONE_SHOT)
+	var health := monster.get_node_or_null("Health") as HealthComponent
+	if health != null:
+		health.health_changed.connect(_on_monster_health_changed.bind(monster))
 
 	monster.configure(_player, _generator, chunk_coords)
+	monster.apply_difficulty(difficulty_entry)
+	if _defer_non_gate_spawns:
+		_update_monster_activity(monster)
 	return monster
 
 
@@ -230,6 +307,8 @@ func allows_spawn_at(tile: Vector2i) -> bool:
 
 
 func clear_monsters() -> void:
+	_pending_spawns.clear()
+	_sleeping_monsters.clear()
 	for monster: BaseMonster in monsters.duplicate():
 		if is_instance_valid(monster):
 			if monster.get_parent() == self:
@@ -241,6 +320,10 @@ func clear_monsters() -> void:
 
 func get_spawned_monster_count() -> int:
 	return monsters.size()
+
+
+func get_pending_spawn_count() -> int:
+	return _pending_spawns.size()
 
 
 func _remove_chunk_monsters(coords: Vector2i) -> void:
@@ -255,10 +338,11 @@ func _remove_chunk_monsters(coords: Vector2i) -> void:
 
 
 func _on_monster_exited(monster: BaseMonster, chunk_coords: Vector2i) -> void:
+	_sleeping_monsters.erase(monster)
 	monsters.erase(monster)
 	if not _monsters_by_chunk.has(chunk_coords):
 		return
 	var chunk_monsters: Array = _monsters_by_chunk[chunk_coords]
 	chunk_monsters.erase(monster)
-	if chunk_monsters.is_empty():
+	if chunk_monsters.is_empty() and _active_map == null:
 		_monsters_by_chunk.erase(chunk_coords)
