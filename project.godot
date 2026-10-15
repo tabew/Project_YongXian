@@ -26,6 +26,7 @@ AlchemicalAttributeList="*uid://k5lsvl6bbbgk"
 ItemListGlobal="*uid://cyg4u48sj4d7i"
 PerceptionManager="*res://scripts/monsters/ai/perception_manager.gd"
 PathRequestScheduler="*res://scripts/monsters/ai/path_request_scheduler.gd"
+AudioManager="*res://autoloads/audio_manager.gd"
 
 [display]
 

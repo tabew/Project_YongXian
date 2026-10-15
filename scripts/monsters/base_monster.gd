@@ -332,6 +332,9 @@ func _update_visual_pose() -> void:
 
 
 func _on_monster_damaged(hit: CombatHit, _actual_damage: float) -> void:
+	# 命中音由受击方决定，这样不同材质的怪物可以换不同音色。
+	_play_sfx(&"hit_critical" if hit.critical else &"hit_flesh", hit.position)
+	_play_sfx(&"monster_hurt", global_position)
 	_hit_flash_remaining = hit_flash_duration
 	_update_hit_flash()
 	var health_component := get_node_or_null("Health") as HealthComponent
@@ -357,7 +360,17 @@ func _hit_source_position(hit: CombatHit) -> Vector2:
 
 
 func _on_monster_died(_hit: CombatHit) -> void:
+	# 只有被打死才出声；调试用的全灭指令保持安静。
+	_play_sfx(&"monster_die", global_position)
 	kill()
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
 
 
 # --- 动画 -------------------------------------------------------------------

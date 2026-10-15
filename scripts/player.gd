@@ -187,11 +187,13 @@ func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec
 func take_damage(amount: float) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
+	_play_sfx(&"player_hurt", global_position)
 	health = maxf(health - amount, 0.0)
 	health_changed.emit(health, float(max_health))
 	_notify("受到 %s 点伤害，剩余生命 %s/%s" % [str(amount), str(health), str(max_health)])
 	if health <= 0.0:
 		velocity = Vector2.ZERO
+		_play_sfx(&"player_defeat")
 		defeated.emit()
 		_notify("生命归零")
 
@@ -200,6 +202,14 @@ func _notify(message: String) -> void:
 	var event_bus: Node = get_node_or_null("/root/EventBus")
 	if event_bus != null and event_bus.has_signal("notification"):
 		event_bus.emit_signal("notification", message)
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载（与 _notify 的 EventBus 一致）。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
 
 
 func _update_facing() -> void:

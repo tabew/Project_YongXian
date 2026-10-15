@@ -59,6 +59,7 @@ func _process(_delta: float) -> void:
 		if (side < 0 and local.x <= 1) or (side > 0 and local.x >= spec.extent.x - 2):
 			var carried_velocity: Vector2 = player.velocity
 			_enter_map(link["target"], link["arrival_side"], link["arrival_y"])
+			AudioManager.play_sfx(&"gate_transition")
 			# 落点与出口带分离，按住同方向即可走进新箱庭，不会立即弹回。
 			player.velocity = carried_velocity
 			EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
@@ -112,6 +113,7 @@ func build_world(seed_value: int) -> void:
 	if debug_map_report:
 		print(MapDebug.report(_generator))
 	EventBus.world_ready.emit(_generator.world_seed)
+	AudioManager.play_music(&"music_wilds")
 
 
 ## 从当前怪物定义取群系并集；新增怪物后地图会自动支持其战斗主题。

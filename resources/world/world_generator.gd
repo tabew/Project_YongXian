@@ -237,9 +237,53 @@ func _assign_region_biomes() -> void:
 					swamp_target = spec
 		if not has_swamp_combat and swamp_target != null:
 			swamp_target.biome_id = Biome.Kind.SWAMP
+	_reserve_snow_combat()
 	for spec: MapSpec in _specs:
 		spec.boundary_kind = RegionBiomes.boundary_for(spec.biome_id)
 		spec.ensure_swamp_water()
+
+
+## 主线上安排兔子战斗区域；不挤占雨林、沼泽或安全房间。
+func _reserve_snow_combat() -> void:
+	var chosen_biome: int = Biome.Kind.SNOWY_PLAINS
+	if not config.combat_biomes.has(chosen_biome):
+		chosen_biome = Biome.Kind.TUNDRA
+	if not config.combat_biomes.has(chosen_biome):
+		return
+	var target: MapSpec = null
+	var protected_main: MapSpec = null
+	for spec: MapSpec in _specs:
+		if run.type_of(spec.node_id) != RoomType.Kind.COMBAT or not run.is_main_path(spec.node_id):
+			continue
+		if RunGraph.floor_of(spec.node_id) >= run.floors.size() - 2:
+			continue
+		if spec.biome_id in [Biome.Kind.SNOWY_PLAINS, Biome.Kind.TUNDRA]:
+			return
+		if spec.biome_id in [Biome.Kind.TROPICAL_RAINFOREST, Biome.Kind.SWAMP]:
+			if protected_main == null:
+				protected_main = spec
+		elif target == null:
+			target = spec
+	if target != null:
+		target.biome_id = chosen_biome
+		return
+	var branch: MapSpec = null
+	for spec: MapSpec in _specs:
+		if run.type_of(spec.node_id) != RoomType.Kind.COMBAT or run.is_main_path(spec.node_id):
+			continue
+		if spec.biome_id in [Biome.Kind.SNOWY_PLAINS, Biome.Kind.TUNDRA]:
+			branch = spec
+			break
+		if branch == null and spec.biome_id not in [Biome.Kind.TROPICAL_RAINFOREST, Biome.Kind.SWAMP]:
+			branch = spec
+	if branch == null:
+		return
+	if protected_main == null:
+		branch.biome_id = chosen_biome
+		return
+	var preserved_biome: int = protected_main.biome_id
+	protected_main.biome_id = branch.biome_id if branch.biome_id in [Biome.Kind.SNOWY_PLAINS, Biome.Kind.TUNDRA] else chosen_biome
+	branch.biome_id = preserved_biome
 
 
 func _index_bounds(bins: Dictionary, bounds: Rect2, item: Variant) -> void:

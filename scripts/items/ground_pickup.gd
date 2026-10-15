@@ -50,6 +50,7 @@ func collect(player: PlayerCharacter) -> bool:
 	_collected = true
 	_update_throwable_group()
 	player.inventory.add_item(data.id, amount)
+	_play_sfx(&"pickup_material", global_position)
 	collected.emit(data.id, amount)
 	visible = false
 	queue_free()
@@ -92,6 +93,7 @@ func throw_at(target: Node2D, damage: int) -> bool:
 	set_highlighted(false)
 	_update_throwable_group()
 	set_physics_process(true)
+	_play_sfx(&"stone_throw", global_position)
 	return true
 
 
@@ -137,6 +139,15 @@ func _finish_throw() -> void:
 	_throw_target = null
 	set_physics_process(false)
 	_update_visual()
+	_play_sfx(&"stone_land", global_position)
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _play_sfx(id: StringName, position: Vector2 = Vector2.INF) -> void:
+	var manager: Node = get_node_or_null("/root/AudioManager")
+	if manager != null:
+		manager.call("play_sfx", id, position)
 
 
 ## 枚举整段扫过的格子，含恰好擦过的对角格，避免高速投石穿过虚拟地形墙。

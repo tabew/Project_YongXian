@@ -8,8 +8,11 @@ extends Control
 
 
 func _ready() -> void:
+	AudioManager.play_music(&"music_menu")
 	btn_start.pressed.connect(_on_start_pressed)
 	btn_quit.pressed.connect(_on_quit_pressed)
+	for button: Button in [btn_start, btn_quit]:
+		button.mouse_entered.connect(func() -> void: AudioManager.play_sfx(&"ui_hover"))
 
 	version_label.text = "v" + str(
 		ProjectSettings.get_setting("application/config/version", "0.1.0")
@@ -23,9 +26,11 @@ func _ready() -> void:
 
 
 func _on_start_pressed() -> void:
+	AudioManager.play_sfx(&"ui_click")
 	GameState.start_new_world()
 	SceneManager.change_scene("res://scenes/game/game_world.tscn")
 
 
 func _on_quit_pressed() -> void:
+	AudioManager.play_sfx(&"ui_click")
 	get_tree().quit()

@@ -11,6 +11,7 @@ enum ATTRIBUTE
 	MINERAL = 3,
 	WOODY = 4,
 	BINDING = 5,
+	EXPLOSIVE = 6,
 }
 
 
@@ -23,7 +24,8 @@ enum ATTRIBUTE
 	preload("res://resources/alchemical_attribute/continuous_heal.tres"),
 	preload("res://resources/alchemical_attribute/mineral.tres"),
 	preload("res://resources/alchemical_attribute/woody.tres"),
-	preload("res://resources/alchemical_attribute/binding.tres")
+	preload("res://resources/alchemical_attribute/binding.tres"),
+	preload("res://resources/alchemical_attribute/explosive.tres")
 ]
 
 ##id -> 模板

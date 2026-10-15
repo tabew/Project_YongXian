@@ -131,6 +131,7 @@ Project_YongXian/
 godot --headless --path . --script res://tools/test_transitions_materials.gd
 godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
 godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
+godot --headless --path . --script res://tools/test_bomb_material.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
 godot --headless --path . --script res://tools/test_map_integration.gd
@@ -264,9 +265,13 @@ python tools/generate_art.py
 
 鳄鱼“饿”使用 `crocodile_monster.tscn` 继承模板，100生命，沼泽原始名额90%水中、10%水边5格内陆地。10格视野，水中巡逻、上岸追击，陆地速度为水中60%；1.5格内咬击造成2伤害，0.18秒前摇、0.4秒动作、1秒冷却。专用 AnimationTree 连接 Idle/Swim/Walk/Attack/Hurt/Death，水中摆尾与四足爬行动作分别驱动，身体和受击胶囊同外观一起转向。死亡单次三选一：鳄鱼眼睛10%、鳄鱼壳60%、锋利牙齿30%；返图不补刷。
 
+雪地白兔“啥杯”继承通用怪物模板，80生命，只在苔原和雪原战斗区域生成，使用模板默认10格仇恨视野。专属脚本驱动两次0.22秒低跳后休息1秒；进入15格攻击距离且无遮挡时原地尖叫4秒，每隔0.8秒释放一层朝向玩家的60度扇形音波，共5层。每层独立从发射点向外传播15格，单层最多命中玩家一次、造成1点伤害，地形/墙体可阻挡；尖叫可被受击打断，随后沿模板寻路逃离玩家，超出15格后在当前位置恢复巡逻。专属 AnimationTree 使用 Idle/Hop/Rest/Scream/Hurt/Death，死亡三选一掉兔皮30%、啥杯肉50%、胡萝卜“操操操。！”20%（材料ID11至13）。
+
 回归测试：
 
 ```
+godot --headless --path . --script res://tools/test_shabei_monster.gd
+godot --headless --path . --script res://tools/test_rabbit_combat_route.gd
 godot --headless --path . --script res://tools/test_crocodile.gd
 godot --headless --path . --script res://tools/test_shi_monster.gd
 godot --headless --path . --script res://tools/test_swamp_performance.gd
