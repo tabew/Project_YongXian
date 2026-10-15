@@ -13,7 +13,7 @@ var _highlighted: bool = false
 var _generator: WorldGenerator = null
 var _in_flight: bool = false
 var _throw_target: Node2D = null
-var _throw_damage: int = 0
+var _throw_damage: float = 0.0
 var _throw_start: Vector2 = Vector2.ZERO
 var _throw_destination: Vector2 = Vector2.ZERO
 var _throw_elapsed: float = 0.0
@@ -66,7 +66,7 @@ func can_be_thrown() -> bool:
 
 
 ## 使用现有地面石头作为弹体，落地后仍是同一份材料；目标位置在出手时固定。
-func throw_at(target: Node2D, damage: int) -> bool:
+func throw_at(target: Node2D, damage: float) -> bool:
 	if not can_be_thrown() or not is_instance_valid(target):
 		return false
 	if amount > 1:
@@ -85,7 +85,7 @@ func throw_at(target: Node2D, damage: int) -> bool:
 		reparent(owner_node.get_parent(), true)
 	_in_flight = true
 	_throw_target = target
-	_throw_damage = maxi(damage, 0)
+	_throw_damage = maxf(damage, 0.0)
 	_throw_start = global_position
 	_throw_destination = target.global_position
 	_throw_elapsed = 0.0

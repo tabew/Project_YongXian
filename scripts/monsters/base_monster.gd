@@ -5,6 +5,9 @@ extends CharacterBody2D
 signal killed
 
 var _death_committed: bool = false
+var difficulty_entry: int = 1
+var difficulty_multiplier: float = 1.0
+var _difficulty_applied: bool = false
 
 ## 所有怪物共用的模板：生命、受击、动画、感知/寻路原语，以及通用四状态 AI 的装配。
 ##
@@ -283,6 +286,27 @@ func _on_ai_path_ready(result: Array[Vector2i], request_generation: int) -> void
 ## 子类调用 super._physics_process() 后应优先处理这一状态，避免 AI 覆盖击退。
 func is_receiving_knockback() -> bool:
 	return _knockback_remaining > 0.0 or _knockback_applied_this_frame
+
+
+func is_distance_sleep_blocked() -> bool:
+	return not is_zero_approx(_visual_height)
+
+
+func apply_difficulty(entry: int) -> void:
+	if _difficulty_applied:
+		return
+	_difficulty_applied = true
+	difficulty_entry = maxi(entry, 1)
+	difficulty_multiplier = MonsterDifficulty.multiplier_for_entry(difficulty_entry)
+	var health := get_node_or_null("Health") as HealthComponent
+	if health != null and not is_equal_approx(difficulty_multiplier, 1.0):
+		health.max_health *= difficulty_multiplier
+		health.current_health = health.max_health
+		health.health_changed.emit(health.current_health, health.max_health)
+
+
+func outgoing_damage(base_damage: float) -> float:
+	return base_damage * difficulty_multiplier
 
 
 # --- 受击反馈 ---------------------------------------------------------------

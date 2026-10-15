@@ -271,6 +271,8 @@ python tools/generate_art.py
 回归测试：
 
 ```
+godot --headless --path . --script res://tools/test_monster_difficulty.gd
+godot --headless --path . --script res://tools/test_monster_activity_budget.gd
 godot --headless --path . --script res://tools/test_shabei_monster.gd
 godot --headless --path . --script res://tools/test_rabbit_combat_route.gd
 godot --headless --path . --script res://tools/test_crocodile.gd

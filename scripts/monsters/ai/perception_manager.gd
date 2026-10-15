@@ -62,3 +62,6 @@ func _on_suspicious_event(position: Vector2, radius: float, _source: Node = null
 			continue
 		if monster.global_position.distance_to(position) <= hearing:
 			monster.report_suspicious(position)
+			var owner: Node = monster.get_parent()
+			if owner != null and owner.has_method("wake_for_suspicious_event"):
+				owner.call("wake_for_suspicious_event", monster)
