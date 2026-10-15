@@ -39,7 +39,8 @@ func setup(
 	chunk_manager: ChunkManager,
 	player: PlayerCharacter,
 	active_map: MapSpec = null,
-	combat_entry: int = 1
+	combat_entry: int = 1,
+	defer_during_transition: bool = false
 ) -> void:
 	# 同一生成器代表同一局；切换箱庭保留记录，新开世界（包括相同种子）重置。
 	if generator != _generator:
@@ -49,7 +50,7 @@ func setup(
 	_player = player
 	_active_map = active_map
 	difficulty_entry = maxi(combat_entry, 1)
-	_defer_non_gate_spawns = _active_map != null and is_processing() and can_process()
+	_defer_non_gate_spawns = _active_map != null and is_processing() and (can_process() or defer_during_transition)
 	_activity_scan_remaining = 0.0
 	_gate_encounter_anchors.clear()
 	if _active_map != null:

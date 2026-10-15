@@ -115,22 +115,47 @@ func _run() -> void:
 		if candidate != null:
 			root.get_node("EventBus").emit_signal(&"noise_reported", candidate.global_position, 16.0, world.player)
 			check(candidate.process_mode == Node.PROCESS_MODE_INHERIT and candidate.blackboard.has_suspicious_event, "heard_noise_wakes_dormant_actor_immediately")
-			candidate.blackboard.has_suspicious_event = false
-			spawner._update_monster_activity(candidate)
-			check(candidate.process_mode == Node.PROCESS_MODE_DISABLED, "distant_actor_can_sleep_again_after_alert")
-			var dead_tile: Vector2i = WorldGenerator.world_to_tile(candidate.global_position)
-			var definition: MonsterSpawnData = null
-			for possible: MonsterSpawnData in spawner.spawn_definitions:
-				if (candidate is CrocodileMonster and possible.monster_id == &"crocodile") or (candidate is ShiMonster and possible.monster_id == &"shi"):
-					definition = possible
+			var victim: BaseMonster = null
+			for actor: BaseMonster in spawner.monsters:
+				if actor != candidate and actor.process_mode == Node.PROCESS_MODE_DISABLED:
+					victim = actor
 					break
-			check(definition != null, "dormant_victim_species_is_registered")
-			candidate.kill()
-			check(definition != null and spawner._defeated_spawn_ids.has(spawner._spawn_id(definition, dead_tile)), "sleeping_victim_records_death")
-			world._enter_map(0)
-			world._enter_map(target.node_id)
-			await wait_for_room(world)
-			check(definition != null and spawner.spawn_monster(definition, dead_tile) == null, "return_does_not_revive_sleeping_victim")
+			check(victim != null, "another_dormant_actor_remains_after_alert")
+			if victim != null:
+				var definition: MonsterSpawnData = null
+				for possible: MonsterSpawnData in spawner.spawn_definitions:
+					if (victim is CrocodileMonster and possible.monster_id == &"crocodile") or (victim is ShiMonster and possible.monster_id == &"shi"):
+						definition = possible
+						break
+				check(definition != null, "dormant_victim_species_is_registered")
+				var defeated_before: Dictionary = spawner._defeated_spawn_ids.duplicate()
+				victim.kill()
+				var new_spawn_id: String = ""
+				for id: String in spawner._defeated_spawn_ids:
+					if not defeated_before.has(id):
+						new_spawn_id = id
+				check(not new_spawn_id.is_empty(), "sleeping_victim_records_original_spawn_id")
+				world._enter_map(0)
+				world._enter_map(target.node_id)
+				await wait_for_room(world)
+				if definition != null and not new_spawn_id.is_empty():
+					var parts: PackedStringArray = new_spawn_id.split(":")
+					var spawn_tile := Vector2i(int(parts[parts.size() - 2]), int(parts[parts.size() - 1]))
+					check(spawner.spawn_monster(definition, spawn_tile) == null, "return_does_not_revive_sleeping_victim")
+	world._enter_map(0)
+	spawner.process_mode = Node.PROCESS_MODE_DISABLED
+	world._transitioning = true
+	world._enter_map(target.node_id, -1, target.west_gate_y)
+	check(spawner._defer_non_gate_spawns and spawner.get_pending_spawn_count() > 0, "paused_black_screen_transition_still_queues_interior_monsters")
+	var transition_gate_count: int = 0
+	for actor: BaseMonster in spawner.monsters:
+		if actor is ShiMonster and actor.global_position.distance_to(world.player.global_position) < 16.0 * 15.0:
+			transition_gate_count += 1
+	check(transition_gate_count >= 3, "paused_transition_keeps_gate_encounter_immediate")
+	spawner.process_mode = Node.PROCESS_MODE_INHERIT
+	world._transitioning = false
+	await wait_for_room(world)
+	check(spawner.get_pending_spawn_count() == 0, "queued_transition_monsters_finish_after_black_screen")
 	world.queue_free()
 	await process_frame
 	await process_frame

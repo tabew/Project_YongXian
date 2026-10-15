@@ -268,7 +268,7 @@ func _setup_map_monsters() -> void:
 	_monster_map = _current_node
 	# 箱庭保留整图怪物；spawner 自身只运行限额生成与远处休眠，不做距离回收。
 	monster_spawner.set_process(true)
-	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count)
+	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count, _transitioning)
 	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
 	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
 	_on_monster_chunk_applied(Vector2i.ZERO)
