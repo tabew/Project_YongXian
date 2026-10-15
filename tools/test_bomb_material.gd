@@ -1,7 +1,7 @@
 extends SceneTree
 
-## 炸弹材料（材料 id 5 / 属性 id 6）的验收：
-## 材料模板与模型、爆裂属性注册、丢进坩埚能带进爆裂并装瓶、扔出去的范围伤害只打敌人。
+## 炸弹材料（材料 id 5 / 属性 id 6「爆炸」）的验收：
+## 材料与属性注册、丢进坩埚能带进爆炸、装瓶后属性不丢、爆炸的范围伤害与击退。
 ##
 ## 运行：godot --headless --path . --script res://tools/test_bomb_material.gd
 ##
@@ -16,7 +16,11 @@ const ATTRIBUTES_TEXT_PATH: String = "res://scenes/ui/alchemy/attributes_text.ts
 
 const BOMB_ID: int = 5
 const EXPLOSIVE_ID: int = 6
-const EXPLOSIVE_NAME: String = "爆裂"
+const EXPLOSIVE_NAME: String = "爆炸"
+## 敌对受击盒所在层(Layer 3 = EnemyHurtbox = 值 4)，和 training_dummy / base_monster 一致
+const ENEMY_HURTBOX_LAYER: int = 4
+## 命中掩码之外的层：炼金层(Layer 4 = 值 8)，放这里的受击盒不该被炸到
+const OUTSIDE_MASK_LAYER: int = 8
 const TARGET_HEALTH: float = 1000.0
 
 var _checks: int = 0
@@ -43,8 +47,9 @@ func _sync_physics() -> void:
 	await physics_frame
 
 
-## 造一个带受击盒的目标，层级和阵营仿照正式怪物（敌方 = 阵营 2 / Layer 3 = 值 4）
-func _target(at: Vector2, team: int = 2, layer: int = 4) -> HealthComponent:
+## 造一个带受击盒的目标，并把每次实际命中记录下来（伤害、击退都在 CombatHit 上）。
+## 层级和阵营仿照正式怪物（敌方 = 阵营 2 / Layer 3 = 值 4）
+func _target(at: Vector2, team: int = 2, layer: int = ENEMY_HURTBOX_LAYER) -> Dictionary:
 	var target: Node2D = Node2D.new()
 	target.position = at
 	var component: HealthComponent = HealthComponent.new()
@@ -62,10 +67,13 @@ func _target(at: Vector2, team: int = 2, layer: int = 4) -> HealthComponent:
 	hurtbox.add_child(shape_node)
 	target.add_child(hurtbox)
 	_arena.add_child(target)
-	return component
+
+	var hits: Array[CombatHit] = []
+	component.damaged.connect(func(hit: CombatHit, _amount: float) -> void: hits.append(hit))
+	return {"health": component, "hits": hits}
 
 
-## 在 at 处引爆一次属性：药水破碎时传进来的就是这个位置上的 Node2D
+## 在 at 处引爆一次属性：药水/炸弹破碎时传进来的就是这个位置上的 Node2D
 func _blast(attribute: AlchemicalData, at: Vector2) -> void:
 	var center: Node2D = Node2D.new()
 	_arena.add_child(center)
@@ -84,7 +92,7 @@ func _test_material() -> IngredientData:
 	_check(bomb.texture != null, "炸弹有图标")
 	_check(bomb.alchemical_attribute.size() == 1, "炸弹只带一条炼金属性")
 	if bomb.alchemical_attribute.size() == 1:
-		_check(bomb.alchemical_attribute[0].get_script() == _explosive_script, "炸弹带的是爆裂属性")
+		_check(bomb.alchemical_attribute[0].get_script() == _explosive_script, "炸弹带的是爆炸属性")
 	_check(is_same(_items.get_template(BOMB_ID), bomb), "炸弹登记在材料注册表 id=%d" % BOMB_ID)
 
 	var model: ItemModel = bomb.create_model()
@@ -98,44 +106,62 @@ func _test_material() -> IngredientData:
 
 func _test_attribute() -> void:
 	var created: AlchemicalData = _attributes.create(EXPLOSIVE_ID, 1)
-	_check(created != null, "按 id %d 能从属性注册表造出爆裂" % EXPLOSIVE_ID)
+	_check(created != null, "按 id %d 能从属性注册表造出爆炸" % EXPLOSIVE_ID)
 	if created == null:
 		return
-	_check(created.get_script() == _explosive_script, "注册表 id %d 指向爆裂脚本" % EXPLOSIVE_ID)
-	_check(created.name == EXPLOSIVE_NAME, "爆裂属性名字正确")
-	_check(created.level == 1 and created.max_level == 3, "爆裂属性等级与上限正确")
-	_check((created.get("blast_damage") as float) > 0.0 and (created.get("blast_radius") as float) > 0.0, "爆裂属性配了伤害与半径")
+
+	_check(created.get_script() == _explosive_script, "注册表 id %d 指向爆炸脚本" % EXPLOSIVE_ID)
+	_check(created.name == EXPLOSIVE_NAME, "爆炸属性名字正确")
+	_check(created.max_level == 3, "爆炸属性等级上限是 3")
+	_check(created.need_target == false, "爆炸不需要目标，破碎点直接引爆")
+	_check((created.get("damage") as float) > 0.0 and (created.get("explosion_radius") as float) > 0.0,
+			"爆炸配了伤害与半径")
+	_check(((created.get("hit_mask") as int) & ENEMY_HURTBOX_LAYER) != 0, "爆炸的命中层包含敌对受击盒")
+	_check((created.get("knockback") as float) > 0.0, "爆炸配了击退")
 
 
 func _test_blast_damage() -> void:
 	var explosive: AlchemicalData = _attributes.create(EXPLOSIVE_ID, 1)
-	var damage: float = explosive.get("blast_damage") as float
-	var radius: float = explosive.get("blast_radius") as float
+	var radius: float = explosive.get("explosion_radius") as float
+	var damage: float = explosive.call("enemy_damage") as float
 
-	var near: HealthComponent = _target(Vector2(30, 0))
-	var edge: HealthComponent = _target(Vector2(0, radius * 0.9))
-	var outside: HealthComponent = _target(Vector2(radius * 1.5, 0))
-	var friendly: HealthComponent = _target(Vector2(20, 0), 1)
-	var wrong_layer: HealthComponent = _target(Vector2(20, 0), 2, 2)
+	var near: Dictionary = _target(Vector2(30.0, 0.0))
+	var edge: Dictionary = _target(Vector2(0.0, radius * 0.9))
+	var outside: Dictionary = _target(Vector2(radius * 1.5, 0.0))
+	var friendly: Dictionary = _target(Vector2(20.0, 0.0), 1)
+	var wrong_layer: Dictionary = _target(Vector2(20.0, 0.0), 2, OUTSIDE_MASK_LAYER)
 	await _sync_physics()
 	_blast(explosive, Vector2.ZERO)
-	_check(is_equal_approx(near.current_health, TARGET_HEALTH - damage), "半径内的敌人吃到一次爆炸伤害")
-	_check(is_equal_approx(edge.current_health, TARGET_HEALTH - damage), "半径边缘内的敌人也吃到伤害")
-	_check(is_equal_approx(outside.current_health, TARGET_HEALTH), "半径外的目标不受影响")
-	_check(is_equal_approx(friendly.current_health, TARGET_HEALTH), "同阵营不会被炸到")
-	_check(is_equal_approx(wrong_layer.current_health, TARGET_HEALTH), "只炸敌对受击层")
 
-	#等级越高炸得越疼：锅里出来的属性至少 1 级
+	_check(is_equal_approx(near["health"].current_health, TARGET_HEALTH - damage), "半径内的敌人吃到一次爆炸伤害")
+	_check(is_equal_approx(edge["health"].current_health, TARGET_HEALTH - damage), "半径边缘内的敌人也吃到伤害")
+	_check(is_equal_approx(outside["health"].current_health, TARGET_HEALTH), "半径外的目标不受影响")
+	_check(is_equal_approx(friendly["health"].current_health, TARGET_HEALTH), "同阵营不会被炸到")
+	_check(is_equal_approx(wrong_layer["health"].current_health, TARGET_HEALTH), "命中掩码之外的层不会被炸到")
+
+	#击退：从爆心朝外推，爆心正右侧的目标被往 +X 推
+	var near_hits: Array = near["hits"]
+	_check(near_hits.size() == 1, "命中记录收到一次爆炸")
+	if near_hits.size() == 1:
+		var hit: CombatHit = near_hits[0]
+		_check(is_equal_approx(hit.damage, damage), "命中伤害等于属性算出来的爆炸伤害")
+		_check(hit.knockback.x > 0.0 and absf(hit.knockback.x) >= absf(hit.knockback.y), "击退方向从爆心朝外")
+	_check((friendly["hits"] as Array).is_empty() and (outside["hits"] as Array).is_empty(), "被炸不到的目标一次命中都没收到")
+
+	#等级越高炸得越狠
 	var leveled: AlchemicalData = _attributes.create(EXPLOSIVE_ID, 3)
-	var leveled_target: HealthComponent = _target(Vector2(20, 0))
+	var leveled_damage: float = leveled.call("enemy_damage") as float
+	_check(leveled_damage > damage, "3 级爆炸伤害高于 1 级（%s > %s）" % [str(leveled_damage), str(damage)])
+	var leveled_target: Dictionary = _target(Vector2(20.0, 0.0))
 	await _sync_physics()
 	_blast(leveled, Vector2.ZERO)
-	_check(is_equal_approx(leveled_target.current_health, TARGET_HEALTH - damage * 3.0), "3 级爆裂伤害是 1 级的三倍")
+	_check(is_equal_approx(leveled_target["health"].current_health, TARGET_HEALTH - leveled_damage),
+			"高级爆炸打出的是高级伤害")
 
 
-func _test_cauldron(bomb: IngredientData) -> void:
+func _test_cauldron(bomb: IngredientData) -> PotionData:
 	if bomb == null:
-		return
+		return null
 
 	#坩埚的 AttributesText 在正式场景里由 alchemy.tscn 挂上去，这里自己补一个
 	var cauldron: Node = (load(CAULDRON_PATH) as PackedScene).instantiate()
@@ -153,34 +179,40 @@ func _test_cauldron(bomb: IngredientData) -> void:
 	var attributes: Array = cauldron.get("attributes")
 	_check(attributes.size() == 1, "炸弹丢进坩埚带进一条属性")
 	if attributes.size() == 1:
-		_check(attributes[0].get_script() == _explosive_script, "带进锅里的就是爆裂")
-		_check(attributes[0].level == 1, "材料自带的属性进锅后是 1 级")
+		_check(attributes[0].get_script() == _explosive_script, "带进锅里的就是爆炸")
 
 	cauldron.call("start_transform")
-	_check(cauldron.get("attributes").size() == 1, "爆裂不参与反应，反应完还留在锅里")
+	_check(cauldron.get("attributes").size() == 1, "爆炸不参与反应，反应完还留在锅里")
 	_check(cauldron.call("can_finish_transform"), "锅里有属性就能装瓶")
 
-	var potion: PotionData = cauldron.call("finish_transform")
+	var potion: PotionData = cauldron.call("finish_transform") as PotionData
 	_check(potion != null, "装瓶得到药水")
 	if potion == null:
-		return
-	_check(potion.alchemical_attribute.size() == 1 and potion.alchemical_attribute[0].get_script() == _explosive_script, "药水带上了爆裂属性")
+		return null
+
+	_check(potion.alchemical_attribute.size() == 1
+			and potion.alchemical_attribute[0].get_script() == _explosive_script, "药水带上了爆炸属性")
 	_check(inventory.get_count(potion.id) == 1, "药水进了背包")
 	_check(cauldron.get("attributes").is_empty(), "装瓶后清锅")
 
-	#带爆裂的药水扔出去就是炸弹：砸碎点引爆一次
-	var victim: HealthComponent = _target(Vector2(24, 0))
+	#关键：这一瓶进背包后属性不能丢——按 id 取回来还得是同一瓶、还带着爆炸
+	var from_bag: ItemData = inventory.get_item_template(potion.id)
+	_check(is_same(from_bag, potion), "背包按 id 取回的是同一瓶药水")
+	_check(from_bag != null and from_bag.alchemical_attribute.size() == 1, "取回来的这一瓶还带着爆炸属性")
+
+	#带爆炸的药水砸碎就是炸弹：碎点引爆一次
+	var victim: Dictionary = _target(Vector2(24.0, 0.0))
 	await _sync_physics()
-	var damage: float = potion.alchemical_attribute[0].get("blast_damage") as float
 	_blast(potion.alchemical_attribute[0], Vector2.ZERO)
-	_check(is_equal_approx(victim.current_health, TARGET_HEALTH - damage), "带爆裂的药水砸碎会炸")
+	_check(victim["health"].current_health < TARGET_HEALTH, "带爆炸的药水砸碎会炸")
+	return potion
 
 
 func _run() -> void:
 	_items = root.get_node("ItemListGlobal")
 	_attributes = root.get_node("AlchemicalAttributeList")
 	_explosive_script = load(EXPLOSIVE_SCRIPT_PATH) as GDScript
-	_check(_explosive_script != null, "爆裂脚本能载入")
+	_check(_explosive_script != null, "爆炸脚本能载入")
 
 	_arena = Node2D.new()
 	root.add_child(_arena)
@@ -188,7 +220,7 @@ func _run() -> void:
 	var bomb: IngredientData = _test_material()
 	_test_attribute()
 	await _test_blast_damage()
-	_test_cauldron(bomb)
+	await _test_cauldron(bomb)
 
 	print("炸弹材料验收：%d 项检查，%d 项失败" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
