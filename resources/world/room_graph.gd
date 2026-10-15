@@ -70,6 +70,12 @@ func world_node_of(_data_node_id: int) -> int:
 	return -1
 
 
+## 挂在该房间上的秘密房世界 node_id 列表；旧骨架没有秘密房，返回空。
+## 世界层用它把对应的出口封成词条门，而不是普通门。
+func secret_targets_of(_node_id: int) -> PackedInt32Array:
+	return PackedInt32Array()
+
+
 func is_main_path(node_id: int) -> bool:
 	return main_path.has(node_id)
 

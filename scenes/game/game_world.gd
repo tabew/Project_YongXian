@@ -41,6 +41,10 @@ var _map_entity_roots: Dictionary = {}
 var _material_maps: Dictionary = {}
 ## 每张地图的场景元素与可破坏物只生成一次；元素吸附后会自行冷却回满。
 var _room_props: Dictionary = {}
+## 秘密房世界 node_id -> 通往它的词条门；未开门时对应出口被封。
+var _secret_doors: Dictionary = {}
+## 本局已打开的词条门（秘密房世界 node_id）。跨房间保留，重进宿主不再封路。
+var _opened_secret_doors: Dictionary = {}
 ## 当前高亮的可吸附场景元素；同一时刻只允许吸附一个。
 var _nearby_element: SceneElement = null
 ## 吸附键是否按住；长按到满才真正吸附。
@@ -92,6 +96,9 @@ func _process(_delta: float) -> void:
 	var spec: MapSpec = player.active_map
 	var local: Vector2i = WorldGenerator.world_to_tile(player.global_position) - spec.origin
 	for link: Dictionary in _generator.gate_links(_current_node):
+		# 词条门没开就封住该出口，玩家只能从别的门继续推进。
+		if _is_sealed_secret_gate(int(link["target"])):
+			continue
 		var side: int = link["side"]
 		if player.velocity.x * side <= 0.1:
 			continue
@@ -221,6 +228,7 @@ func build_world(seed_value: int) -> void:
 	_run_failed = false
 	_run_finished = false
 	_room_cleared = false
+	_opened_secret_doors.clear()
 	door_choice.hide_choices()
 	settlement.hide_panel()
 	inspiration_field.clear_all()
@@ -403,6 +411,7 @@ func _clear_map_entities() -> void:
 	_nearby_element = null
 	_material_maps.clear()
 	_room_props.clear()
+	_secret_doors.clear()
 	for root: Node2D in _map_entity_roots.values():
 		remove_child(root)
 		root.queue_free()
@@ -453,8 +462,63 @@ func _setup_room_props(spec: MapSpec) -> void:
 		node.name = "%s_%d_%d" % [String(entry["id"]), tile.x, tile.y]
 		node.position = WorldGenerator.tile_to_world(tile)
 		entity_root.add_child(node)
+	_spawn_secret_door(spec, entity_root)
 	_room_props[spec.node_id] = true
 	_refresh_map_entity_visibility()
+
+
+## 秘密房的词条门：堵在宿主房通往秘密房的出口上，带对应词条才能敲开。
+## 出口坐标直接取 gate_links，和普通门走同一套定位。
+func _spawn_secret_door(spec: MapSpec, entity_root: Node2D) -> void:
+	var room: RoomData = _current_room()
+	if room == null or not room.has_secret_door():
+		return
+	var target: int = int(room.secret_door.get("target", -1))
+	if target < 0 or _opened_secret_doors.has(target) or _secret_doors.has(target):
+		return
+	var kind: int = int(room.secret_door.get("kind", SecretDoor.Kind.EXPLODE))
+	for link: Dictionary in _generator.gate_links(spec.node_id):
+		if int(link["target"]) != target:
+			continue
+		var door := SecretDoorProp.new()
+		door.name = "SecretDoor_%d" % target
+		door.trait_levels_provider = _active_trait_entries
+		door.bind(kind, target)
+		door.opened.connect(_on_secret_door_opened.bind(door))
+		entity_root.add_child(door)
+		# 贴着出口内侧，玩家在房间里就能看到并敲到。
+		door.position = WorldGenerator.tile_to_world(link["point"]) + Vector2(-10.0 * float(link["side"]), 0.0)
+		_secret_doors[target] = door
+		return
+
+
+## 该出口是不是一扇还没打开的词条门。
+## 只认「当前真的立着词条门」的出口：门一旦打开就从表里移除，
+## 万一道具没能生成也退回普通门，避免把出口永久锁死。
+func _is_sealed_secret_gate(target: int) -> bool:
+	return _secret_doors.has(target)
+
+
+## 当前生效炼金组合的词条快照，供词条门判定。
+## 只走炼金台的公开接口，不读它的内部结构。
+func _active_trait_entries() -> Array:
+	var entries: Array = []
+	if player == null or player.alchemy_station == null:
+		return entries
+	var combo: BrewCombo = player.alchemy_station.active_combo()
+	if combo == null:
+		return entries
+	for trait_instance: TraitInstance in combo.traits:
+		entries.append({"id": trait_instance.id, "level": trait_instance.level})
+	return entries
+
+
+func _on_secret_door_opened(kind: int, door: SecretDoorProp) -> void:
+	if not is_instance_valid(door):
+		return
+	_opened_secret_doors[door.target_world_node] = true
+	_secret_doors.erase(door.target_world_node)
+	EventBus.notification.emit("%s已开 · 秘密房解锁" % SecretDoor.name_of(kind))
 
 
 ## 只有当前房间的道具会显示与运行；其余房间整棵树暂停，避免隔墙交互。

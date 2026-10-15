@@ -206,7 +206,7 @@ roll(来源, rng):
 | 区域主题配置 + 材料掉落联动 | 已完成（`region_theme_catalog.gd`，13 个主题，含抗性 / 弱点） |
 | 训练场 / 材料库 / 难度祭坛 3 档 | 已完成（`training_ground_panel.gd`、`material_vault_panel.gd`、`difficulty_altar_panel.gd`） |
 | 秘密房 + 词条门（数据） | 已完成（`secret_door.gd` 8 种门 + `room_data.secret_door`） |
-| 秘密房入口运行时 | 未接：`game_world` 目前只走普通门，词条门尚未在场景里生成 |
+| 秘密房入口运行时 | 已完成：宿主房出口生成词条门（`scripts/items/secret_door_prop.gd`），未开门时封路，带对应词条敲开或按 E 开门 |
 | 图鉴台 / 遗物架 / 成就墙 / 商店 | 只留接口（`placeholder_panel.gd`） |
 | 小地图（房间类型 / 主题色 / 未探索 ? / 秘密房 / 炼金效果 + 热量条） | 未做：现有小地图仍服务旧的箱庭世界 |
 | Boss 多阶段弱点变化 | 未做 |
@@ -222,6 +222,7 @@ godot --headless --path . --script res://tests/test_run_map.gd             # 987
 godot --headless --path . --script res://tests/test_inspiration.gd         # 2131 项
 godot --headless --path . --script res://tests/test_permanent_upgrades.gd  # 264 项
 godot --headless --path . --script res://tests/test_room_props.gd          # 2290 项
+godot --headless --path . --script res://tests/test_secret_door.gd         # 231 项
 godot --headless --path . --script res://tests/test_run_settlement.gd      # 21 项
 godot --headless --path . --script res://tests/test_weapon_catalog.gd      # 123 项
 # 场景 / 世界集成

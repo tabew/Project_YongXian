@@ -88,6 +88,11 @@ func world_node_of(data_node_id: int) -> int:
 	return int(_world_node_of_data.get(data_node_id, -1))
 
 
+## 挂在该房间上的秘密房；这些出口是词条门，不是普通门。
+func secret_targets_of(node_id: int) -> PackedInt32Array:
+	return _secret_children.get(node_id, PackedInt32Array())
+
+
 ## 局内地图的文字描述（供调试与 HUD 使用）。
 func describe_rooms() -> String:
 	return RunMapGenerator.describe(floor)

@@ -57,3 +57,26 @@ static func matches(kind: int, trait_levels: Dictionary) -> bool:
 	if trait_id == &"":
 		return false
 	return int(trait_levels.get(trait_id, 0)) >= level_of(kind)
+
+
+## 把炼金组合的公开快照 [{ "id": StringName, "level": int }] 压成判定表。
+## 只接受公开数据，本模块不引用炼金内部类型；同词条取最高等级。
+static func levels_from(trait_entries: Array) -> Dictionary:
+	var result: Dictionary = {}
+	for entry: Dictionary in trait_entries:
+		var trait_id := StringName(entry.get("id", &""))
+		if trait_id == &"":
+			continue
+		var level: int = int(entry.get("level", 1))
+		result[trait_id] = maxi(int(result.get(trait_id, 0)), level)
+	return result
+
+
+## 该门需求词条的中文名，供门面提示。
+static func trait_name_of(kind: int) -> String:
+	return TraitCatalog.display_name_of(trait_of(kind))
+
+
+## 一句可读的开门提示。
+static func requirement_text(kind: int) -> String:
+	return "%s：需要「%s」" % [name_of(kind), trait_name_of(kind)]
