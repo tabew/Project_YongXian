@@ -27,7 +27,7 @@ extends Resource
 @export_range(0.0, 600.0, 0.1) var duration: float = 6.0
 
 ##等级上限，施加时夹取（防止等级算飞出界）
-@export_range(1, 99, 1) var max_level: int = 5
+@export_range(1, 99, 1) var max_level: int = 3
 
 @export_group("定时效果")
 ##每隔多少秒跳一次。<= 0 表示不跳
