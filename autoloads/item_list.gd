@@ -65,6 +65,9 @@ func has_runtime_instance(id: int) -> bool:
 
 const POTION_ID_STRAT:int = 300
 
+##附魔武器的运行时实例从这个 id 起发号(见 WeaponData.next_instance_id)
+const WEAPON_INSTANCE_ID_START:int = 400
+
 func _ready() -> void:
 	_build_table()
 
@@ -74,7 +77,7 @@ func has_template(id: int) -> bool:
 	if runtime_instances.has(id):
 		return true
 
-	if id>=POTION_ID_STRAT:
+	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
 		return true
 
 	return table.has(id)
@@ -87,7 +90,8 @@ func get_template(id: int) -> ItemData:
 		return runtime_instances[id]
 
 
-	if id >=POTION_ID_STRAT:
+	#药水区间回退到药水模板；附魔武器区间必须自己登记过，否则视为无效 id
+	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
 		return table[POTION_ID_STRAT]
 
 	if !table.has(id):

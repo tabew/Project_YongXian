@@ -8,4 +8,5 @@ script = ExtResource("1_55llq")
 attribute_id = 2
 name = "恢复"
 max_level = 3
+enchant_target = 1
 metadata/_custom_type_script = "uid://lqt074b7iugc"

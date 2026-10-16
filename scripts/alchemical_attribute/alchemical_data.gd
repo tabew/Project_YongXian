@@ -12,6 +12,15 @@ extends Resource
 #施加效果是否需要对象
 @export var need_target:bool = true
 
+##作为武器附魔时效果作用到谁：need_target = false 的属性固定作用在命中点(爆炸这类)
+enum EnchantTarget
+{
+	HIT_TARGET, ## 被命中的目标
+	WIELDER,    ## 武器持有者，治疗/恢复这类对自己生效
+}
+
+@export var enchant_target: EnchantTarget = EnchantTarget.HIT_TARGET
+
 ##可反应属性名单
 @export var can_be_interacted_attribute:Array[int];
 

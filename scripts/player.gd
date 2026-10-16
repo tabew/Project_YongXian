@@ -55,6 +55,7 @@ func _ready() -> void:
 	health_changed.emit(health, float(max_health))
 
 	inventory.handy_selection_changed.connect(handy_item_changed)
+	inventory.inventory_update.connect(_sync_handy_item)
 	inventory._init()
 	handy_item_changed()
 
@@ -98,10 +99,21 @@ func _unhandled_input(event: InputEvent) -> void:
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
 
-	if handy_item >=200&&handy_item<300:
-		weapon_controller.equip((inventory.get_item_data[handy_item] as WeaponData).weapon)
+	#附魔过的武器是运行时实例(id 400+)，这里按类型判断，不再靠 id 段
+	var data:ItemData = inventory.get_item_template(handy_item)
+
+	if data is WeaponData:
+		weapon_controller.equip((data as WeaponData).weapon)
 	else:
 		weapon_controller.equip(null)
+
+
+##背包变化后同步手上这把：选中格换成了别的物品（拖拽、附魔把武器换成实例、用完）
+##就重新装备。只在格子里的 id 真的变了才动作，避免捡个材料也把正在挥的攻击打断。
+func _sync_handy_item() ->void:
+	if inventory.get_handy_slot_id(inventory.get_selected_handy()) != handy_item:
+		handy_item_changed()
+
 ##ui是否挡着世界操作
 func is_ui_blocking() -> bool:
 
