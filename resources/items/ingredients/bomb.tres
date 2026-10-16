@@ -6,12 +6,13 @@
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_obsin"]
 [ext_resource type="Texture2D" uid="uid://dy57nkxiw4bsf" path="res://assets/items/ingredients/bomb.png" id="4_icon"]
 [ext_resource type="Resource" path="res://resources/alchemical_attribute/fire.tres" id="5_fire"]
+[ext_resource type="Script" path="res://scripts/items/ingredients/bomb.gd" id="6_bomb"]
 
 [resource]
-script = ExtResource("1_data")
-can_be_used = true
+script = ExtResource("6_bomb")
 id = 5
 name = "炸弹"
 texture = ExtResource("4_icon")
+for_use_attribute = Array[ExtResource("2_attribute")]([ExtResource("3_explosive")])
 alchemical_attribute = Array[ExtResource("2_attribute")]([ExtResource("3_explosive"), ExtResource("5_fire")])
 item_scene_path = "res://scenes/items/ingredients/bomb.tscn"

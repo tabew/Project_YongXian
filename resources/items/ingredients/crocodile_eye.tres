@@ -1,8 +1,11 @@
-[gd_resource type="Resource" script_class="IngredientData" load_steps=5 format=3]
-[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/crocodile_eye.svg" id="2_icon"]
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/continuous_heal.tres" id="4_continuous_heal"]
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://dt0ts8dgssb70"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://dqj4tw74di5cu" path="res://assets/items/ingredients/crocodile_eye.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_5qwd8"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
+[ext_resource type="Resource" uid="uid://8ugmywcuoule" path="res://resources/alchemical_attribute/continuous_heal.tres" id="4_continuous_heal"]
+
 [resource]
 script = ExtResource("1_data")
 id = 6

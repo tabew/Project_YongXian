@@ -4,12 +4,11 @@
 [ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_c5sn5"]
 [ext_resource type="Texture2D" uid="uid://bb7hy6cj402wd" path="res://assets/items/ingredients/carrot.svg" id="2_icon"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/heal.tres" id="3_heal"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/continuous_heal.tres" id="4_continuous_heal"]
+[ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="3_heal"]
+[ext_resource type="Resource" uid="uid://8ugmywcuoule" path="res://resources/alchemical_attribute/continuous_heal.tres" id="4_continuous_heal"]
 
 [resource]
 script = ExtResource("1_data")
-can_be_used = true
 id = 13
 name = "操操操。！"
 texture = ExtResource("2_icon")

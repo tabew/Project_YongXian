@@ -58,6 +58,10 @@ func right_use(player:PlayerCharacter) -> int:
 
 	var potion: ItemModel = create_model()
 
+	#修改药水大小
+	for child in potion.get_children():
+		(child as Node2D).scale = Vector2(0.5,0.5)
+
 	if potion == null:
 		return 0
 
