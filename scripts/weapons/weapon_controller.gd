@@ -94,9 +94,6 @@ func try_attack() -> bool:
 	if actor == null:
 		return false
 	_attack = equipped_weapon.attack_scene.instantiate() as WeaponAttack
-	if actor == null:
-		return false
-	_attack = equipped_weapon.attack_scene.instantiate() as WeaponAttack
 	_attack.finished.connect(_on_attack_finished)
 	_attack.hit_landed.connect(_on_hit_landed)
 	add_child(_attack)

@@ -20,6 +20,10 @@ var _speed: float = 400.0
 var _burst_radius: float = 32.0
 var _burst_duration: float = 0.0
 var _attributes: Array[AlchemicalData] = []
+##最大飞行距离(像素)：<= 0 表示不限制。升级卡“投掷精通”会把它乘大。
+var _max_distance: float = 0.0
+##已飞过的距离，用来判断有没有超程。
+var _travelled: float = 0.0
 var _spin: float = SPIN_RADIANS_PER_SECOND
 
 var _view_radius: float = FALLBACK_VIEW_RADIUS
@@ -28,7 +32,7 @@ var _done: bool = false
 
 
 ##由药水在出手时调用：要飞的模型就是本节点的父节点
-func start(player: PlayerCharacter, direction: Vector2, speed: float, burst_radius: float, burst_duration: float, attributes: Array[AlchemicalData]) -> void:
+func start(player: PlayerCharacter, direction: Vector2, speed: float, burst_radius: float, burst_duration: float, attributes: Array[AlchemicalData], max_distance: float = 0.0) -> void:
 	_potion = get_parent() as ItemModel
 	_player = player
 	_direction = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
@@ -36,6 +40,8 @@ func start(player: PlayerCharacter, direction: Vector2, speed: float, burst_radi
 	_burst_radius = burst_radius
 	_burst_duration = burst_duration
 	_attributes = attributes
+	_max_distance = maxf(max_distance, 0.0)
+	_travelled = 0.0
 	_spin = SPIN_RADIANS_PER_SECOND if _direction.x >= 0.0 else -SPIN_RADIANS_PER_SECOND
 	_view_radius = _measure_view_radius()
 	_out_of_view_seconds = 0.0
@@ -49,14 +55,32 @@ func _physics_process(delta: float) -> void:
 
 	var from: Vector2 = _potion.global_position
 	var to: Vector2 = from + _direction * _speed * delta
+
+	# 射程到了就在尽头碎掉：把这一步的落点截在射程上，破碎点才不会越过射程。
+	if _max_distance > 0.0:
+		var remaining: float = _max_distance - _travelled
+		if remaining <= 0.0:
+			_break_at(from)
+			return
+		var step: float = from.distance_to(to)
+		if step > remaining:
+			to = from + (to - from) * (remaining / maxf(step, 0.0001))
+
 	var impact: float = _first_block(from, to)
 
 	if impact >= 0.0:
 		_break_at(from.lerp(to, impact))
 		return
 
+	_travelled += from.distance_to(to)
 	_potion.global_position = to
 	_potion.rotation += _spin * delta
+
+	# 正好落在射程尽头：这一步就碎。
+	if _max_distance > 0.0 and _travelled >= _max_distance - 0.01:
+		_break_at(to)
+		return
+
 	_tick_out_of_view(delta)
 
 

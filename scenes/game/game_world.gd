@@ -275,7 +275,7 @@ func _setup_map_monsters() -> void:
 	_monster_map = _current_node
 	# 箱庭保留整图怪物；spawner 自身只运行限额生成与远处休眠，不做距离回收。
 	monster_spawner.set_process(true)
-	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count, _transitioning)
+	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count, _transitioning, true)
 	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
 	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
 	_on_monster_chunk_applied(Vector2i.ZERO)
@@ -376,7 +376,9 @@ func _refresh_pickup() -> void:
 	var pickup_roots: Array[Node2D] = [monster_spawner]
 	if entity_root != null:
 		pickup_roots.append(entity_root)
-	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
+	# 拾取范围受升级卡“拾荒”影响。
+	var radius: float = player.pickup_radius_tiles() * float(WorldGenerator.TILE_SIZE)
+	var closest: float = radius * radius
 	for pickup_root: Node2D in pickup_roots:
 		for child: Node in pickup_root.get_children():
 			if child is WorldChest and not child.opened and not child.is_queued_for_deletion():

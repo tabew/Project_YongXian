@@ -7,6 +7,9 @@ const SPEED: float = 120.0
 const HALF_ANGLE: float = PI / 6.0
 const WIDTH: float = 6.0
 const PLAYER_RADIUS: float = 7.0
+## 单层伤害。与玩家 100 点生命刻度配套（玩家 10 点刻度时为 1.0），
+## 满一次咆哮 5 层合计 50 点，比例与旧刻度一致。
+const DAMAGE: float = 10.0
 var radius: float = 0.0
 var _host: ShabeiMonster
 var _target: PlayerCharacter
@@ -36,7 +39,7 @@ func _physics_process(delta: float) -> void:
 	radius = minf(radius + SPEED * delta,MAX_RADIUS)
 	if not _hit and _crosses_player(previous,radius) and _clear_to_player():
 		_hit = true
-		_target.take_damage(_host.outgoing_damage(1.0), _host)
+		_target.take_damage(_host.outgoing_damage(DAMAGE), _host)
 	queue_redraw()
 	if radius >= MAX_RADIUS:
 		_spend()

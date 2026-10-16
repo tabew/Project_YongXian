@@ -28,6 +28,14 @@ func _close(holder: Node) -> void:
 	holder.queue_free()
 	await process_frame
 
+## 本测试只关心难度曲线与伤害数值，不关心局内成长。
+## 升级面板弹出时会暂停场景树、连区块加载一起冻住，所以先把本局等级拉高，
+## 让击杀经验（10 上下）远不足以升级，测试才能稳定跑完。
+func _suspend_level_ups() -> void:
+	var progress: Node = root.get_node_or_null("RunProgress")
+	if progress != null:
+		progress.set("level", 999)
+
 func _fixture(scene: PackedScene, entry: int, target_offset: Vector2) -> Dictionary:
 	var holder := Node2D.new()
 	root.add_child(holder)
@@ -60,7 +68,7 @@ func _test_curve() -> void:
 
 func _find_same_slot(spawner: MonsterSpawner, script_path: String, tile: Vector2i) -> BaseMonster:
 	for monster: BaseMonster in spawner.monsters:
-		if monster.get_script().resource_path == script_path and WorldGenerator.world_to_tile(monster.global_position) == tile:
+		if monster.get_script().resource_path == script_path and monster.original_spawn_tile == tile:
 			return monster
 	return null
 
@@ -93,29 +101,51 @@ func _test_room_entries() -> void:
 		await _close(world)
 		return
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
-	check(world._combat_entry_count == 1 and not spawner.monsters.is_empty(), "first_combat_entry_has_immediate_gate_encounter")
+	await _wait_room(world)
+	check(world._combat_entry_count == 1 and not spawner.monsters.is_empty(), "first_combat_entry_has_monsters")
+	var first_guard: BaseMonster = null
+	var first_scattered: BaseMonster = null
+	for actor: BaseMonster in spawner.monsters:
+		if actor.has_supply_post and first_guard == null:
+			first_guard = actor
+		elif not actor.has_supply_post and first_scattered == null:
+			first_scattered = actor
+	check(first_guard != null and first_scattered != null, "first_room_contains_guard_and_ordinary_enemies")
+	if spawner.monsters.is_empty():
+		await _close(world)
+		return
+	var plan_count: int = spawner.monsters.size()
+	var guard_hp: float = (first_guard.get_node("Health") as HealthComponent).max_health if first_guard != null else 0.0
+	var guard_tile: Vector2i = first_guard.original_spawn_tile if first_guard != null else Vector2i.ZERO
+	var guard_script: String = first_guard.get_script().resource_path if first_guard != null else ""
 	var first: BaseMonster = spawner.monsters[0]
 	var first_hp: float = (first.get_node("Health") as HealthComponent).max_health
-	var first_tile: Vector2i = WorldGenerator.world_to_tile(first.global_position)
+	var first_tile: Vector2i = first.original_spawn_tile
 	var first_script: String = first.get_script().resource_path
 	check(first.difficulty_entry == 1 and first.difficulty_multiplier == 1.0, "initial_monster_has_individual_baseline")
 	world._enter_map(0)
 	check(world._combat_entry_count == 1, "safe_room_does_not_increase_difficulty")
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
+	await _wait_room(world)
 	var second: BaseMonster = _find_same_slot(spawner, first_script, first_tile)
 	check(world._combat_entry_count == 2 and second != null, "return_to_same_combat_room_advances_entry")
+	if first_guard != null:
+		var guard_again: BaseMonster = _find_same_slot(spawner, guard_script, guard_tile)
+		check(guard_again != null and is_equal_approx((guard_again.get_node("Health") as HealthComponent).max_health, guard_hp * 1.5), "supply_guard_uses_same_reentry_hp_multiplier")
 	if second != null:
 		var second_health := second.get_node("Health") as HealthComponent
 		check(is_equal_approx(second_health.max_health, first_hp * 1.5) and is_equal_approx(second_health.current_health, second_health.max_health), "reentered_monster_hp_is_full_and_scaled")
 		check(second.difficulty_entry == 2 and is_equal_approx(second.outgoing_damage(1.0), 1.5), "second_entry_multiplier_lives_on_monster")
 		second.apply_difficulty(2)
 		check(is_equal_approx(second_health.max_health, first_hp * 1.5), "difficulty_cannot_stack_twice_on_one_instance")
+		var defeated_before: int = spawner._defeated_spawn_ids.size()
 		second.kill()
+		var killed_slots: int = spawner._defeated_spawn_ids.size() - defeated_before
 		world._enter_map(0)
 		world._enter_map(combat.node_id, -1, combat.west_gate_y)
-		check(world._combat_entry_count == 3 and _find_same_slot(spawner, first_script, first_tile) == null, "dead_slot_stays_empty_despite_difficulty_growth")
 		await _wait_room(world)
-		check(spawner.monsters.size() > 3, "interior_monsters_spawn_in_later_batches")
+		check(world._combat_entry_count == 3 and _find_same_slot(spawner, first_script, first_tile) == null, "dead_slot_stays_empty_despite_difficulty_growth")
+		check(spawner.monsters.size() == plan_count - killed_slots, "only_original_surviving_guards_and_scattered_monsters_spawn")
 		for monster: BaseMonster in spawner.monsters:
 			check(monster.difficulty_entry == 3 and is_equal_approx(monster.difficulty_multiplier, 2.0), "all_delayed_monsters_use_arrival_entry")
 	world._enter_map(next_combat.node_id, -1, next_combat.west_gate_y)
@@ -127,6 +157,7 @@ func _test_room_entries() -> void:
 	world.build_world(18473)
 	check(world._combat_entry_count == 0, "new_run_same_seed_resets_difficulty")
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
+	await _wait_room(world)
 	var restarted: BaseMonster = _find_same_slot(spawner, first_script, first_tile)
 	check(restarted != null and restarted.difficulty_entry == 1, "same_seed_new_run_restores_first_entry_monster")
 	await _close(world)
@@ -138,24 +169,24 @@ func _test_damage() -> void:
 	f.holder.add_child(stone)
 	stone.global_position = f.monster.global_position + Vector2(4, 0)
 	check(f.monster.attack.perform_attack(f.monster, f.player), "scaled_give_throw_starts")
-	check(is_equal_approx(stone._throw_damage, 1.5), "stone_captures_fractional_damage_from_throwing_monster")
+	check(is_equal_approx(stone._throw_damage, 15.0), "stone_captures_fractional_damage_from_throwing_monster")
 	stone.set_physics_process(false)
 	stone._physics_process(1.0)
-	check(is_equal_approx(f.player.health, 8.5), "scaled_stone_deals_fractional_damage_on_hit")
+	check(is_equal_approx(f.player.health, 85.0), "scaled_stone_deals_fractional_damage_on_hit")
 	await _close(f.holder)
 
 	f = _fixture(GIVE, 2, Vector2(48, 0))
 	var leap := f.monster.attack as GiveMonsterAttack
 	check(leap.perform_attack(f.monster, f.player), "scaled_give_leap_starts")
 	leap.update(f.monster, GiveMonsterAttack.LEAP_DURATION)
-	check(is_equal_approx(f.player.health, 8.5), "give_leap_uses_monster_multiplier")
+	check(is_equal_approx(f.player.health, 85.0), "give_leap_uses_monster_multiplier")
 	await _close(f.holder)
 
 	f = _fixture(CROC, 2, Vector2(16, 0))
 	var bite := f.monster.attack as CrocodileBiteAttack
 	check(bite.perform_attack(f.monster, f.player), "scaled_crocodile_bite_starts")
 	bite.update(f.monster, CrocodileBiteAttack.WINDUP + 0.01)
-	check(is_equal_approx(f.player.health, 7.0), "crocodile_bite_uses_monster_multiplier")
+	check(is_equal_approx(f.player.health, 70.0), "crocodile_bite_uses_monster_multiplier")
 	await _close(f.holder)
 
 	f = _fixture(RABBIT, 4, Vector2(100, 0))
@@ -164,7 +195,7 @@ func _test_damage() -> void:
 	wave.launch(f.monster, f.player, f.monster.global_position, Vector2.RIGHT)
 	wave.set_physics_process(false)
 	wave._physics_process(1.0)
-	check(is_equal_approx(f.player.health, 7.6), "rabbit_wave_uses_owning_monster_multiplier")
+	check(is_equal_approx(f.player.health, 76.0), "rabbit_wave_uses_owning_monster_multiplier")
 	await _close(f.holder)
 
 	var holder := Node2D.new()
@@ -195,7 +226,7 @@ func _test_damage() -> void:
 	projectile.launch(trio[0], player, trio[0].global_position)
 	projectile.set_physics_process(false)
 	projectile._physics_process(1.0)
-	check(is_equal_approx(player.health, 9.0), "slime_projectile_uses_leader_multiplier")
+	check(is_equal_approx(player.health, 90.0), "slime_projectile_uses_leader_multiplier")
 	player.global_position = trio[0].global_position
 	await physics_frame
 	await physics_frame
@@ -203,12 +234,13 @@ func _test_damage() -> void:
 	attack._form_remaining = 0.0
 	attack._contact_remaining = 0.0
 	attack.update(trio[0], 0.01)
-	check(is_equal_approx(player.health, 3.0), "slime_group_contact_uses_leader_multiplier")
+	check(is_equal_approx(player.health, 30.0), "slime_group_contact_uses_leader_multiplier")
 	await _close(holder)
 
 func _run() -> void:
 	Engine.max_fps = 240
 	root.size = Vector2i(1280, 720)
+	_suspend_level_ups()
 	_test_curve()
 	await _test_room_entries()
 	await _test_damage()

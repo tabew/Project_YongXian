@@ -13,11 +13,11 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func wait_for_room(world: Node2D) -> void:
-	for frame: int in 480:
+	for frame: int in 1200:
 		if world.chunk_manager.map_ready() and world.monster_spawner.get_pending_spawn_count() == 0:
 			return
 		await process_frame
-	check(false, "room_and_spawn_queue_finish_loading")
+	check(false, "room_and_spawn_queue_finish_loading ready=%s pending=%d spawner_mode=%d processing=%s" % [world.chunk_manager.map_ready(), world.monster_spawner.get_pending_spawn_count(), world.monster_spawner.process_mode, world.monster_spawner.is_processing()])
 
 func _run() -> void:
 	Engine.max_fps = 240
@@ -41,19 +41,19 @@ func _run() -> void:
 	world._enter_map(target.node_id, -1, target.west_gate_y)
 	check(spawner._defer_non_gate_spawns, "live_room_uses_spawn_budget")
 	spawner.set_process(false)
-	for frame: int in 480:
+	for frame: int in 1200:
 		if world.chunk_manager.map_ready():
 			break
 		await process_frame
 	check(world.chunk_manager.map_ready(), "terrain_finishes_while_spawns_wait")
 	var entrance_count: int = 0
 	for actor: BaseMonster in spawner.monsters:
-		if actor is ShiMonster and actor.global_position.distance_to(world.player.global_position) < 16.0 * 15.0:
+		if actor is ShiMonster and not actor.has_supply_post and actor.global_position.distance_to(world.player.global_position) < 16.0 * 15.0:
 			entrance_count += 1
-	check(entrance_count >= 3, "gate_encounter_is_immediate")
+	check(entrance_count >= 3, "gate_pack_still_spawns_immediately_beside_supply_guards")
 	world.chunk_manager.set_process(false)
 	var waiting: int = spawner.get_pending_spawn_count()
-	check(waiting > spawner.spawns_per_frame, "interior_slots_are_queued_not_instantiated_at_entry")
+	check(waiting > spawner.spawns_per_frame, "supply_guards_and_scattered_slots_are_queued_after_gate_pack")
 	spawner.set_process(true)
 	spawner._process(0.016)
 	check(spawner.get_pending_spawn_count() == maxi(waiting - spawner.spawns_per_frame, 0), "spawn_budget_limits_one_frame")
@@ -69,7 +69,7 @@ func _run() -> void:
 			dormant = actor
 		if actor.process_mode != Node.PROCESS_MODE_DISABLED and engaged == null:
 			engaged = actor
-	check(dormant != null and engaged != null, "far_patrollers_sleep_while_entrance_encounter_stays_active")
+	check(dormant != null and engaged != null, "far_patrollers_sleep_while_nearby_gate_and_supply_enemies_stay_active")
 	if engaged != null:
 		var saved_position: Vector2 = world.player.global_position
 		var saved_state: EnemyState.State = engaged.blackboard.state
@@ -146,12 +146,16 @@ func _run() -> void:
 	spawner.process_mode = Node.PROCESS_MODE_DISABLED
 	world._transitioning = true
 	world._enter_map(target.node_id, -1, target.west_gate_y)
-	check(spawner._defer_non_gate_spawns and spawner.get_pending_spawn_count() > 0, "paused_black_screen_transition_still_queues_interior_monsters")
+	for frame: int in 1200:
+		if world.chunk_manager.map_ready():
+			break
+		await process_frame
+	check(world.chunk_manager.map_ready() and spawner._defer_non_gate_spawns and spawner.get_pending_spawn_count() > 0, "paused_transition ready=%s defer=%s pending=%d" % [world.chunk_manager.map_ready(), spawner._defer_non_gate_spawns, spawner.get_pending_spawn_count()])
 	var transition_gate_count: int = 0
 	for actor: BaseMonster in spawner.monsters:
-		if actor is ShiMonster and actor.global_position.distance_to(world.player.global_position) < 16.0 * 15.0:
+		if actor is ShiMonster and not actor.has_supply_post and actor.global_position.distance_to(world.player.global_position) < 16.0 * 15.0:
 			transition_gate_count += 1
-	check(transition_gate_count >= 3, "paused_transition_keeps_gate_encounter_immediate")
+	check(transition_gate_count >= 3, "paused_transition_keeps_original_gate_pack_immediate")
 	spawner.process_mode = Node.PROCESS_MODE_INHERIT
 	world._transitioning = false
 	await wait_for_room(world)

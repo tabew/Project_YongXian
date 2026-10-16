@@ -8,6 +8,9 @@ var _death_committed: bool = false
 var difficulty_entry: int = 1
 var difficulty_multiplier: float = 1.0
 var _difficulty_applied: bool = false
+const SUPPLY_PATROL_RADIUS_TILES: float = 8.0
+var has_supply_post: bool = false
+var supply_post: Vector2 = Vector2.ZERO
 
 ## 所有怪物共用的模板：生命、受击、动画、感知/寻路原语，以及通用四状态 AI 的装配。
 ##
@@ -33,12 +36,18 @@ var _knockback_impulse: Vector2 = Vector2.ZERO
 var _knockback_remaining: float = 0.0
 var _knockback_applied_this_frame: bool = false
 var _hit_flash_remaining: float = 0.0
+## 定身减速的剩余时间与比例；0 表示未被减速。
+var _slow_remaining: float = 0.0
+var _slow_ratio: float = 0.0
 
 @onready var target_raycast: RayCast2D = $TargetRayCast
 
 var player: PlayerCharacter = null
 var world_generator: WorldGenerator = null
 var spawn_chunk: Vector2i = Vector2i.ZERO
+var original_spawn_tile: Vector2i = Vector2i.ZERO
+## 击杀基础经验，由 MonsterSpawner 按生成配置写入。
+var experience_reward: int = 0
 
 ## 每个怪物独立的 AI 组件；共享的只有配置、感知服务、路径调度与事件总线。
 var blackboard: EnemyBlackboard = null
@@ -185,6 +194,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	advance_frame_animation(delta)
 	_hit_flash_remaining = maxf(_hit_flash_remaining - delta, 0.0)
+	_slow_remaining = maxf(_slow_remaining - delta, 0.0)
 	_update_hit_flash()
 	_update_invisibility_reveal()
 	_knockback_applied_this_frame = _knockback_remaining > 0.0
@@ -238,6 +248,18 @@ func _build_ai() -> void:
 		attack.setup(self, ai_config)
 	brain = EnemyBrain.new()
 	brain.setup(self, ai_config, blackboard, perception, navigator, attack, _ai_seed())
+
+
+func set_supply_post(position: Vector2) -> void:
+	has_supply_post = true
+	supply_post = position
+	ai_config.patrol_radius_tiles = SUPPLY_PATROL_RADIUS_TILES
+	blackboard.patrol_anchor = position
+
+
+func supply_patrol_allows(tile: Vector2i) -> bool:
+	var radius: float = SUPPLY_PATROL_RADIUS_TILES * WorldGenerator.TILE_SIZE
+	return not has_supply_post or WorldGenerator.tile_to_world(tile).distance_squared_to(supply_post) <= radius * radius
 
 
 ## 子类返回自己的攻击实现；默认没有攻击，怪物只会巡逻与追击。
@@ -606,9 +628,17 @@ func _drop_death_loot() -> void:
 		return
 	var pickup := GroundPickup.new()
 	pickup.name = "%sLoot" % name
-	pickup.bind(item, 1, world_generator)
+	pickup.bind(item, 1 + _loot_bonus(), world_generator)
 	get_parent().add_child(pickup)
 	pickup.global_position = _death_loot_position()
+
+
+## 升级卡“贪婪”：材料掉落数量加值。
+func _loot_bonus() -> int:
+	var progress: Node = shared_service(&"RunProgress")
+	if progress == null:
+		return 0
+	return progress.loot_bonus()
 
 
 ## 水中击杀的材料落在最近可通行岸边，玩家不用进入不可通行水面才能收取。
@@ -775,7 +805,34 @@ func is_patrol_tile_allowed(tile: Vector2i) -> bool:
 
 
 func movement_speed() -> float:
+	# 定身期间按比例降速；只影响移动，不影响攻击节奏。
+	if _slow_remaining > 0.0:
+		return navigation_speed * (1.0 - _slow_ratio)
 	return navigation_speed
+
+
+## 升级卡“定身”：命中后减速一段时间，取更强的一次。
+func apply_slow(ratio: float, seconds: float) -> void:
+	if ratio <= 0.0 or seconds <= 0.0 or _death_committed:
+		return
+	_slow_ratio = clampf(maxf(_slow_ratio, ratio), 0.0, 0.9)
+	_slow_remaining = maxf(_slow_remaining, seconds)
+
+
+## 升级卡“连锁”：由玩家侧对周围怪物结算一次额外伤害。
+func apply_chain_damage(amount: float, source: Node2D) -> void:
+	if amount <= 0.0 or _death_committed:
+		return
+	var component := get_node_or_null("Health") as HealthComponent
+	if component == null or not component.is_alive():
+		return
+	var hit: CombatHit = CombatHit.new()
+	hit.source = source
+	hit.weapon_id = &"chain"
+	hit.damage = amount
+	hit.position = global_position
+	component.receive_hit(hit)
+
 
 
 func stop_navigation() -> void:

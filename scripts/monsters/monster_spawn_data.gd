@@ -14,6 +14,10 @@ extends Resource
 ## 战斗房间入口内侧的稳定遭遇组；占用该区块名额，避免怪物只在遥远房间内部。
 @export_range(0, 6, 1) var gate_encounter_count: int = 0
 
+@export_group("成长")
+## 击杀基础经验；实际值按楼层缩放后由 RunProgress 结算，掉落经验球由生成器负责。
+@export_range(0, 10000, 1) var experience_reward: int = 10
+
 
 func choose_spawn_variant(_rng: RandomNumberGenerator) -> int:
 	return 0

@@ -11,6 +11,7 @@ extends Resource
 @export_group("Damage")
 @export_range(0.0, 10000.0, 0.5) var damage: float = 18.0
 @export_range(0.0, 1.0, 0.01) var critical_chance: float = 0.04
+@export_range(0.0, 1.0, 0.01) var proc_chance: float = 0.0
 @export_range(1.0, 10.0, 0.1) var critical_multiplier: float = 2.0
 ## Velocity impulse, in pixels per second. The target applies its own resistance.
 @export_range(0.0, 2000.0, 1.0) var knockback: float = 110.0
@@ -24,6 +25,17 @@ extends Resource
 @export_range(0.0, 5.0, 0.01) var reuse_delay: float = 0.04
 @export var auto_repeat: bool = true
 
+@export_group("Upgrade cards")
+## 命中后缩短当次后摇的窗口（秒），0 表示无。对应“回旋”。
+@export_range(0.0, 2.0, 0.01) var combo_window: float = 0.0
+## 命中时自身朝准心位移的格数，0 表示无。对应“剑压”。
+@export_range(0.0, 4.0, 0.5) var lunge_tiles: float = 0.0
+## 命中时使目标减速的比例，0 表示无。对应“定身”。
+@export_range(0.0, 0.9, 0.05) var slow_ratio: float = 0.0
+@export_range(0.0, 10.0, 0.1) var slow_seconds: float = 0.0
+## 攻击期间额外环绕自身的溜溜球数量。对应“环绕球”。
+@export_range(0, 4, 1) var orbit_balls: int = 0
+
 
 func attack_duration() -> float:
 	return windup_seconds + active_seconds + recovery_seconds
@@ -35,6 +47,8 @@ func attacks_per_second() -> float:
 
 func validation_errors() -> PackedStringArray:
 	var errors: PackedStringArray = []
+	if not is_finite(proc_chance) or proc_chance < 0.0 or proc_chance > 1.0:
+		errors.append("Proc chance must be between zero and one.")
 	if id.is_empty():
 		errors.append("Weapon id cannot be empty.")
 	if attack_scene == null:

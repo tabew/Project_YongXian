@@ -141,6 +141,7 @@ func finish_transform() -> PotionData:
 		return null
 
 	inventory.add_item(potion.id,1)
+	_grant_alchemy_rewards(potion)
 
 	#装完就清锅：药水已经在背包里了，锅里不该还留着能再装一次的东西
 	attributes.clear()
@@ -148,6 +149,47 @@ func finish_transform() -> PotionData:
 	has_started = false
 
 	return potion
+
+## 用运行期查找而不是全局标识符，保证本脚本仍能作为 --script 单元测试的编译依赖被加载。
+func _notify(message: String) -> void:
+	var event_bus: Node = get_node_or_null("/root/EventBus")
+	if event_bus != null and event_bus.has_signal("notification"):
+		event_bus.emit_signal("notification", message)
+
+
+## 装瓶结算：给炼金经验，并按“炼金回响”概率额外产出一瓶。
+func _grant_alchemy_rewards(potion:PotionData) -> void:
+	if potion == null:
+		return
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if progress == null:
+		return
+	var key: String = _recipe_key(potion)
+	var highest: int = 0
+	for attribute:AlchemicalData in potion.alchemical_attribute:
+		if attribute != null:
+			highest = maxi(highest, attribute.level)
+	progress.add_experience(progress.alchemy_experience(key, highest))
+	var echo: float = progress.alchemy_echo_chance()
+	if echo > 0.0 and randf() < echo:
+		var extra:PotionData = create_from_attributes()
+		if extra != null:
+			inventory.add_item(extra.id,1)
+			_notify("炼金回响：额外产出一瓶药水")
+
+
+## 配方身份：属性 id 排序后拼接，等级不影响身份。
+func _recipe_key(potion:PotionData) -> String:
+	var ids: Array[int] = []
+	for attribute:AlchemicalData in potion.alchemical_attribute:
+		if attribute != null:
+			ids.append(attribute.attribute_id)
+	ids.sort()
+	var parts: PackedStringArray = []
+	for id: int in ids:
+		parts.append(str(id))
+	return "-".join(parts)
+
 
 ##把坩埚里反应完的属性装成一瓶药水
 func create_from_attributes() -> PotionData:

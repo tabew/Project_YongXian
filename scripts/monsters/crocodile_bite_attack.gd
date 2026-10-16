@@ -1,7 +1,7 @@
 class_name CrocodileBiteAttack
 extends EnemyAttack
 
-const DAMAGE: int = 2
+const DAMAGE: int = 20
 const BITE_RANGE: float = float(WorldGenerator.TILE_SIZE) * 1.5
 const WINDUP: float = 0.18
 const DURATION: float = 0.40

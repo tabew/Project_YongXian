@@ -28,6 +28,8 @@ var _monsters_by_chunk: Dictionary = {}
 ## 本局死亡记录按原始生成位置保存，巡逻/追击后的位置不影响身份。
 var _defeated_spawn_ids: Dictionary = {}
 var _pending_spawns: Array[Dictionary] = []
+var _supply_guards_by_chunk: Dictionary = {}
+var _supply_guards_enabled: bool = false
 var _sleeping_monsters: Dictionary = {}
 var _activity_scan_remaining: float = 0.0
 var _defer_non_gate_spawns: bool = false
@@ -40,7 +42,8 @@ func setup(
 	player: PlayerCharacter,
 	active_map: MapSpec = null,
 	combat_entry: int = 1,
-	defer_during_transition: bool = false
+	defer_during_transition: bool = false,
+	supply_guards_enabled: bool = false
 ) -> void:
 	# 同一生成器代表同一局；切换箱庭保留记录，新开世界（包括相同种子）重置。
 	if generator != _generator:
@@ -49,9 +52,14 @@ func setup(
 	_generator = generator
 	_player = player
 	_active_map = active_map
+	_supply_guards_enabled = supply_guards_enabled and _active_map != null
 	difficulty_entry = maxi(combat_entry, 1)
 	_defer_non_gate_spawns = _active_map != null and is_processing() and (can_process() or defer_during_transition)
 	_activity_scan_remaining = 0.0
+	if _supply_guards_enabled:
+		var room_kind: int = _generator.run.type_of(_active_map.node_id)
+		if room_kind in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS] and (content == null or content.budget_of(_active_map.node_id, MapContent.ENEMY) > 0):
+			_plan_supply_guards()
 	_gate_encounter_anchors.clear()
 	if _active_map != null:
 		_gate_encounter_anchors.append(WorldGenerator.world_to_tile(_generator.entry_position(_active_map.node_id, -1, _active_map.west_gate_y)) + Vector2i(10, 0))
@@ -75,7 +83,7 @@ func _process(delta: float) -> void:
 			var planned: Dictionary = _pending_spawns.pop_front()
 			var coords: Vector2i = planned["chunk"]
 			if _monsters_by_chunk.has(coords):
-				spawn_monster(planned["definition"], planned["tile"], coords)
+				spawn_monster(planned["definition"], planned["tile"], coords, planned["post"])
 		_activity_scan_remaining -= delta
 		if _activity_scan_remaining <= 0.0:
 			_activity_scan_remaining = ACTIVITY_SCAN_INTERVAL
@@ -105,7 +113,7 @@ func _update_monster_activity(monster: BaseMonster) -> void:
 		return
 	if monster.process_mode != Node.PROCESS_MODE_INHERIT or distance_squared < sleep_pixels * sleep_pixels:
 		return
-	if monster.get_ai_state() != EnemyState.State.PATROL or monster.is_receiving_knockback() or monster.is_distance_sleep_blocked() or suspicious:
+	if monster.get_ai_state() != EnemyState.State.PATROL or (monster.brain != null and monster.brain.is_returning_to_supply_post()) or monster.is_receiving_knockback() or monster.is_distance_sleep_blocked() or suspicious:
 		return
 	if monster.attack != null and monster.attack.is_busy():
 		return
@@ -130,13 +138,58 @@ func wake_for_suspicious_event(monster: BaseMonster) -> void:
 	_wake_monster(monster)
 
 
+func _plan_supply_guards() -> void:
+	var population: Dictionary = _generator.population_for(_active_map.node_id)
+	var occupied: Dictionary = {}
+	for structure: Dictionary in population.get("structures", []):
+		if structure["kind"] != &"supplies":
+			continue
+		var post: Vector2i = structure["tile"]
+		var rng: RandomNumberGenerator = MapRng.enemy_chunk_rng(_generator.world_seed, post, &"supply_guards")
+		var count: int = rng.randi_range(2, 3)
+		var placed: int = 0
+		for attempt: int in 128:
+			if placed >= count:
+				break
+			var offset := Vector2i(rng.randi_range(-8, 8), rng.randi_range(-8, 8))
+			if offset.length_squared() > 64:
+				continue
+			var tile: Vector2i = post + offset
+			if occupied.has(tile) or not allows_spawn_at(tile) or not _generator.is_walkable(tile):
+				continue
+			var eligible: Array[MonsterSpawnData] = []
+			for definition: MonsterSpawnData in spawn_definitions:
+				if definition == null or definition.monster_scene == null:
+					continue
+				if not definition.allowed_biomes.is_empty() and not definition.allowed_biomes.has(_active_map.biome_id):
+					continue
+				if definition.can_spawn_at(_generator, tile):
+					eligible.append(definition)
+			if eligible.is_empty():
+				continue
+			var coords: Vector2i = WorldGenerator.tile_to_chunk(tile)
+			if not _supply_guards_by_chunk.has(coords):
+				var group: Array[Dictionary] = []
+				_supply_guards_by_chunk[coords] = group
+			var guards: Array[Dictionary] = _supply_guards_by_chunk[coords]
+			guards.append({"definition": eligible[rng.randi_range(0, eligible.size() - 1)], "tile": tile, "post": post})
+			occupied[tile] = true
+			placed += 1
+
+
 func _on_chunk_applied(coords: Vector2i) -> void:
 	if _generator == null or _monsters_by_chunk.has(coords):
 		return
 	var chunk_monsters: Array[BaseMonster] = []
 	_monsters_by_chunk[coords] = chunk_monsters
 	var occupied: Dictionary = {}
-
+	if _supply_guards_enabled:
+		for planned: Dictionary in _supply_guards_by_chunk.get(coords, []):
+			var definition: MonsterSpawnData = planned["definition"]
+			var tile: Vector2i = planned["tile"]
+			occupied[tile] = true
+			if not _defeated_spawn_ids.has(_spawn_id(definition, tile)):
+				_place_non_gate_monster(definition, tile, coords, planned["post"])
 	for definition: MonsterSpawnData in spawn_definitions:
 		_spawn_definition_in_chunk(definition, coords, occupied)
 
@@ -183,11 +236,11 @@ func _spawn_definition_in_chunk(
 		spawned += 1
 
 
-func _place_non_gate_monster(definition: MonsterSpawnData, tile: Vector2i, coords: Vector2i) -> bool:
+func _place_non_gate_monster(definition: MonsterSpawnData, tile: Vector2i, coords: Vector2i, post: Vector2i = EnemyPathfinder.INVALID_TILE) -> bool:
 	if _defer_non_gate_spawns:
-		_pending_spawns.append({"definition": definition, "tile": tile, "chunk": coords})
+		_pending_spawns.append({"definition": definition, "tile": tile, "chunk": coords, "post": post})
 		return true
-	return spawn_monster(definition, tile, coords) != null
+	return spawn_monster(definition, tile, coords, post) != null
 
 
 ## 入口内侧10格、道路附近的确定遭遇点，使用原生成身份且占用区块名额。
@@ -249,7 +302,8 @@ func _spawn_independent_slots(definition: MonsterSpawnData, coords: Vector2i, oc
 func spawn_monster(
 	definition: MonsterSpawnData,
 	tile: Vector2i,
-	chunk_coords: Vector2i = WorldGenerator.tile_to_chunk(tile)
+	chunk_coords: Vector2i = WorldGenerator.tile_to_chunk(tile),
+	post: Vector2i = EnemyPathfinder.INVALID_TILE
 ) -> BaseMonster:
 	if definition == null or definition.monster_scene == null:
 		return null
@@ -261,6 +315,7 @@ func spawn_monster(
 		push_warning("Monster scene '%s' must inherit BaseMonster" % definition.monster_id)
 		return null
 
+	monster.original_spawn_tile = tile
 	add_child(monster)
 	monster.global_position = WorldGenerator.tile_to_world(tile)
 	monsters.append(monster)
@@ -270,13 +325,17 @@ func spawn_monster(
 	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk[chunk_coords]
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
-	monster.killed.connect(_on_monster_killed.bind(spawn_id), CONNECT_ONE_SHOT)
+	monster.experience_reward = definition.experience_reward
+	monster.killed.connect(_on_monster_killed.bind(spawn_id, monster), CONNECT_ONE_SHOT)
+	# 受伤/回血都算“这怪动起来了”，用来唤醒被延后生成的怪物。
 	var health := monster.get_node_or_null("Health") as HealthComponent
 	if health != null:
 		health.health_changed.connect(_on_monster_health_changed.bind(monster))
 
 	monster.configure(_player, _generator, chunk_coords)
 	monster.apply_difficulty(difficulty_entry)
+	if post != EnemyPathfinder.INVALID_TILE:
+		monster.set_supply_post(WorldGenerator.tile_to_world(post))
 	if _defer_non_gate_spawns:
 		_update_monster_activity(monster)
 	return monster
@@ -287,8 +346,37 @@ func _spawn_id(definition: MonsterSpawnData, tile: Vector2i) -> String:
 	return "%s:%d:%d" % [definition.monster_id, tile.x, tile.y]
 
 
-func _on_monster_killed(spawn_id: String) -> void:
+func _on_monster_killed(spawn_id: String, monster: BaseMonster = null) -> void:
 	_defeated_spawn_ids[spawn_id] = true
+	_award_kill(monster)
+
+
+## 击杀结算：掉落经验球，并触发玩家侧的嗜血 / 连锁。
+func _award_kill(monster: BaseMonster) -> void:
+	if monster == null or not is_instance_valid(monster):
+		return
+	if _player == null or not is_instance_valid(_player):
+		return
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if monster.experience_reward > 0:
+		var amount: float = float(monster.experience_reward)
+		if progress != null:
+			amount = progress.kill_experience(monster.experience_reward, _floor_index())
+		var orb := ExperienceOrb.new()
+		orb.bind(amount, _player)
+		# 挂在生成器下（和怪物、掉落同一个父节点），切图清理怪物时经验球一起走，
+		# 不会留在 GameWorld 上跨区域堆积。
+		add_child(orb)
+		orb.global_position = monster.global_position
+	var weapon: WeaponDefinition = _player.weapon_controller.equipped_weapon
+	_player.on_monster_killed(monster, weapon.damage if weapon != null else 0.0)
+
+
+## 当前区域的层数，用于经验与难度的线性缩放。
+func _floor_index() -> int:
+	if _active_map == null:
+		return 0
+	return RunGraph.floor_of(_active_map.node_id)
 
 
 ## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。
@@ -308,6 +396,7 @@ func allows_spawn_at(tile: Vector2i) -> bool:
 
 func clear_monsters() -> void:
 	_pending_spawns.clear()
+	_supply_guards_by_chunk.clear()
 	_sleeping_monsters.clear()
 	for monster: BaseMonster in monsters.duplicate():
 		if is_instance_valid(monster):

@@ -36,7 +36,6 @@ func _use_hotbar_slot(player: PlayerCharacter, pos: int) -> void:
 	# 装备是靠 handy_selection_changed 触发的，所以先挪开再选回来，保证一定会触发
 	player.inventory.handy_selected = -1
 	player.inventory.select_handy_slot(pos)
-	player.inventory.use_handy_slot()
 	await process_frame
 	await process_frame
 
@@ -63,24 +62,21 @@ func _screenshot(filename: String) -> void:
 	_check(frame.save_png(directory.path_join(filename)) == OK, "Screenshot saved")
 
 
-func _capture_depth_poses(controller: WeaponController, reverse: bool) -> void:
+func _capture_spear_poses(controller: WeaponController) -> void:
 	if not _capture or DisplayServer.get_name() == "headless":
 		return
 	var original: WeaponDefinition = controller.equipped_weapon
-	var data: DepthStrikeWeaponDefinition = original.duplicate(true) as DepthStrikeWeaponDefinition
-	data.reverse_strike = reverse
-	controller.equip(data)
+	controller.equip(original)
 	controller.try_attack()
-	var attack: DepthStrikeAttack
+	var attack: SpearAttack
 	for child: Node in controller.get_children():
-		if child is DepthStrikeAttack and not child.is_queued_for_deletion():
-			attack = child as DepthStrikeAttack
+		if child is SpearAttack and not child.is_queued_for_deletion():
+			attack = child as SpearAttack
 	attack.set_physics_process(false)
-	var prefix: String = "staff_reverse" if reverse else "staff_depth"
 	for phase: int in range(3):
-		var time: float = data.windup_seconds + data.active_seconds * float(phase) * 0.5
+		var time: float = original.windup_seconds + original.active_seconds * SpearAttack.EXTEND_RATIO * float(phase) * 0.5
 		attack._physics_process(time - attack.elapsed)
-		await _screenshot("%s_%d.png" % [prefix, phase])
+		await _screenshot("spear_thrust_%d.png" % phase)
 	controller.equip(original)
 
 
@@ -105,12 +101,12 @@ func _run() -> void:
 	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Player starts with the longsword equipped from the hotbar")
 	_check(not player.has_method("equip_next_weapon"), "Player exposes no direct weapon switch")
 	_check(inventory.get_handy_slot_id(0) == 200, "Starting hotbar slot 1 holds the longsword")
-	_check(inventory.get_handy_slot_id(1) == 201, "Starting hotbar slot 2 holds the staff")
+	_check(inventory.get_handy_slot_id(1) == 201, "Starting hotbar slot 2 holds the spear")
 	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD shows the equipped weapon")
 
-	# 走到长棍格：选中即装备（装备不再靠"用一次"）
+	# 走到长枪格：选中即装备（装备不再靠"用一次"）
 	await _use_hotbar_slot(player, 1)
-	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"long_staff", "Selecting the next hotbar slot equips the staff")
+	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"spear", "Selecting the next hotbar slot equips the spear")
 	# ↑↑↑↑ 改动：用物品栏装备 ↑↑↑↑
 	# ==========================================================================
 	# 切回长剑，后面的用例按长剑节奏来
@@ -118,7 +114,7 @@ func _run() -> void:
 	_check(controller.equipped_weapon != null and controller.equipped_weapon.id == &"longsword", "Selecting slot 1 equips the longsword again")
 
 	# 溜溜球也按同一套接入物品栏：临时登记一个武器物品放进第 3 格，用完再收回去
-	var yoyo_item_id: int = 202
+	var yoyo_item_id: int = 232
 	var yoyo_item: WeaponData = WeaponData.new()
 	yoyo_item.id = yoyo_item_id
 	yoyo_item.name = "测试溜溜球"
@@ -139,30 +135,29 @@ func _run() -> void:
 	_check(not controller.is_attacking(), "Mouse release stops held attacks")
 
 	# ==========================================================================
-	# ↓↓↓↓ 改动：长棍同样从物品栏第2格装上 ↓↓↓↓
+	# ↓↓↓↓ 改动：长枪同样从物品栏第2格装上 ↓↓↓↓
 	await _use_hotbar_slot(player, 1)
-	_check(controller.equipped_weapon.id == &"long_staff", "Using the next hotbar slot equips the staff")
-	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD updates to the staff")
-	# ↑↑↑↑ 改动：用物品栏装备长棍 ↑↑↑↑
+	_check(controller.equipped_weapon.id == &"spear", "Using the next hotbar slot equips the spear")
+	_check(weapon_label.text.contains(controller.equipped_weapon.display_name), "HUD updates to the spear")
+	# ↑↑↑↑ 改动：用物品栏装备长枪 ↑↑↑↑
 	# ==========================================================================
-	var health_before_staff: float = dummy.health.current_health
-	# The resized staff requires close range rather than the old 74-pixel reach.
-	player.global_position = dummy.global_position - controller.aim_direction * 30.0
+	var health_before_spear: float = dummy.health.current_health
+	# The spear reaches a target beyond the sword sweep.
+	player.global_position = dummy.global_position - controller.aim_direction * 60.0
 	controller.set_aim(dummy.global_position - player.global_position)
 	_mouse(true)
-	await create_timer(0.25).timeout
-	_check(controller.is_attacking(), "Staff responds to mouse attack input")
-	await _screenshot("long_staff_swing.png")
+	await create_timer(0.15).timeout
+	_check(controller.is_attacking(), "Spear responds to mouse attack input")
+	await _screenshot("spear_thrust.png")
 	_mouse(false)
 	await create_timer(0.6).timeout
-	_check(dummy.health.current_health < health_before_staff, "Staff damages the world target")
-	await _capture_depth_poses(controller, false)
-	await _capture_depth_poses(controller, true)
+	_check(dummy.health.current_health < health_before_spear, "Spear damages the world target")
+	await _capture_spear_poses(controller)
 	_mouse(true)
 	await create_timer(0.04).timeout
 	await _use_hotbar_slot(player, 0)
 	_check(controller.equipped_weapon.id == &"longsword", "Switching through the hotbar goes back to the sword")
-	_check(not controller.is_attacking(), "Switching from staff cancels the active swing")
+	_check(not controller.is_attacking(), "Switching from spear cancels the active swing")
 	await create_timer(0.7).timeout
 	_check(not controller.is_attacking(), "Switching while held requires a fresh mouse press")
 	_mouse(false)
@@ -196,7 +191,7 @@ func _run() -> void:
 
 	var template_copies: Array[WeaponDefinition] = [
 		(load("res://resources/weapons/templates/swing_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
-		(load("res://resources/weapons/templates/staff_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
+		(load("res://resources/weapons/templates/spear_weapon_template.tres") as WeaponDefinition).duplicate(true) as WeaponDefinition,
 	]
 	for index: int in range(template_copies.size()):
 		var copy: WeaponDefinition = template_copies[index]
@@ -214,7 +209,7 @@ func _run() -> void:
 	for index: int in range(template_copies.size()):
 		var copy: WeaponDefinition = template_copies[index]
 		await _use_hotbar_slot(player, 2 + index)
-		_check(controller.equipped_weapon == copy, "Template copy added as an item is reachable through the backpack")
+		_check(controller.equipped_weapon != null and controller.equipped_weapon.id == copy.id, "Template copy added as an item is reachable through the backpack")
 		_check(weapon_label.text.contains(copy.display_name), "Template copy name appears in the HUD")
 		_check((world.get_node("GameHUD/HUD/WeaponIcon") as TextureRect).texture == copy.icon, "Template copy icon appears in the HUD")
 	await _use_hotbar_slot(player, 0)

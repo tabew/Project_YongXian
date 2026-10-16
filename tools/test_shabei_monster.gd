@@ -90,7 +90,7 @@ func _run() -> void:
 		for wave: ShabeiSoundWave in impl.emitted_layers:
 			if is_instance_valid(wave):
 				wave._physics_process(1.0/60.0)
-	check(f.player.health == 5.0,"five_independent_layers_each_deal_one_damage_once")
+	check(f.player.health == 50.0,"five_independent_layers_each_deal_one_damage_once")
 	actor.global_position = f.player.global_position + Vector2(241,0)
 	impl.update(actor,0.01)
 	check(not impl.is_busy() and not actor.fleeing and actor.get_ai_state() == EnemyState.State.PATROL,"outside_attack_range_returns_to_patrol")
@@ -109,7 +109,7 @@ func _run() -> void:
 	check(early.radius == 60.0 and late.radius == 0.0,"each_layer_has_own_propagation_radius")
 	f.player.global_position = actor.global_position + Vector2(-100,0)
 	late._physics_process(1.0)
-	check(f.player.health == 10.0,"outside_fan_is_not_hit")
+	check(f.player.health == 100.0,"outside_fan_is_not_hit")
 	late._physics_process(1.0)
 	check(late.radius == 240.0 and late._spent,"layer_disappears_at_fifteen_tiles")
 	var hit := CombatHit.new()

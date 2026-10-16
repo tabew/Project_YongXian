@@ -11,3 +11,4 @@ max_per_chunk = 6
 candidate_attempts = 64
 independent_spawn_slots = true
 gate_encounter_count = 3
+experience_reward = 6

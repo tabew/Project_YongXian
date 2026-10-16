@@ -20,8 +20,10 @@ extends Node
 	preload("res://resources/items/ingredients/shabei_meat.tres"),
 	preload("res://resources/items/ingredients/carrot.tres"),
 	preload("res://resources/items/weapons/longsword.tres"),
-	preload("res://resources/items/weapons/long_staff.tres"),
+	preload("res://resources/items/weapons/spear.tres"),
 	preload("res://resources/items/weapons/yoyo.tres"),
+	preload("res://resources/items/weapons/thunder_yoyo.tres"),
+	preload("res://resources/items/weapons/hive_yoyo.tres"),
 	preload("res://resources/items/ingredients/bomb.tres"),
 	#药水模板始终保持在最后一个
 	preload("res://resources/items/potions/potion_model.tres")

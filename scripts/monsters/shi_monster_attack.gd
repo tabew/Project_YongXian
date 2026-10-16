@@ -2,7 +2,7 @@ class_name ShiMonsterAttack
 extends EnemyAttack
 
 const ROTATION_SPEED: float = TAU * 0.5
-const CONTACT_DAMAGE: float = 3.0
+const CONTACT_DAMAGE: float = 30.0
 const CONTACT_COOLDOWN: float = 1.0
 var host: ShiMonster
 var _busy: bool = false

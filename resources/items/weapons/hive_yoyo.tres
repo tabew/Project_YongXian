@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/weapons/weapon_data.gd" id="1"]
+[ext_resource type="Resource" path="res://resources/weapons/hive_yoyo.tres" id="2"]
+[ext_resource type="Texture2D" path="res://assets/weapons/hive_yoyo.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+weapon = ExtResource("2")
+id = 204
+name = "蜂巢"
+texture = ExtResource("3")
+max_stack = 1
+item_scene_path = "res://scenes/items/weapons/hive_yoyo.tscn"

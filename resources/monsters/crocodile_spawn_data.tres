@@ -11,3 +11,4 @@ max_per_chunk = 2
 candidate_attempts = 32
 independent_spawn_slots = true
 bank_spawn_chance = 0.10
+experience_reward = 14

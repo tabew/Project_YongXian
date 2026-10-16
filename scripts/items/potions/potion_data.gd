@@ -13,6 +13,9 @@ const BURST_SCENE: PackedScene = preload("res://scenes/items/potions/potion_burs
 
 const POTION_SPEED:float = 400.0
 
+##基础最大射程(像素)，10 格；升级卡“投掷精通”在它之上乘倍率。
+const POTION_MAX_DISTANCE:float = 500.0
+
 ##作用效果范围半径(像素)
 @export var burst_radius: float = 32.0
 
@@ -30,7 +33,11 @@ static func next_potion_id() -> int:
 	return potion_id
 
 
+## 左键喝下：把瓶内全部炼金属性作用到玩家身上。
+## “苦行”禁用时返回 0，不消耗药水。
 func left_use(player:PlayerCharacter) -> int:
+	if player == null or player.potions_blocked():
+		return 0
 
 	#是否有护己属性
 	var exempt: bool = false
@@ -53,7 +60,7 @@ func left_use(player:PlayerCharacter) -> int:
 ##不需要目标的属性(need_target = false)不经过范围，直接对碎点上的药水模型调用一次。
 func right_use(player:PlayerCharacter) -> int:
 
-	if player == null or player.get_parent() == null:
+	if player == null or player.get_parent() == null or player.potions_blocked():
 		return 0
 
 	var potion: ItemModel = create_model()
@@ -76,12 +83,15 @@ func right_use(player:PlayerCharacter) -> int:
 	var origin: Vector2 = player.global_position
 	potion.global_position = origin
 
+	# 投掷距离受升级卡“投掷精通”影响：超程的弹道会在射程尽头碎掉。
+	var max_distance: float = POTION_MAX_DISTANCE * player.potion_range_mult()
+
 	var aim: Vector2 = player.get_global_mouse_position() - origin
 	var direction: Vector2 = aim.normalized() if aim.length() > 1.0 else Vector2.RIGHT
 
 	var flight: PotionProjectile = PotionProjectile.new()
 
 	potion.add_child(flight)
-	flight.start(player, direction, POTION_SPEED, burst_radius, burst_duration, alchemical_attribute)
+	flight.start(player, direction, POTION_SPEED, burst_radius, burst_duration, alchemical_attribute, max_distance)
 
 	return 1

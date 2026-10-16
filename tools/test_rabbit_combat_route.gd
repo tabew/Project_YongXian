@@ -54,15 +54,18 @@ func _run() -> void:
 				break
 			await process_frame
 		check(world.chunk_manager.map_ready(),"reported_seed_main_rabbit_room_loads")
-		var nearby: int = 0
-		var rabbits: int = 0
+		var guards: int = 0
+		var ordinary: int = 0
 		for actor: BaseMonster in world.monster_spawner.monsters:
 			if not actor is ShabeiMonster:
 				continue
-			rabbits += 1
-			nearby += int(actor.is_visible_in_tree() and actor.global_position.distance_to(world.player.global_position) < 16.0*15.0)
-		check(rabbits > 0 and nearby > 0,"reported_seed_main_rabbit_encounter_visible_at_entry")
-		print("RABBIT_ROUTE seed=%d main_floor=%d node=%d rabbits=%d near_entry=%d" % [seed_value,first_main_combat,snow_main.node_id,rabbits,nearby])
+			if actor.has_supply_post:
+				guards += 1
+				check(actor.is_visible_in_tree(), "reported_seed_rabbit_guards_supply_site")
+			else:
+				ordinary += 1
+		check(guards > 0 and ordinary > 0, "reported_seed_rabbit_room_keeps_scattered_rabbits_and_adds_guards")
+		print("RABBIT_ROUTE seed=%d main_floor=%d node=%d guards=%d ordinary=%d" % [seed_value,first_main_combat,snow_main.node_id,guards,ordinary])
 	world.queue_free()
 	await process_frame
 	await process_frame

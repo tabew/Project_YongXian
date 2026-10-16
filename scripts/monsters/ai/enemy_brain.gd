@@ -4,8 +4,8 @@ extends RefCounted
 ## 通用四状态 AI：Patrol / Chase / Attack / Search。
 ##
 ## 每个怪物一个实例，持有自己的黑板与随机序列；共享配置、感知服务、路径调度与事件总线。
-## 硬性规则：丢失玩家视野后以怪物当前位置作为新的 PatrolAnchor，绝不回出生点或原巡逻点，
-## 因此状态集合里没有 Return / GoHome / Flee。
+## 普通怪物丢失目标后以当前位置为新 PatrolAnchor；补给点守卫保留固定锚点，
+## 与玩家拉开8格后使用原巡逻状态寻路返回，不增加通用 Return 状态。
 ##
 ## 每帧只做便宜的计时与路径跟随；感知、状态转换、选点与寻路请求按 update_interval 分帧，
 ## 并用随机 stagger 打散，远处怪物再乘上 LOD 倍率。
@@ -22,6 +22,7 @@ var attack: EnemyAttack = null
 var _rng := RandomNumberGenerator.new()
 var _update_accumulator: float = 0.0
 var _lod_active: bool = false
+var _returning_to_supply_post: bool = false
 
 
 func setup(
@@ -42,6 +43,7 @@ func setup(
 
 	_rng.seed = seed_value
 	_lod_active = false
+	_returning_to_supply_post = false
 	# stagger：用确定性随机把决策起点打散到 update_interval 内，避免同一帧集体决策。
 	_update_accumulator = _rng.randf() * config.update_interval
 	blackboard.state = EnemyState.State.PATROL
@@ -63,6 +65,10 @@ func is_lod_active() -> bool:
 	return _lod_active
 
 
+func is_returning_to_supply_post() -> bool:
+	return _returning_to_supply_post
+
+
 ## 每帧驱动：计时 -> 分帧决策 -> 每帧动作。
 func tick(delta: float) -> void:
 	if host == null or config == null or blackboard == null:
@@ -70,6 +76,14 @@ func tick(delta: float) -> void:
 	if not is_instance_valid(host.player) or host.world_generator == null:
 		return
 	_advance_timers(delta)
+	if host.has_supply_post:
+		if not _returning_to_supply_post and blackboard.state != EnemyState.State.PATROL and is_instance_valid(host.player):
+			var leash: float = BaseMonster.SUPPLY_PATROL_RADIUS_TILES * TILE_SIZE
+			if host.global_position.distance_squared_to(host.player.global_position) > leash * leash:
+				_begin_supply_return()
+		if _returning_to_supply_post:
+			_act_supply_return()
+			return
 	if attack != null and attack.is_busy():
 		attack.update(host, delta)
 		return
@@ -92,6 +106,32 @@ func abandon_target() -> void:
 func interrupt_attack() -> void:
 	if attack != null:
 		attack.cancel(host)
+
+
+func _begin_supply_return() -> void:
+	interrupt_attack()
+	blackboard.clear_target()
+	blackboard.clear_search()
+	blackboard.patrol_anchor = host.supply_post
+	blackboard.patrol_wait_remaining = 0.0
+	navigator.clear()
+	_change_state(EnemyState.State.PATROL)
+	_returning_to_supply_post = true
+
+
+func _act_supply_return() -> void:
+	var post_tile: Vector2i = WorldGenerator.world_to_tile(host.supply_post)
+	if host.global_position.distance_squared_to(host.supply_post) <= TILE_SIZE * TILE_SIZE * 0.75 * 0.75:
+		_returning_to_supply_post = false
+		navigator.clear()
+		host.stop_navigation()
+		blackboard.patrol_wait_remaining = 0.0
+		return
+	if navigator.consume_failed_request():
+		blackboard.patrol_wait_remaining = config.path_failure_retry_delay
+	if navigator.is_idle() and blackboard.patrol_wait_remaining <= 0.0:
+		navigator.request_path(post_tile, true)
+	navigator.follow()
 
 
 func _advance_timers(delta: float) -> void:
@@ -195,8 +235,9 @@ func _change_state(new_state: EnemyState.State) -> void:
 
 func _decide_patrol() -> void:
 	if blackboard.can_see_target:
-		_begin_chase()
-		return
+		if not host.has_supply_post or host.global_position.distance_to(host.player.global_position) <= BaseMonster.SUPPLY_PATROL_RADIUS_TILES * TILE_SIZE:
+			_begin_chase()
+			return
 	if blackboard.has_suspicious_event:
 		blackboard.consume_suspicious()
 		_begin_search(blackboard.suspicious_position)
@@ -245,9 +286,10 @@ func _try_request_patrol_point() -> bool:
 		# 与当前格重合的点会算出空路径，直接换一个候选。
 		if WorldGenerator.world_to_tile(candidate) == current_tile:
 			continue
-		if not host.is_patrol_tile_allowed(WorldGenerator.world_to_tile(candidate)) or not _is_candidate_point(candidate, anchor):
+		var candidate_tile: Vector2i = WorldGenerator.world_to_tile(candidate)
+		if (host.has_supply_post and not host.supply_patrol_allows(candidate_tile)) or not host.is_patrol_tile_allowed(candidate_tile) or not _is_candidate_point(candidate, anchor):
 			continue
-		return navigator.request_path(WorldGenerator.world_to_tile(candidate), true)
+		return navigator.request_path(candidate_tile, true)
 	return false
 
 
@@ -261,10 +303,10 @@ func _decide_chase() -> void:
 		if _in_attack_range() and attack != null and attack.can_attack(host, host.player):
 			_change_state(EnemyState.State.ATTACK)
 			return
-	elif blackboard.lose_sight_elapsed >= config.lose_sight_grace:
+	elif blackboard.lose_sight_elapsed >= config.lose_sight_grace and not host.has_supply_post:
 		_lose_target()
 		return
-	elif config.search_on_lost_sight and blackboard.has_last_known_position:
+	elif config.search_on_lost_sight and not host.has_supply_post and blackboard.has_last_known_position:
 		_begin_search(blackboard.last_known_position)
 		return
 
@@ -288,10 +330,10 @@ func _act_chase(_delta: float) -> void:
 
 func _decide_attack() -> void:
 	if not blackboard.can_see_target:
-		if blackboard.lose_sight_elapsed >= config.lose_sight_grace:
+		if blackboard.lose_sight_elapsed >= config.lose_sight_grace and not host.has_supply_post:
 			_lose_target()
 			return
-		if config.search_on_lost_sight and blackboard.has_last_known_position:
+		if config.search_on_lost_sight and not host.has_supply_post and blackboard.has_last_known_position:
 			_begin_search(blackboard.last_known_position)
 			return
 		# 视线被墙挡住但还在宽限内：交回 Chase 绕行到最后已知位置，
@@ -387,8 +429,11 @@ func _advance_search_point() -> void:
 	)
 
 
-## 搜索超时或搜索完所有点：以当前位置作为新的巡逻锚点回到 Patrol，不回出生点。
+## 普通怪物以当前位置继续巡逻；补给点守卫沿固定锚点返程。
 func _finish_search() -> void:
+	if host.has_supply_post:
+		_begin_supply_return()
+		return
 	blackboard.patrol_anchor = host.global_position
 	blackboard.clear_target()
 	blackboard.clear_search()
@@ -426,8 +471,11 @@ func _begin_chase() -> void:
 	navigator.request_path(WorldGenerator.world_to_tile(blackboard.last_known_position), true)
 
 
-## 丢失目标：不回家、不回原巡逻点，以当前位置作为新的巡逻锚点。
+## 普通怪物就地设新锚点；补给点守卫返回原补给点。
 func _lose_target() -> void:
+	if host.has_supply_post:
+		_begin_supply_return()
+		return
 	blackboard.patrol_anchor = host.global_position
 	blackboard.clear_target()
 	blackboard.clear_search()

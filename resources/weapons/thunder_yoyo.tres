@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SwarmYoyoDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/weapons/swarm_yoyo_definition.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/swarm_yoyo_attack.tscn" id="2"]
+[ext_resource type="Texture2D" path="res://assets/weapons/thunder_yoyo.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/weapons/yoyo_bee.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+id = &"thunder_yoyo"
+display_name = "雷鸣"
+texture = ExtResource("3")
+icon = ExtResource("3")
+attack_scene = ExtResource("2")
+damage = 12.0
+knockback = 40.0
+windup_seconds = 0.06
+active_seconds = 4.0
+recovery_seconds = 0.3
+reuse_delay = 0.06
+effect = 0
+proc_chance = 0.10
+effect_range = 40.0
+secondary_damage_scale = 1.5
+bee_texture = ExtResource("4")
+trail_color = Color(0.25, 0.7, 1, 0.5)

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cftwkgvhuis3e"
-path="res://.godot/imported/long_staff.png-338149a42e832b516c76aecfad92a1cc.ctex"
+uid="uid://cdn1bw60dw1ok"
+path="res://.godot/imported/yoyo_bee.png-4f516aef356f7bfa18d50ebb7573de36.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/weapons/long_staff.png"
-dest_files=["res://.godot/imported/long_staff.png-338149a42e832b516c76aecfad92a1cc.ctex"]
+source_file="res://assets/weapons/yoyo_bee.png"
+dest_files=["res://.godot/imported/yoyo_bee.png-4f516aef356f7bfa18d50ebb7573de36.ctex"]
 
 [params]
 

@@ -84,6 +84,9 @@ func _physics_process(delta: float) -> void:
 	_hop_rest = maxf(_hop_rest - delta, 0.0)
 	super._physics_process(delta)
 	if is_group_leader():
+		for member: ShiMonster in group_members:
+			if is_instance_valid(member) and member != self:
+				member.global_position = global_position
 		if monster_animation_state() == &"Idle":
 			play_monster_animation(&"Spin")
 		return
@@ -174,6 +177,8 @@ func nearby_partners() -> Array[ShiMonster]:
 	for node: Node in ShiProximityCache.nearby(self, &"shi_monsters", FORM_RADIUS):
 		var candidate := node as ShiMonster
 		if candidate == null or candidate == self or candidate._shi_dead or candidate.is_queued_for_deletion() or candidate.group_leader != null:
+			continue
+		if candidate.has_supply_post != has_supply_post or (has_supply_post and candidate.supply_post != supply_post):
 			continue
 		if candidate.get_parent() != get_parent() or candidate.world_generator != world_generator or not candidate.is_visible_in_tree():
 			continue

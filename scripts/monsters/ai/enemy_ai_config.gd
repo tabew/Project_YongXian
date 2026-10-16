@@ -37,9 +37,9 @@ extends Resource
 ## 进入 Attack 状态的距离（格）。攻击实现自带 attack_range() 时以它为准。
 @export_range(0.0, 64.0, 0.5) var attack_range_tiles: float = 2.0
 @export_range(0.0, 30.0, 0.05) var attack_cooldown: float = 1.0
-## 丢失视野后允许继续追击/攻击的宽限时间，超时后以当前位置为锚点回到 Patrol。
+## 普通怪物丢失视野后的追击宽限；补给点守卫改为按玩家距离判定返程。
 @export_range(0.0, 30.0, 0.1) var lose_sight_grace: float = 2.5
-## 开启后 Chase/Attack 丢失视野会先进入 Search 再回 Patrol；最终仍不回出生点。
+## 普通怪物开启后丢失视野会先进入 Search；补给点守卫仍固定返回所属点位。
 @export var search_on_lost_sight: bool = false
 
 @export_group("搜索")

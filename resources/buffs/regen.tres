@@ -11,5 +11,5 @@ display_name = "恢复"
 description = "每秒回复生命，持续 6 秒。"
 icon = ExtResource("1_o3rny")
 tick_interval = 1.0
-heal_per_tick = 1.0
-heal_per_tick_per_level = 0.5
+heal_per_tick = 10.0
+heal_per_tick_per_level = 5.0
