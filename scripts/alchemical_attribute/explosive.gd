@@ -54,3 +54,7 @@ func enemy_damage() -> float:
 func player_damage_total() -> float:
 	return player_damage + effect_level * float(maxi(level, 0))
 
+
+func _default_polarity() -> POLARITY:
+	return POLARITY.NEGATIVE
+

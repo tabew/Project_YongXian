@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Absorb" format=3 uid="uid://d0cfayl2cqimi"]
+
+[ext_resource type="Script" uid="uid://cgkmw76ho5n4v" path="res://scripts/alchemical_attribute/absorb.gd" id="1_absorb"]
+[ext_resource type="Resource" path="res://resources/buffs/absorb.tres" id="2_absorb_buff"]
+
+[resource]
+script = ExtResource("1_absorb")
+attribute_id = 21
+name = "吸收"

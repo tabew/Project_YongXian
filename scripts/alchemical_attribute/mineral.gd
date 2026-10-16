@@ -1,13 +1,10 @@
-# ===== AI 新增文件 (矿物：独立脚本，与其它属性同一种实现方式) =====
+
 class_name Mineral
 extends AlchemicalData
 
-## 矿物（材料本性）：与木质反应生成固结属性。
+## 矿物
 ## 与其它属性保持同一种实现方式：反应用枚举 id + AlchemicalAttributeList.create(枚举, 等级)；
 ## 使用效果统一走 Buffs 入口，属性只做施加器。
-
-##本属性产生的使用效果：留空表示只参与反应、不产生效果
-@export var buff: BuffData = null
 
 
 func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[AlchemicalData]:
@@ -26,12 +23,18 @@ func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[Alchemi
 				else:
 					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.BINDING, level))
 
+			AlchemicalAttributeList.ATTRIBUTE.FIRE:
+
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.SELF_EXEMPT, level))
+
 		#一轮只看第一个反应物，判定完直接结束
 		break
 	return result
 
 
 func use_effect(object: Node = null) -> void:
-	if buff == null:
-		return
-	Buffs.apply(object, buff, level)
+	pass

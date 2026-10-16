@@ -32,8 +32,19 @@ static func next_potion_id() -> int:
 
 func left_use(player:PlayerCharacter) -> int:
 
+	#是否有护己属性
+	var exempt: bool = false
+
 	for attribute: AlchemicalData in alchemical_attribute:
-			attribute.use_effect(player)
+		if attribute != null and attribute.has_method("exempts_user") and attribute.exempts_user():
+			exempt = true
+
+	for attribute: AlchemicalData in alchemical_attribute:
+		if attribute == null or not attribute.has_method("use_effect"):
+			continue
+		if exempt and attribute.is_negative_effect():
+			continue
+		attribute.use_effect(player)
 	return 1
 
 ##投掷药水，朝准心抛出去，撞到受击盒或地形才碎

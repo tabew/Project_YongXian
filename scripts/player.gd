@@ -3,6 +3,9 @@ extends CharacterBody2D
 
 signal health_changed(current: float, maximum: float)
 signal defeated
+#荆棘之类的反伤监听这个信号
+signal damaged(hit: CombatHit, actual_damage: float)
+
 
 ## 主角占位实现：WASD / 方向键控制，速度带加速度与摩擦力，摄像机跟随。
 ##
@@ -44,6 +47,10 @@ var health: float = 10.0
 var damage_taken: float = 1.0
 ##防御：直接减伤，含义与怪物 HealthComponent.defense 一致
 var defense: float = 0.0
+##造成的伤害倍率：1.0 表示正常，攻击类 buff 会改它（武器结算时乘算）
+var damage_dealt: float = 1.0
+##吸血比例：造成伤害时按这个比例回血（0 = 不吸血）
+var lifesteal: float = 0.0
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -70,6 +77,9 @@ func _physics_process(delta: float) -> void:
 	_apply_input(input_direction, delta)
 	_integrate_movement(delta)
 	_update_facing()
+	#攻击动作期间持续显形：动作一停，隐身立刻恢复（buff 不会消失）
+	if weapon_controller != null and weapon_controller.is_attacking():
+		reveal_by_action()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -81,6 +91,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			inventory.left_use_handy_slot(self)
 			weapon_controller.set_trigger_pressed(true)
+			reveal_by_action()
 			get_viewport().set_input_as_handled()
 			return
 		
@@ -90,6 +101,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 			inventory.right_use_handy_slot(self)
+			reveal_by_action()
 			get_viewport().set_input_as_handled()
 			return
 		
@@ -198,6 +210,12 @@ func read_stat(stat: StringName) -> float:
 			return defense
 		&"damage_taken":
 			return damage_taken
+		&"damage_dealt":
+			return damage_dealt
+		&"lifesteal":
+			return lifesteal
+		&"max_health":
+			return float(max_health)
 	return 0.0
 
 
@@ -210,25 +228,39 @@ func apply_stat(stat: StringName, value: float) -> void:
 			defense = value
 		&"damage_taken":
 			damage_taken = value
+		&"damage_dealt":
+			damage_dealt = value
+		&"lifesteal":
+			lifesteal = value
+		&"max_health":
+			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
+			max_health = maxi(int(round(value)), 1)
+			health = minf(health, float(max_health))
+			health_changed.emit(health, float(max_health))
 
 
-# ===== AI 修改开始 (buff 标记：隐身) =====
 ##当前是否处于隐身状态
 var invisible: bool = false
 
 
-##BuffHolder 通知标记类效果（隐身不是数值属性，所以单独一个入口）
+##BuffHolder 通知标记类效果(目前只给隐身使用)
 func set_buff_flag(flag: StringName, active: bool) -> void:
 	if flag != Buffs.FLAG_INVISIBLE:
 		return
 	invisible = active
-	#半透明表示隐身：整棵子树（人物+武器）一起变淡
 	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
 
 
 func is_invisible() -> bool:
 	return invisible
-# ===== AI 修改结束 =====
+
+
+##出手（用道具/挥武器）会显形：隐身 buff 不消失，动作结束就恢复
+func reveal_by_action() -> void:
+	var holder: BuffHolder = Buffs.holder_of(self)
+	
+	if holder != null:
+		holder.reveal_by_action()
 
 
 ##持续恢复之类的定时效果走这里
@@ -239,24 +271,62 @@ func heal(amount: float) -> void:
 	health_changed.emit(health, float(max_health))
 
 
-func take_damage(amount: float) -> void:
+##和怪物 CombatHurtbox 一样收到一次命中；复用传入的 CombatHit，所以反伤深度等 metadata 不会丢
+func receive_hit(hit: CombatHit) -> bool:
+	if hit == null or hit.damage <= 0.0 or health <= 0.0:
+		return false
+	var mitigated: float = maxf(hit.damage * damage_taken - defense, 0.0)
+
+
+	if Buffs.is_absorbing(self):
+		heal(mitigated)
+		return false
+
+	if mitigated <= 0.0:
+		return false
+	hit.damage = mitigated
+	_apply_hit(hit)
+
+	return true
+
+
+##受伤入口：source 是攻击者，可为空（燃烧/毒之类没有来源）
+func take_damage(amount: float, source: Node = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
 	#先过 buff 的减伤倍率与防御，再扣血
-	amount = maxf(amount * damage_taken - defense, 0.0)
-	if amount <= 0.0:
+	var mitigated: float = maxf(amount * damage_taken - defense, 0.0)
+
+	if Buffs.is_absorbing(self):
+		heal(mitigated)
 		return
+
+	if mitigated <= 0.0:
+		return
+	var hit: CombatHit = CombatHit.new()
+
+	hit.damage = mitigated
+	hit.position = global_position
+	if source is Node2D:
+		hit.source = source as Node2D
+	_apply_hit(hit)
+
+
+##真正扣血：两条入口都走这里，保证只有一条结算路径
+func _apply_hit(hit: CombatHit) -> void:
+	var amount: float = hit.damage
 
 	_play_sfx(&"player_hurt", global_position)
 	health = maxf(health - amount, 0.0)
 	health_changed.emit(health, float(max_health))
+	damaged.emit(hit, amount)
+	Buffs.apply_lifesteal(hit.source, amount)
 	_notify("受到 %s 点伤害，剩余生命 %s/%s" % [str(amount), str(health), str(max_health)])
 	if health <= 0.0:
 		velocity = Vector2.ZERO
 		_play_sfx(&"player_defeat")
 		defeated.emit()
 		_notify("生命归零")
-
 
 func _notify(message: String) -> void:
 	var event_bus: Node = get_node_or_null("/root/EventBus")

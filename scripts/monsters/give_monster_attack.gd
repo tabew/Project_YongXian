@@ -107,7 +107,7 @@ func update(monster: BaseMonster, delta: float) -> void:
 	if is_instance_valid(monster.player) and (
 		monster.global_position.distance_to(monster.player.global_position) <= MELEE_HIT_RANGE
 	):
-		monster.player.take_damage(monster.outgoing_damage(DAMAGE))
+		monster.player.take_damage(monster.outgoing_damage(DAMAGE), monster)
 
 
 func set_attacking(value: bool) -> void:

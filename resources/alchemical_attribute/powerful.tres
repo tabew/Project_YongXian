@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Powerful" format=3 uid="uid://h1c8y2alrnnn"]
+
+[ext_resource type="Resource" uid="uid://de0np05q7ohwn" path="res://resources/buffs/powerful.tres" id="1_houdr"]
+[ext_resource type="Script" uid="uid://c2pmidycvhbfa" path="res://scripts/alchemical_attribute/powerful.gd" id="2_v0wd7"]
+
+[resource]
+script = ExtResource("2_v0wd7")
+attribute_id = 14
+name = "力量"
+max_level = 3
+level = 3

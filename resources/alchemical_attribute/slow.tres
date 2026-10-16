@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Slow" format=3 uid="uid://clue3wk0joahh"]
+
+[ext_resource type="Script" uid="uid://bfskau2jwwo80" path="res://scripts/alchemical_attribute/slow.gd" id="1_slow"]
+[ext_resource type="Resource" uid="uid://cylbid6ljea0k" path="res://resources/buffs/slow.tres" id="2_slow_buff"]
+
+[resource]
+script = ExtResource("1_slow")
+attribute_id = 11
+name = "迟缓"
+max_level = 3
+can_be_interacted_attribute = Array[int]([10, 11])

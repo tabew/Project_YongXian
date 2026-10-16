@@ -7,5 +7,6 @@ script = ExtResource("2_lw1qg")
 name = "治疗"
 max_level = 3
 is_take_only_one = true
-can_be_interacted_attribute = Array[int]([0, 1])
+can_be_interacted_attribute = Array[int]([0, 1, 2])
+level = 3
 metadata/_custom_type_script = "uid://bwjh6ht06yssc"

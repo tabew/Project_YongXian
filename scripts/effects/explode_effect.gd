@@ -26,7 +26,7 @@ var _shape: CircleShape2D = null
 var _elapsed: float = 0.0
 var _idle_seconds: float = 0.0
 var _playing: bool = false
-##"护己"：本次爆炸要跳过的人（药水带这个属性时就是使用者自己）
+##不受效果影响目标
 var _exempt: Node = null
 
 
@@ -35,14 +35,14 @@ var _exempt: Node = null
 func detonate(radius: float, enemy_damage: float, player_damage: float, knockback: float,  source: Node,hit_mask: int = 7,
 		edge_scale: float = 0.3, falloff_power: float = 1.0) -> void:
 	_prepare_shape(radius)
-	#"护己"：投掷者把它自己记在药水模型的 metadata 上，爆炸同样要跳过它
+	#获取排除目标
 	_exempt = _exempt_of(source)
 	_hit_hurtboxes(enemy_damage, knockback, hit_mask, _resolve_source(source), edge_scale, falloff_power)
 	_hit_player(player_damage, knockback, edge_scale, falloff_power)
 	_play_visual(radius)
 
 
-##从来源节点的 metadata 取"护己"记录（没有就是 null）
+##获取排除目标函数，目前只有护己属性会有排除目标返回
 func _exempt_of(source: Node) -> Node:
 	if source == null or not is_instance_valid(source) or not source.has_meta(SelfExempt.EXEMPT_META):
 		return null
@@ -62,7 +62,7 @@ func _knockback_scale(distance: float, radius: float, edge_scale: float, falloff
 	return lerpf(edge_scale, 1.0, pow(falloff, maxf(falloff_power, 0.001)))
 
 
-##用场景里那套 Area2D/CollisionShape2D 当范围：场景里的形状资源是所有实例共用的，先复制再改半径
+##用场景里那套 Area2D/CollisionShape2D 当范围
 func _prepare_shape(radius: float) -> void:
 	var collider: CollisionShape2D = get_node_or_null("Area2D/CollisionShape2D") as CollisionShape2D
 	var scene_shape: Shape2D = collider.shape if collider != null else null
@@ -111,7 +111,7 @@ func _hit_hurtboxes(enemy_damage: float, knockback: float, hit_mask: int, source
 		if hurtbox == null or not hurtbox.can_receive_hit(source, SOURCE_TEAM):
 			continue
 
-		#护己：跳过使用者自己身上的受击盒
+		#排除不受影响目标
 		if hurtbox.health != null and _is_exempt_entity(hurtbox.health.get_parent()):
 			continue
 
@@ -120,7 +120,7 @@ func _hit_hurtboxes(enemy_damage: float, knockback: float, hit_mask: int, source
 		hit.weapon_id = WEAPON_ID
 		hit.damage = enemy_damage
 		hit.position = hurtbox.global_position
-		#从爆点朝外推：正好站在爆心上的目标给一个向上，避免零向量
+		#从爆点朝外推，正好站在爆心上的目标给一个向上
 		var to_target: Vector2 = hurtbox.global_position - global_position
 		var direction: Vector2 = to_target.normalized() if not to_target.is_zero_approx() else Vector2.UP
 		hit.knockback = direction * knockback * _knockback_scale(to_target.length(), _shape.radius, edge_scale, falloff_power)
@@ -139,7 +139,6 @@ func _hit_player(player_damage: float, knockback: float, edge_scale: float, fall
 	if player == null or not is_instance_valid(player):
 		return
 
-	#护己：使用者自己不受伤也不被推
 	if _is_exempt_entity(player):
 		return
 

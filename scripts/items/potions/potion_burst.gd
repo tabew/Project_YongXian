@@ -22,7 +22,7 @@ var attributes: Array[AlchemicalData] = []
 ##间隔下限
 const MIN_PULSE_INTERVAL: float = 0.05
 
-##被排除在效果之外的目标（药水带"护己"属性时是使用者自己）
+##护己效果作用对象，只吃正面效果
 var exempt_target: Node = null
 
 ##下一个脉冲的时间点(相对 _elapsed)
@@ -46,7 +46,7 @@ func _ready() -> void:
 
 
 ##由药水在碎点调用，设置范围参数并立刻放第一个脉冲
-##exempt：不参与效果的目标（带"护己"属性的药水会把使用者传进来）
+##exempt：只参与正面效果
 func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attributes: Array[AlchemicalData],
 		exempt: Node = null) -> void:
 	radius = burst_radius
@@ -98,7 +98,7 @@ func _physics_process(delta: float) -> void:
 
 
 
-##发出脉冲，对当时在圈里的每个目标各调用一次 use_effect
+##发出脉冲
 func _pulse() -> void:
 	if not _started:
 		return
@@ -128,16 +128,37 @@ func _query_bodies() -> Array:
 func _apply_to(bodies: Array) -> void:
 	for body: Variant in bodies:
 		var target: Node = body as Node
-		if target == null or _is_exempt(target):
+		if target == null:
 			continue
-		for attribute: AlchemicalData in attributes:
-			if attribute != null and attribute.has_method("use_effect"):
-				attribute.use_effect(target)
-				if attribute.is_take_only_one == true:
-					attributes.erase(attribute)
+		#使用者只吃正面；其它圈内目标只吃非正面
+		_apply_attributes(target, _is_exempt(target))
 
 
-##"护己"：使用者自己（连同它下面的节点）不算圈内目标
+##给一个目标结算属性。
+##护己生效时，正面只给for_self，其它圈内目标只吃非正面（for_self = false）；
+##没有护己时不做过滤，效果照旧作用于圈内所有人。
+func _apply_attributes(target: Node, for_self: bool) -> void:
+	var split: bool = _has_exempt()
+
+	for attribute: AlchemicalData in attributes:
+		if attribute == null or not attribute.has_method("use_effect"):
+			continue
+		if split:
+			if for_self and not attribute.is_positive_effect():
+				continue
+			if not for_self and attribute.is_positive_effect():
+				continue
+		attribute.use_effect(target)
+		if attribute.is_take_only_one == true:
+			attributes.erase(attribute)
+
+
+##是否具有护己属性
+func _has_exempt() -> bool:
+	return exempt_target != null and is_instance_valid(exempt_target)
+
+
+##护己效果判断
 func _is_exempt(target: Node) -> bool:
 	if exempt_target == null or not is_instance_valid(exempt_target):
 		return false

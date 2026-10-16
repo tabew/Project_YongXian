@@ -1,11 +1,13 @@
 [gd_resource type="Resource" script_class="ContinuousHeal" format=3 uid="uid://8ugmywcuoule"]
 
 [ext_resource type="Script" uid="uid://lqt074b7iugc" path="res://scripts/alchemical_attribute/continuous_heal.gd" id="1_55llq"]
-[ext_resource type="Resource" path="res://resources/buffs/regen.tres" id="1_v0mah"]
+[ext_resource type="Resource" uid="uid://bqx03vjk4bhfd" path="res://resources/buffs/regen.tres" id="1_v0mah"]
 
 [resource]
 script = ExtResource("1_55llq")
 attribute_id = 2
 name = "恢复"
 max_level = 3
+can_be_interacted_attribute = Array[int]([2, 5])
+level = 3
 metadata/_custom_type_script = "uid://lqt074b7iugc"

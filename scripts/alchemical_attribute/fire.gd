@@ -1,19 +1,31 @@
-# ===== AI 新增文件 (火：独立脚本，与其它属性同一种实现方式) =====
+
 class_name Fire
 extends AlchemicalData
 
-## 火：施加燃烧 buff，定时扣血。
-## 与其它属性保持同一种实现方式：反应用枚举 id + AlchemicalAttributeList.create(枚举, 等级)；
-## 使用效果统一走 Buffs 入口，属性只做施加器。
-
-##本属性施加的 buff：默认指向燃烧，可在 Inspector 换成别的
 @export var buff: BuffData = preload("res://resources/buffs/burn.tres")
 
 
-##目前不参与反应（以后要配方就在 match 里按枚举写，写法参照 heal.gd）
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
+func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[AlchemicalData]:
 	var result: Array[AlchemicalData] = []
 
+	if attribute.is_empty():
+		return result
+
+	#单属性反应一定优先是第一个，多属性反应才需要单独遍历数组内其它属性
+	for i in attribute.size():
+		match attribute[i].attribute_id:
+			AlchemicalAttributeList.ATTRIBUTE.FIRE:
+				if !can_upgrade_level(attribute[i]):
+					continue
+
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.FIRE, level + 1))
+
+		#除了升级会continue外，其它情况直接break
+		break
 	return result
 
 
@@ -21,3 +33,7 @@ func use_effect(object: Node = null) -> void:
 	if buff == null:
 		return
 	Buffs.apply(object, buff, level)
+
+
+func _default_polarity() -> POLARITY:
+	return POLARITY.NEGATIVE

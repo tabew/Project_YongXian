@@ -6,6 +6,7 @@ func _init(set_level:int = 0) -> void:
 	level = set_level
 	max_level = 0
 
+
 func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalData]:
 	var result:Array[AlchemicalData]
 
@@ -16,7 +17,14 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 	#相同属性但不能升级的情况就continue，其它情况直接break，无需遍历
 	for i in attribute.size():
 		match attribute[i].attribute_id:
-			pass
+
+			AlchemicalAttributeList.ATTRIBUTE.CONTINUOUS_HEAL:
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.CLEANSE, level))
+
 		break
 	return result
 			

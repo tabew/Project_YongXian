@@ -84,6 +84,10 @@ func _land_hit(hurtbox: CombatHurtbox) -> void:
 	hit.weapon_id = definition.id
 	hit.critical = MapRng.shared(MapRng.Stream.COMBAT).randf() < definition.critical_chance
 	hit.damage = definition.damage * (definition.critical_multiplier if hit.critical else 1.0)
+	#buff 的攻击力倍率：玩家/怪物实现了 read_stat 才生效
+	if wielder != null and wielder.has_method("read_stat"):
+		hit.damage *= maxf(float(wielder.call("read_stat", &"damage_dealt")), 0.0)
+		
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()
 	if direction.is_zero_approx():

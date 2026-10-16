@@ -1,18 +1,30 @@
-# ===== AI 新增文件 (固结：独立脚本，与其它属性同一种实现方式) =====
+
 class_name BindingAttribute
 extends AlchemicalData
 
-## 固结（材料本性）：矿物 + 木质的反应产物，惰性终产物，不再参与任何反应。
-## 与其它属性保持同一种实现方式：使用效果统一走 Buffs 入口，属性只做施加器。
+## 固结:提供减伤
 
-##本属性产生的使用效果：留空表示不产生效果
-@export var buff: BuffData = null
+@export var buff: BuffData = preload("res://resources/buffs/solid.tres")
 
 
-##惰性终产物：不与任何属性反应
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
+func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[AlchemicalData]:
 	var result: Array[AlchemicalData] = []
 
+	if attribute.is_empty():
+		return result
+
+	#单属性反应一定优先是第一个，多属性反应才需要单独遍历数组内其它属性
+	for i in attribute.size():
+		match attribute[i].attribute_id:
+			AlchemicalAttributeList.ATTRIBUTE.POISON:
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.SLOW, level))
+
+		#一轮只看第一个反应物，判定完直接结束
+		break
 	return result
 
 

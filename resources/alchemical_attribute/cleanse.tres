@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Cleanse" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/cleanse.gd" id="1_cleanse"]
+
+[resource]
+script = ExtResource("1_cleanse")
+attribute_id = 15
+name = "净化"
+max_level = 0
+can_be_interacted_attribute = Array[int]([10])

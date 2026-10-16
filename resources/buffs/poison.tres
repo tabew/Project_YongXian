@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://c2yypycqdfmv2"]
+
+[ext_resource type="Texture2D" uid="uid://bdw3fh4yd7lrf" path="res://assets/ui/buffs/poison.png" id="1_8p5ad"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_sf8n8"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_vpdxd"]
+
+[resource]
+script = ExtResource("3_vpdxd")
+id = &"poison"
+display_name = "中毒"
+description = "每秒受到伤害，持续 8 秒，比燃烧更慢但更久。"
+icon = ExtResource("1_8p5ad")
+is_debuff = true
+duration = 8.0
+tick_interval = 1.0
+damage_per_tick = 1.0
+damage_per_tick_per_level = 0.5

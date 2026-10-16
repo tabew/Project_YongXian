@@ -69,43 +69,85 @@ var navigation_speed: float:
 ##BuffHolder 读当前属性值。速度借用 navigation_speed（底层是每只怪物独立的副本），
 ##所以 AI 自己改过导航速度后，holder 下一次重算会把这个改动认成新基准，不会踩掉它。
 func read_stat(stat: StringName) -> float:
+	var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
+
 	match stat:
 		&"move_speed":
 			return navigation_speed
 		&"defense":
-			var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
 			return health_component.defense if health_component != null else 0.0
+		&"damage_taken":
+			return health_component.damage_taken if health_component != null else 1.0
+		&"damage_dealt":
+			return outgoing_damage_multiplier
+		&"lifesteal":
+			return lifesteal
+		&"max_health":
+			return health_component.max_health if health_component != null else 0.0
 	return 0.0
 
 
 ##BuffHolder 把算好的值写回属性
 func apply_stat(stat: StringName, value: float) -> void:
+	var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
+
 	match stat:
 		&"move_speed":
 			navigation_speed = value
 		&"defense":
-			var health_component: HealthComponent = get_node_or_null("Health") as HealthComponent
 			if health_component != null:
 				health_component.defense = value
+		&"damage_taken":
+			if health_component != null:
+				health_component.damage_taken = value
+		&"damage_dealt":
+			outgoing_damage_multiplier = value
+		&"lifesteal":
+			lifesteal = value
+		&"max_health":
+			if health_component != null:
+				health_component.max_health = maxf(value, 1.0)
+				health_component.current_health = minf(health_component.current_health, health_component.max_health)
+				health_component.health_changed.emit(health_component.current_health, health_component.max_health)
 
 
-# ===== AI 修改开始 (buff 标记：隐身) =====
 ##当前是否处于隐身状态
 var invisible: bool = false
+##buff 的攻击力倍率（1.0 = 正常），由 BuffHolder 写回
+var outgoing_damage_multiplier: float = 1.0
+##buff 的吸血比例（0 = 不吸血），由 BuffHolder 写回
+var lifesteal: float = 0.0
 
 
-##BuffHolder 通知标记类效果（隐身不是数值属性，所以单独一个入口）
+##BuffHolder 通知标记类效果（隐身）
 func set_buff_flag(flag: StringName, active: bool) -> void:
 	if flag != Buffs.FLAG_INVISIBLE:
 		return
 	invisible = active
-	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
+	modulate.a = Buffs.HIDDEN_ALPHA if active else 1.0
 
 
 ##感知用：隐身时看不见（EnemyPerception 会读这个）
 func is_invisible() -> bool:
 	return invisible
-# ===== AI 修改结束 =====
+
+
+##出手（攻击/出手伤害）会显形
+func reveal_by_action() -> void:
+	var holder: BuffHolder = Buffs.holder_of(self)
+
+	if holder != null:
+		holder.reveal_by_action()
+
+
+##攻击状态下持续显形：动作一停，隐身立刻恢复
+func _update_invisibility_reveal() -> void:
+	var holder: BuffHolder = Buffs.holder_of(self)
+
+	if holder == null or not holder.has_flag(Buffs.FLAG_INVISIBLE):
+		return
+	if get_ai_state() == EnemyState.State.ATTACK:
+		reveal_by_action()
 
 ## 共享占位动画轨道；子类可替换动画库和 Visual 下的外形。
 var _visual_height: float = 0.0:
@@ -144,6 +186,7 @@ func _physics_process(delta: float) -> void:
 	advance_frame_animation(delta)
 	_hit_flash_remaining = maxf(_hit_flash_remaining - delta, 0.0)
 	_update_hit_flash()
+	_update_invisibility_reveal()
 	_knockback_applied_this_frame = _knockback_remaining > 0.0
 	if _knockback_applied_this_frame:
 		var step_time: float = minf(delta, _knockback_remaining)
@@ -348,7 +391,11 @@ func apply_difficulty(entry: int) -> void:
 
 
 func outgoing_damage(base_damage: float) -> float:
-	return base_damage * difficulty_multiplier
+	#隐身现形
+	reveal_by_action()
+
+	return base_damage * difficulty_multiplier * outgoing_damage_multiplier
+
 
 
 # --- 受击反馈 ---------------------------------------------------------------

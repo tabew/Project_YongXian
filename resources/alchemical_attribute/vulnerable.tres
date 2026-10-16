@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Vulnerable" format=3 uid="uid://bhhq45ferenin"]
+
+[ext_resource type="Script" uid="uid://c3f2woncqffjo" path="res://scripts/alchemical_attribute/vulnerable.gd" id="1_vulnerable"]
+[ext_resource type="Resource" uid="uid://pivoi1d3ejo2" path="res://resources/buffs/vulnerable.tres" id="2_vulnerable_buff"]
+
+[resource]
+script = ExtResource("1_vulnerable")
+attribute_id = 18
+name = "易伤"
+max_level = 3
+can_be_interacted_attribute = Array[int]([18])
+level = 3

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cylbid6ljea0k"]
+
+[ext_resource type="Texture2D" uid="uid://caplyn768od5i" path="res://assets/ui/buffs/slow.png" id="1_op4cw"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_a2saf"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_w0swb"]
+
+[sub_resource type="Resource" id="Resource_7mqbh"]
+script = ExtResource("2_a2saf")
+stat = &"move_speed"
+mode = 1
+value = -0.35
+value_per_level = -0.1
+
+[resource]
+script = ExtResource("3_w0swb")
+id = &"slow"
+display_name = "迟缓"
+description = "移动速度下降，持续 5 秒。"
+icon = ExtResource("1_op4cw")
+is_debuff = true
+duration = 5.0
+modifiers = Array[ExtResource("2_a2saf")]([SubResource("Resource_7mqbh")])

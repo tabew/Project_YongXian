@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Thorns" format=3 uid="uid://dwhsxyrom4sho"]
+
+[ext_resource type="Script" uid="uid://dwv87y3c68kx3" path="res://scripts/alchemical_attribute/thorns.gd" id="1_thorns"]
+[ext_resource type="Resource" path="res://resources/buffs/thorns.tres" id="2_thorns_buff"]
+
+[resource]
+script = ExtResource("1_thorns")
+attribute_id = 16
+name = "荆棘"
+max_level = 3
+can_be_interacted_attribute = Array[int]([16])
+level = 3

@@ -136,6 +136,10 @@ func get_display_list() -> Array[Dictionary]:
 func _physics_process(delta: float) -> void:
 	if _active.is_empty():
 		return
+	#隐身效果特殊结算，出手显形窗口结束
+	if _reveal_until_ms > 0 and Time.get_ticks_msec() >= _reveal_until_ms:
+		_reveal_until_ms = 0
+		_sync_flags()
 	var expired: Array = []
 	for entry in _active:
 		var buff: BuffData = entry["buff"]
@@ -186,20 +190,34 @@ func _tick(entry: Dictionary) -> void:
 	var heal: float = buff.heal_amount(level)
 
 	if heal > 0.0:
-		if host.has_method("heal"):
-			host.call("heal", heal)
-		#怪物恢复
-		elif health != null:
-			var maximum: float = float(health.get("max_health"))
-			var current: float = float(health.get("current_health"))
-			if current > 0.0:
-				health.set("current_health", minf(current + heal, maximum))
-				if health.has_signal("health_changed"):
-					health.emit_signal("health_changed", health.get("current_health"), maximum)
+		#回血统一走 Buffs.heal_entity：玩家有 heal()，怪物/靶子补给 HealthComponent
+		Buffs.heal_entity(host, heal)
 
 
-##标记类效果的当前状态（flag -> true），用来判断哪些需要通知宿主变化
+##标记类效果的当前状态（flag -> 最高等级），用来判断哪些需要通知宿主变化
 var _flags: Dictionary = {}
+##已经通知给宿主的对外状态
+var _notified_flags: Dictionary = {}
+
+#///////////隐身显性特殊结算
+##出手显形的截止时间，这之前隐身类标记对外算关闭
+var _reveal_until_ms: int = 0
+
+
+##出手显形，让隐身类标记在 REVEAL_SECONDS 内对宿主与感知都算关闭。
+##隐身 buff 本身不会消失，窗口一过就自动恢复。
+func reveal_by_action() -> void:
+	var until: int = Time.get_ticks_msec() + int(Buffs.REVEAL_SECONDS * 1000.0)
+
+	if until > _reveal_until_ms:
+		_reveal_until_ms = until
+		_sync_flags()
+
+#//////////////////////////////////
+
+##宿主当前是否持有某个标记（不管有没有因为出手被临时压掉）
+func has_flag(flag: StringName) -> bool:
+	return _flags.has(flag)
 
 
 func _recompute_all() -> void:
@@ -221,26 +239,116 @@ func _recompute_all() -> void:
 
 
 ##标记类效果（例如隐身）：集合发生增删时通知宿主一次，
-##宿主实现 set_buff_flag(flag, active) 才会收到，没实现就跳过
+##宿主实现 set_buff_flag(flag, active) 才会收到，没实现就跳过。
+##同时记下每个标记的最高等级
 func _sync_flags() -> void:
 	var wanted: Dictionary = {}
 	for entry in _active:
 		var buff: BuffData = entry["buff"]
+		var level: int = int(entry["level"])
 		for flag: StringName in buff.flags:
-			wanted[flag] = true
-	for flag: StringName in _flags.keys():
-		if not wanted.has(flag):
-			_notify_flag(flag, false)
+			wanted[flag] = maxi(int(wanted.get(flag, 0)), level)
+	#隐身标记在出手期间对外暂时关闭
+	var revealed: bool = Time.get_ticks_msec() < _reveal_until_ms
 	for flag: StringName in wanted.keys():
-		if not _flags.has(flag):
-			_notify_flag(flag, true)
+		_notify_if_changed(flag, not (revealed and flag == Buffs.FLAG_INVISIBLE))
+	for flag: StringName in _notified_flags.keys():
+		if not wanted.has(flag):
+			_notify_if_changed(flag, false)
 	_flags = wanted
 
 
+func _notify_if_changed(flag: StringName, active: bool) -> void:
+	if bool(_notified_flags.get(flag, false)) == active:
+		return
+	_notified_flags[flag] = active
+	_notify_flag(flag, active)
+
+
 func _notify_flag(flag: StringName, active: bool) -> void:
+	if flag == Buffs.FLAG_THORNS:
+		_set_thorns_listening(active)
 	var host: Node = get_parent()
 	if host != null and host.has_method("set_buff_flag"):
 		host.call("set_buff_flag", flag, active)
+
+
+##宿主的受伤信号源
+func _host_damage_source() -> Node:
+	var host: Node = get_parent()
+	if host == null:
+		return null
+	if host.has_signal("damaged") and host.has_method("receive_hit"):
+		return host
+	return host.get_node_or_null("Health")
+
+##荆棘：持有期间监听宿主的受伤信号，把一部分伤害弹回攻击者
+func _set_thorns_listening(active: bool) -> void:
+	var source: Node = _host_damage_source()
+	if source == null or not source.has_signal("damaged"):
+		return
+	if active:
+		if not source.damaged.is_connected(_on_host_damaged):
+			source.damaged.connect(_on_host_damaged)
+	elif source.damaged.is_connected(_on_host_damaged):
+		source.damaged.disconnect(_on_host_damaged)
+
+
+##荆棘：受到伤害时把一部分弹回攻击者。
+##反伤本身不会触发对方的荆棘
+func _on_host_damaged(hit: CombatHit, amount: float) -> void:
+	if hit == null:
+		return
+	var source: Node = hit.source
+	if source == null or not is_instance_valid(source) or source == get_parent():
+		return
+	var depth: int = int(hit.get_meta(Buffs.THORNS_DEPTH_META, 0))
+	if depth >= Buffs.THORNS_MAX_DEPTH:
+		return
+	var level: int = maxi(int(_flags.get(Buffs.FLAG_THORNS, 1)), 1)
+	#按实际吃到的伤害反弹（防御挡掉的部分不算）
+	var back: float = maxf(amount, 0.0) * Buffs.THORNS_RATIO_PER_LEVEL * float(level)
+	if back <= 0.0:
+		return
+	var reflect: CombatHit = CombatHit.new()
+	reflect.damage = back
+	reflect.weapon_id = Buffs.THORNS_WEAPON_ID
+	reflect.set_meta(Buffs.THORNS_DEPTH_META, depth + 1)
+	#反伤的来源就是荆棘持有者自己
+	if get_parent() is Node2D:
+		var self_2d: Node2D = get_parent() as Node2D
+		reflect.source = self_2d
+		reflect.position = self_2d.global_position
+	#攻击者能收 CombatHit 就走同一条路：怪物/训练靶走 Health，玩家走自己的 receive_hit。
+	var source_health: Node = source.get_node_or_null("Health")
+	if source_health != null and source_health.has_method("receive_hit"):
+		source_health.call("receive_hit", reflect)
+		return
+	if source.has_method("receive_hit"):
+		source.call("receive_hit", reflect)
+		return
+	if source.has_method("take_damage"):
+		source.call("take_damage", back)
+
+
+##驱散所有减益（is_debuff 的 buff），返回清掉几个
+func clear_debuffs() -> int:
+	var removed: Array = []
+	for entry in _active:
+		var buff: BuffData = entry["buff"]
+		if buff.is_debuff:
+			removed.append(entry)
+	if removed.is_empty():
+		return 0
+	for entry in removed:
+		_active.erase(entry)
+	if _active.is_empty():
+		set_physics_process(false)
+	_recompute_all()
+	for entry in removed:
+		buff_expired.emit(entry["buff"])
+	changed.emit()
+	return removed.size()
 
 
 ##先认领、再算、最后记录。返回 true 表示确实写回了属性

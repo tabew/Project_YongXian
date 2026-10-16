@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://qmndbhducrkc"]
+
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_4f7jg"]
+[ext_resource type="Texture2D" uid="uid://c6umeddngjo4p" path="res://assets/ui/buffs/lifesteal.png" id="1_uhn1b"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_uhn1b"]
+
+[sub_resource type="Resource" id="Resource_jmhuo"]
+script = ExtResource("1_4f7jg")
+stat = &"lifesteal"
+value = 0.2
+value_per_level = 0.05
+
+[resource]
+script = ExtResource("2_uhn1b")
+id = &"lifesteal"
+display_name = "吸血"
+description = "造成伤害时按比例回复生命，持续 8 秒。"
+icon = ExtResource("1_uhn1b")
+duration = 8.0
+modifiers = Array[ExtResource("1_4f7jg")]([SubResource("Resource_jmhuo")])

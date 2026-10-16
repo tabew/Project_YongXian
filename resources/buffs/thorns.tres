@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/thorns.png" id="1_1uvhn"]
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_k7fch"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_1uvhn"]
+
+[resource]
+script = ExtResource("2_1uvhn")
+id = &"thorns"
+display_name = "荆棘"
+description = "受到伤害时把一部分弹回攻击者，持续 10 秒。"
+icon = ExtResource("1_1uvhn")
+duration = 10.0
+flags = Array[StringName]([&"thorns"])

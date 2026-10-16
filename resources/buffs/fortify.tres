@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://de3h7t6adaos7"]
+
+[ext_resource type="Texture2D" uid="uid://dgnpbjwveo8e7" path="res://assets/ui/buffs/fortify.png" id="1_5nk30"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_u4svq"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_5nk30"]
+
+[sub_resource type="Resource" id="Resource_718hs"]
+script = ExtResource("1_u4svq")
+stat = &"max_health"
+value = 3.0
+value_per_level = 1.0
+
+[resource]
+script = ExtResource("2_5nk30")
+id = &"fortify"
+display_name = "强身"
+description = "最大生命临时提高（增加的部分是空血），持续 8 秒。"
+icon = ExtResource("1_5nk30")
+duration = 8.0
+modifiers = Array[ExtResource("1_u4svq")]([SubResource("Resource_718hs")])

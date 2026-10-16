@@ -20,7 +20,7 @@ extends Resource
 
 ##效果等级，最低0级，最高参考maxLevel，等级不影响效果时长。
 ##无法强化的属性默认0级，原料具有的效果一般为0级，具有等级的药水效果1级起步
-var level:int = 0;
+@export var level:int = 0;
 
 ##判断属性是否可以与之反应
 func can_interact_with(attribute:AlchemicalData) ->bool:
@@ -49,3 +49,39 @@ func can_upgrade_level(attribute:AlchemicalData) -> bool:
 ##产生使用效果
 func use_effect(object:Node = null) -> void:
 	pass
+
+
+##正负面词条
+enum POLARITY
+{
+	AUTO = 0,      ##由属性自己决定（默认正面）
+	POSITIVE = 1,  ##增益类
+	NEGATIVE = 2,  ##伤害/减益类
+	NEUTRAL = 3,   ##中性词条，只做修饰、本身不作用于生物
+}
+
+##正负面词条（AUTO = 问属性自己）
+@export var polarity: POLARITY = POLARITY.AUTO
+
+
+##这个属性对目标算正面还是负面
+func effect_polarity() -> POLARITY:
+	if polarity != POLARITY.AUTO:
+		return polarity
+	return _default_polarity()
+
+
+##属性正负面判断，增益类不用重写，会造成伤害或减益的属性重写成 NEGATIVE
+func _default_polarity() -> POLARITY:
+	return POLARITY.POSITIVE
+
+
+##正面效果
+func is_positive_effect() -> bool:
+	return effect_polarity() == POLARITY.POSITIVE
+
+
+##负面效果
+func is_negative_effect() -> bool:
+	return effect_polarity() == POLARITY.NEGATIVE
+

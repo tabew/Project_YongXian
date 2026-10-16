@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Swift" format=3 uid="uid://dnmf43q3qyiwl"]
+
+[ext_resource type="Script" uid="uid://8oqxdeu4nq46" path="res://scripts/alchemical_attribute/swift.gd" id="1_swift"]
+[ext_resource type="Resource" uid="uid://3yehwoms3aqo" path="res://resources/buffs/swift.tres" id="2_swift_buff"]
+
+[resource]
+script = ExtResource("1_swift")
+attribute_id = 12
+name = "迅捷"
+max_level = 3
+can_be_interacted_attribute = Array[int]([12])
+level = 3

@@ -69,7 +69,7 @@ func update(_monster: BaseMonster, delta: float) -> void:
 		if next_front <= host.spin_phase + offset:
 			fire_slime(index)
 	if _contact_remaining <= 0.0 and _touching_player():
-		host.player.take_damage(host.outgoing_damage(CONTACT_DAMAGE))
+		host.player.take_damage(host.outgoing_damage(CONTACT_DAMAGE), host)
 		_contact_remaining = CONTACT_COOLDOWN
 	var body := host.get_node("Visual/Body") as CanvasItem
 	body.queue_redraw()

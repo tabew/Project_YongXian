@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://pivoi1d3ejo2"]
+
+[ext_resource type="Texture2D" uid="uid://cqnjyp4pr1ka1" path="res://assets/ui/buffs/vulnerable.png" id="1_8qp5t"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_uible"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_8qp5t"]
+
+[sub_resource type="Resource" id="Resource_hsfsg"]
+script = ExtResource("1_uible")
+stat = &"damage_taken"
+mode = 1
+value = 0.25
+value_per_level = 0.1
+
+[resource]
+script = ExtResource("2_8qp5t")
+id = &"vulnerable"
+display_name = "易伤"
+description = "受到的伤害增加，持续 6 秒。"
+icon = ExtResource("1_8qp5t")
+is_debuff = true
+modifiers = Array[ExtResource("1_uible")]([SubResource("Resource_hsfsg")])

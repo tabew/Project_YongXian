@@ -1,11 +1,17 @@
-[gd_resource type="Resource" script_class="IngredientData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://ch0c5582bdtty"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/sticky_ball.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://bh0p0f2dej48m" path="res://assets/items/ingredients/sticky_ball.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
+[ext_resource type="Resource" uid="uid://clue3wk0joahh" path="res://resources/alchemical_attribute/slow.tres" id="4_slow"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/binding.tres" id="5_binding"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_jwgjw"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/weakness.tres" id="6_weakness"]
 
 [resource]
 script = ExtResource("1_data")
 id = 10
 name = "粘性球"
 texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("5_binding"), ExtResource("6_weakness")])
 item_scene_path = "res://scenes/items/ingredients/sticky_ball.tscn"

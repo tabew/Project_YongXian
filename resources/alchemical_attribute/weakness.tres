@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Weakness" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/weakness.gd" id="1_weakness"]
+[ext_resource type="Resource" path="res://resources/buffs/weakness.tres" id="2_weakness_buff"]
+
+[resource]
+script = ExtResource("1_weakness")
+attribute_id = 17
+name = "虚弱"
+max_level = 3
+can_be_interacted_attribute = Array[int]([17])
+buff = ExtResource("2_weakness_buff")
