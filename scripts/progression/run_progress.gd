@@ -112,7 +112,7 @@ func roll_choices(current_weapon: StringName, health_ratio: float) -> Array[Upgr
 ## 选定一张卡：记层数并消耗一次待选。
 func take_card(card_id: StringName) -> bool:
 	var card: UpgradeCard = UpgradePool.get_card(card_id)
-	if card == null:
+	if not UpgradePool.can_take(card, cards_taken):
 		return false
 	if stacks_of(card_id) >= card.max_stacks:
 		return false
@@ -151,6 +151,12 @@ func attack_speed_mult() -> float:
 
 func crit_chance_add() -> float:
 	return UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_CRIT_CHANCE_ADD)
+
+
+## Shared scaling for beneficial player events; zero never unlocks an effect.
+func event_chance(base_chance: float) -> float:
+	var bonus: float = UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_EVENT_CHANCE_MULT)
+	return clampf(clampf(base_chance, 0.0, 1.0) * maxf(1.0 + bonus, 0.0), 0.0, 1.0)
 
 
 func crit_multiplier_add() -> float:
@@ -198,7 +204,7 @@ func potion_range_mult() -> float:
 
 
 func alchemy_echo_chance() -> float:
-	return clampf(UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_ALCHEMY_ECHO), 0.0, 1.0)
+	return event_chance(UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_ALCHEMY_ECHO))
 
 
 func heal_mult() -> float:
@@ -217,7 +223,8 @@ func build_weapon(base: WeaponDefinition) -> WeaponDefinition:
 	var modified: WeaponDefinition = base.duplicate(true) as WeaponDefinition
 	if modified == null:
 		return null
-	modified.critical_chance = clampf(modified.critical_chance + crit_chance_add(), 0.0, 1.0)
+	modified.critical_chance = event_chance(modified.critical_chance + crit_chance_add())
+	modified.proc_chance = event_chance(modified.proc_chance)
 	modified.critical_multiplier = maxf(modified.critical_multiplier + crit_multiplier_add(), 1.0)
 	modified.knockback = maxf(modified.knockback * knockback_mult(), 0.0)
 	# 时间轴统一交给 apply_weapon_cards 结算：它先叠武器卡的绝对值，再整体除攻速，

@@ -79,7 +79,7 @@ func _try_hit(hurtbox: CombatHurtbox) -> void:
 
 ## 生成一次命中并交给目标。子类改变“谁在什么时候可以被命中”的规则后，
 ## 仍然复用这里的伤害、暴击、击退与命中信号。
-func _land_hit(hurtbox: CombatHurtbox) -> void:
+func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 	var hit: CombatHit = CombatHit.new()
 	hit.source = wielder
 	hit.weapon_id = definition.id
@@ -87,7 +87,7 @@ func _land_hit(hurtbox: CombatHurtbox) -> void:
 	var multiplier: float = 1.0
 	if wielder != null and wielder.has_method("outgoing_damage_multiplier"):
 		multiplier = float(wielder.call("outgoing_damage_multiplier", hurtbox))
-	hit.damage = definition.damage * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
+	hit.damage = definition.damage * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()
 	if direction.is_zero_approx():

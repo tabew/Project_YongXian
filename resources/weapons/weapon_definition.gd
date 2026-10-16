@@ -11,6 +11,7 @@ extends Resource
 @export_group("Damage")
 @export_range(0.0, 10000.0, 0.5) var damage: float = 18.0
 @export_range(0.0, 1.0, 0.01) var critical_chance: float = 0.04
+@export_range(0.0, 1.0, 0.01) var proc_chance: float = 0.0
 @export_range(1.0, 10.0, 0.1) var critical_multiplier: float = 2.0
 ## Velocity impulse, in pixels per second. The target applies its own resistance.
 @export_range(0.0, 2000.0, 1.0) var knockback: float = 110.0
@@ -46,6 +47,8 @@ func attacks_per_second() -> float:
 
 func validation_errors() -> PackedStringArray:
 	var errors: PackedStringArray = []
+	if not is_finite(proc_chance) or proc_chance < 0.0 or proc_chance > 1.0:
+		errors.append("Proc chance must be between zero and one.")
 	if id.is_empty():
 		errors.append("Weapon id cannot be empty.")
 	if attack_scene == null:

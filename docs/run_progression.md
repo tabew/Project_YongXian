@@ -52,6 +52,7 @@
 | `move_speed_mult` | `PlayerCharacter._move_speed()` |
 | `pickup_radius_add` | `PlayerCharacter.pickup_radius_tiles()` → `GameWorld._refresh_pickup()` |
 | `damage_mult` | `PlayerCharacter.outgoing_damage_multiplier()` → `WeaponAttack._land_hit()` 与 `OrbitBall._deal_damage()` |
+| `event_chance_mult` | `RunProgress.event_chance()` 统一缩放武器特效、暴击和炼金回响；武器概率通过 `build_weapon()` 写入副本 |
 | `crit_chance_add` / `crit_multiplier_add` | `RunProgress.build_weapon()` 写进武器副本 |
 | `knockback_mult` | `RunProgress.build_weapon()` |
 | `attack_speed_mult` | `RunProgress.build_weapon()`：前摇 / 后摇 / 复用间隔一起除以倍率 |
@@ -66,6 +67,12 @@
 | `alchemy_exp_mult` | `RunProgress.alchemy_experience()` |
 | `kill_exp_mult` | `RunProgress.kill_experience()` |
 | `no_potion` | `PlayerCharacter.potions_blocked()` → `PotionData.left_use()` |
+
+### 通用概率加成
+
+“幸运”为通用普通卡，任何武器都能抽到。每层贡献 `event_chance_mult = 0.20`，层数相加，统一公式为 `clamp(基础概率 × (1 + 总加成), 0, 1)`。例如雷鸣 10% → 单层 12% → 五层 20%，蜂巢 15% → 18% → 30%。暴击先叠“锐眼”的百分点加成，再应用幸运；炼金回响必须先取得相应卡，基础概率为零时仍为零。
+
+新增有利概率事件应调用 `RunProgress.event_chance(base_chance)`；武器特效读取已经由 `build_weapon()` 加成的 `WeaponDefinition.proc_chance`，不要再次加成。地图生成、怪物刷新等世界随机事件不受影响，蜂群冷却和数量限制也不变。开新局随 `cards_taken` 清空，当前攻击保持启动时的数值快照。
 
 ### 武器卡
 
@@ -89,9 +96,9 @@
 
 ## 加成卡总表
 
-共 34 张。层数上限列在卡名后的括号里。
+共 40 张。层数上限列在卡名后的括号里。
 
-### 普通（9 张）
+### 普通（10 张）
 
 | 卡 | 效果 | 上限 |
 | --- | --- | --- |
@@ -100,6 +107,7 @@
 | 疾行 | 移动速度 +8% | 4 |
 | 利刃 | 全武器伤害 +12% | 5 |
 | 锐眼 | 暴击率 +3% | 5 |
+| 幸运 | 已有武器特效、暴击与炼金回响概率相对提高 20% | 5 |
 | 致命 | 暴击伤害 +0.3 倍 | 4 |
 | 巨力 | 击退 +25% | 3 |
 | 迅捷 | 攻击速度 +8% | 4 |
@@ -115,9 +123,11 @@
 | 材料学 | 炼金经验 +50% | 3 |
 | 以血换知 | 治疗量 -30%，击杀经验 +25% | 1 |
 
-### 稀有（20 张）
+### 稀有（25 张）
 
-武器卡（10 张，只在握着对应武器时出现）：
+武器卡（15 张，只在握着对应武器时出现）：
+
+新增 5 张溜溜球终极改造：雷鸣的“天罚契约 / 雷暴核心 / 风暴信标”和蜂巢的“蜂巢炸弹 / 迁徙蜂群”。每张最多 1 层，同武器共享 `exclusive_group`，每局只能选其中一种，两把武器各自独立。候选池与 `RunProgress.take_card()` 均校验互斥，旧选项不能绕过；新局重置。具体行为及代价见 [武器终极改造](weapons.md#溜溜球终极改造)。
 
 | 卡 | 武器 | 效果 |
 | --- | --- | --- |

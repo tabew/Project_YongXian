@@ -102,6 +102,7 @@ func _run() -> void:
 	await _test_upgrade_flow()
 	await _test_hud_readout()
 	_test_scene_wiring()
+	_test_fortune()
 	_test_reset()
 
 	if is_instance_valid(_player):
@@ -115,6 +116,35 @@ func _run() -> void:
 
 
 # --- 经验曲线 -------------------------------------------------------------
+
+func _test_fortune() -> void:
+	_progress.reset()
+	var thunder: WeaponDefinition = load("res://resources/weapons/thunder_yoyo.tres")
+	var hive: WeaponDefinition = load("res://resources/weapons/hive_yoyo.tres")
+	_check(is_equal_approx(thunder.proc_chance, 0.10) and is_equal_approx(hive.proc_chance, 0.15), "Yoyos have lower base chances")
+	_check(is_equal_approx(_progress.event_chance(0.1), 0.1), "No fortune leaves chances unchanged")
+	var offered: bool = false
+	for card: UpgradeCard in UpgradePool.candidates({}, &"longsword", 1.0):
+		offered = offered or card.id == &"fortune"
+	_check(offered, "Fortune is available regardless of weapon")
+	_take(&"fortune")
+	var modified: WeaponDefinition = _progress.build_weapon(thunder)
+	_check(is_equal_approx(modified.proc_chance, 0.12), "Fortune scales thunder relatively")
+	_check(is_equal_approx(_progress.build_weapon(hive).proc_chance, 0.18), "Fortune scales hive through the same path")
+	_check(is_equal_approx(modified.critical_chance, 0.048), "Fortune also scales critical chance")
+	_check(_progress.alchemy_echo_chance() == 0.0, "Fortune does not unlock alchemy echo")
+	_take(&"alchemy_echo")
+	_check(is_equal_approx(_progress.alchemy_echo_chance(), 0.24), "Alchemy echo uses shared probability scaling")
+	_take(&"keen")
+	_check(is_equal_approx(_progress.build_weapon(thunder).critical_chance, 0.084), "Dedicated crit bonuses apply before fortune")
+	_take(&"fortune", 4)
+	_check(is_equal_approx(_progress.build_weapon(thunder).proc_chance, 0.20), "Fortune stacks additively to its multiplier")
+	_check(not _progress.take_card(&"fortune"), "Fortune cannot exceed five stacks")
+	_check(_progress.event_chance(0.8) == 1.0 and _progress.event_chance(0.0) == 0.0, "Shared scaling preserves zero and caps at one")
+	_check(is_equal_approx(thunder.proc_chance, 0.1) and is_equal_approx(modified.proc_chance, 0.12), "Source resources and existing snapshots stay unchanged")
+	_progress.reset()
+	_check(is_equal_approx(_progress.build_weapon(thunder).proc_chance, 0.1), "New run clears fortune")
+	_check(is_equal_approx(_progress.build_weapon(LONGSWORD).proc_chance, 0.0), "Ordinary weapons gain no new proc")
 
 func _test_curve() -> void:
 	_progress.reset()

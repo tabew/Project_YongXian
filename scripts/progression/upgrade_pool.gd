@@ -32,6 +32,8 @@ const KEY_DAMAGE_MULT: StringName = &"damage_mult"
 const KEY_MOVE_SPEED_MULT: StringName = &"move_speed_mult"
 ## 暴击率加值。
 const KEY_CRIT_CHANCE_ADD: StringName = &"crit_chance_add"
+const KEY_EVENT_CHANCE_MULT: StringName = &"event_chance_mult"
+const KEY_YOYO_ULTIMATE: StringName = &"yoyo_ultimate"
 ## 击退倍率加值。
 const KEY_KNOCKBACK_MULT: StringName = &"knockback_mult"
 ## 攻速倍率加值。
@@ -97,6 +99,8 @@ static func candidates(stacks: Dictionary, current_weapon: StringName, health_ra
 	var result: Array[UpgradeCard] = []
 	for id: StringName in catalog():
 		var card: UpgradeCard = catalog()[id]
+		if not can_take(card, stacks):
+			continue
 		if int(stacks.get(id, 0)) >= card.max_stacks:
 			continue
 		if card.scope == UpgradeCard.Scope.WEAPON and card.weapon_id != current_weapon:
@@ -108,6 +112,17 @@ static func candidates(stacks: Dictionary, current_weapon: StringName, health_ra
 
 
 ## 抽 count 张不重复的卡。force_rare 保证结果里至少有一张稀有。
+static func can_take(card: UpgradeCard, stacks: Dictionary) -> bool:
+	if card == null or int(stacks.get(card.id, 0)) >= card.max_stacks:
+		return false
+	if not card.exclusive_group.is_empty():
+		for id: StringName in stacks:
+			var taken: UpgradeCard = get_card(id)
+			if int(stacks[id]) > 0 and taken != null and taken.exclusive_group == card.exclusive_group:
+				return false
+	return true
+
+
 static func roll(
 	count: int,
 	stacks: Dictionary,
@@ -228,6 +243,8 @@ static func apply_weapon_cards(weapon: WeaponDefinition, stacks: Dictionary, att
 		# 长绳把回收时间推长，后摇必须跟着覆盖，否则校验不通过会静默失效。
 		# 这一步必须放在攻速之后：回收时间不受攻速影响，先除后比才是正确的不变量。
 		yoyo.recovery_seconds = maxf(yoyo.recovery_seconds, yoyo.return_seconds())
+		if yoyo is SwarmYoyoDefinition:
+			(yoyo as SwarmYoyoDefinition).apply_ultimate(int(sum_effects(applicable, KEY_YOYO_ULTIMATE)))
 
 
 ## 只保留“能作用在这把武器上”的卡：通用卡与机制卡始终保留，武器卡必须 id 匹配。
@@ -253,6 +270,12 @@ static func _build_catalog() -> void:
 	var alchemy: int = UpgradeCard.Scope.ALCHEMY
 	var mechanic: int = UpgradeCard.Scope.MECHANIC
 	var cost: int = UpgradeCard.Scope.COST
+	_add_ultimate(&"thunder_contract", "天罚契约", "落雷必定触发；球体伤害 -60%，命中间隔变为 0.65 秒", &"thunder_yoyo", 1)
+	_add_ultimate(&"thunder_core", "雷暴核心", "落雷伤害 +150%、半径 +50%；预警 0.6 秒，冷却 2 秒", &"thunder_yoyo", 2)
+	_add_ultimate(&"thunder_beacon", "风暴信标", "原地连续落雷 3 次；首次延迟 0.5 秒，最多 2 个雷区", &"thunder_yoyo", 3)
+	_add_ultimate(&"hive_bomb", "蜂巢炸弹", "维持满 1 秒后主动收球释放 8 只蜜蜂；不再命中生蜂", &"hive_yoyo", 4)
+	_add_ultimate(&"hive_migration", "迁徙蜂群", "蜜蜂存活 5 秒，每 0.4 秒撕咬；球伤 -40%，生蜂间隔 1.2 秒", &"hive_yoyo", 5)
+	_add(&"fortune", "幸运", "已有的武器特效、暴击与炼金回响概率相对提高 20%（10% → 12%）", common, general, 5, {KEY_EVENT_CHANCE_MULT: 0.20})
 
 	_add(&"constitution", "体质", "生命上限 +15", common, general, 4, {KEY_MAX_HEALTH_ADD: 15.0})
 	_add(&"toughness", "坚韧", "受到伤害 -6%", common, general, 3, {KEY_DAMAGE_TAKEN_MULT: -0.06})
@@ -307,6 +330,12 @@ static func _build_catalog() -> void:
 		{KEY_DAMAGE_MULT: 0.35, KEY_DAMAGE_TAKEN_MULT: 0.50}, &"", 0.70)
 	_add(&"ascetic", "苦行", "无法使用药水，全武器伤害 +45%", rare, cost, 1,
 		{KEY_NO_POTION: 1.0, KEY_DAMAGE_MULT: 0.45}, &"", 0.70)
+
+
+static func _add_ultimate(id: StringName, title: String, description: String, weapon: StringName, mode: int) -> void:
+	_add(id, title, description + "。同武器终极改造每局限选一种", UpgradeCard.Rarity.RARE, UpgradeCard.Scope.WEAPON, 1, {KEY_YOYO_ULTIMATE: mode}, weapon)
+	var card: UpgradeCard = _catalog[id]
+	card.exclusive_group = StringName(str(weapon) + "_ultimate")
 
 
 static func _add(
