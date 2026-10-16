@@ -9,4 +9,3 @@ attribute_id = 20
 name = "强身"
 max_level = 3
 can_be_interacted_attribute = Array[int]([20])
-level = 3

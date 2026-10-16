@@ -1,9 +1,9 @@
-[gd_resource type="Resource" format=3 uid="uid://c7euk4walwjvc"]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://c7euk4walwjvc"]
 
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_jnca5"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_gy6cp"]
 [ext_resource type="Script" uid="uid://bpk4eaaq2go1w" path="res://scripts/items/weapons/weapon_data.gd" id="3_61glm"]
-[ext_resource type="Texture2D" path="res://assets/weapons/spear.png" id="4_gy6cp"]
+[ext_resource type="Texture2D" uid="uid://tjfnb2458bh0" path="res://assets/weapons/spear.png" id="4_gy6cp"]
 [ext_resource type="Resource" uid="uid://cytadqw85e6rn" path="res://resources/weapons/spear.tres" id="5_weapon"]
 
 [resource]
@@ -14,5 +14,4 @@ name = "长枪"
 texture = ExtResource("4_gy6cp")
 max_stack = 1
 item_scene_path = "res://scenes/items/weapons/spear.tscn"
-weapon_definition = ExtResource("5_weapon")
 metadata/_custom_type_script = "uid://basv57d51ddac"

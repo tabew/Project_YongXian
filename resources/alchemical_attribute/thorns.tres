@@ -9,4 +9,3 @@ attribute_id = 16
 name = "荆棘"
 max_level = 3
 can_be_interacted_attribute = Array[int]([16])
-level = 3

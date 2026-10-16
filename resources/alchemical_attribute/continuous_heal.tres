@@ -9,5 +9,4 @@ attribute_id = 2
 name = "恢复"
 max_level = 3
 can_be_interacted_attribute = Array[int]([2, 5])
-level = 3
 metadata/_custom_type_script = "uid://lqt074b7iugc"
