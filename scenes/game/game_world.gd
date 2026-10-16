@@ -29,10 +29,34 @@ var _combat_entry_count: int = 0
 var _map_entity_roots: Dictionary = {}
 ## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
 var _material_maps: Dictionary = {}
+## 每张地图的地面材料占位格子，供草丛排除。
+var _material_tiles: Dictionary = {}
+## 每张地图的地面材料点位（纯函数结果），过场动画期间就能提前算好。
+var _material_plans: Dictionary = {}
+## 每张地图的草丛上下文（排除区）、按小块的视图与独立草层。
+var _grass_contexts: Dictionary = {}
+var _grass_views: Dictionary = {}
+var _grass_roots: Dictionary = {}
+## 每张地图已清除的草丛（key -> true）；本局内保留，重建世界才清空。
+var _grass_cleared: Dictionary = {}
+## 草丛按玩家周围懒生成：待做队列 + 每帧预算，进入地图时不必同步铺满整图。
+var _grass_queue: Array[Dictionary] = []
+var _grass_cursor: int = 0
+var _grass_queued: Dictionary = {}
+var _grass_focus_chunk: Vector2i = INVALID_CHUNK
 var _nearby_pickup: GroundPickup = null
 var _nearby_chest: WorldChest = null
 var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
+## 草丛层高于角色与怪物（0），低于武器与怪物血条（2）。
+const GRASS_Z_INDEX: int = 1
+## 草丛只生成玩家周围这个区块半径内的小块，走一步补一片。
+## 视野在缩放 2 倍时约 1.3x0.7 个区块，1 圈足够盖住屏幕还留出余量。
+const GRASS_RADIUS_CHUNKS: int = 1
+## 每帧最多生成几块草丛；黑屏转场期间没有画面要画，可以多做。
+const GRASS_CELLS_PER_FRAME: int = 8
+const GRASS_CELLS_PER_FRAME_TRANSITION: int = 24
+const INVALID_CHUNK: Vector2i = Vector2i(2147483647, 2147483647)
 
 
 func _ready() -> void:
@@ -45,6 +69,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# 草丛按预算长出来；转场黑屏期间也在推进，这样淡入时身边已经长好。
+	_process_grass_queue()
 	if _generator == null or player.active_map == null or _transitioning:
 		return
 	_sync_training_dummy()
@@ -73,6 +99,12 @@ func _transition_to_map(link: Dictionary) -> void:
 	var was_physics_processing: bool = player.is_physics_processing()
 	var was_handling_input: bool = player.is_processing_unhandled_input()
 	var monster_mode: Node.ProcessMode = monster_spawner.process_mode
+	# 黑屏之前就把下一张图铺好：地面材料点位与到达点周围的草丛，动画期间逐帧生成。
+	_prewarm_map(
+		_generator.map_spec(int(link["target"])),
+		int(link["arrival_side"]),
+		int(link["arrival_y"])
+	)
 	player.weapon_controller.cancel_attack()
 	player.set_physics_process(false)
 	player.set_process_unhandled_input(false)
@@ -137,6 +169,8 @@ func build_world(seed_value: int) -> void:
 	# 房间类型决定内容池：只有战斗 / Boss 区域刷怪。
 	monster_spawner.content = MapContent.build(_generator)
 	chunk_manager.setup(_generator, player)
+	if not chunk_manager.chunk_applied.is_connected(_on_grass_chunk_applied):
+		chunk_manager.chunk_applied.connect(_on_grass_chunk_applied)
 	_enter_map(_generator.run.start_node(), 0, -1, true)
 	_place_training_dummy(_generator, WorldGenerator.world_to_tile(player.global_position))
 	_setup_map_monsters()
@@ -187,6 +221,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	chunk_manager.load_map(map_node_id)
 	_setup_world_population(spec)
 	_setup_ground_materials(spec)
+	_setup_grass(spec)
 	_refresh_pickup()
 	if _hud_bound:
 		_sync_training_dummy()
@@ -300,6 +335,19 @@ func _clear_map_entities() -> void:
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
 	_material_maps.clear()
+	_material_tiles.clear()
+	_material_plans.clear()
+	_grass_contexts.clear()
+	_grass_views.clear()
+	_grass_cleared.clear()
+	_grass_queue.clear()
+	_grass_cursor = 0
+	_grass_queued.clear()
+	_grass_focus_chunk = INVALID_CHUNK
+	for grass_root: Node2D in _grass_roots.values():
+		remove_child(grass_root)
+		grass_root.queue_free()
+	_grass_roots.clear()
 	for root: Node2D in _map_entity_roots.values():
 		remove_child(root)
 		root.queue_free()
@@ -345,7 +393,9 @@ func _setup_world_population(spec: MapSpec) -> void:
 func _setup_ground_materials(spec: MapSpec) -> void:
 	var entity_root: Node2D = _map_entity_root(spec.node_id)
 	if not _material_maps.has(spec.node_id):
-		for entry: Dictionary in GroundMaterials.plan(_generator, spec):
+		# 点位在过场动画期间就备好了，这里只建节点。
+		_ensure_material_plan(spec)
+		for entry: Dictionary in _material_plans.get(spec.node_id, []):
 			var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
 			if data == null:
 				continue
@@ -355,10 +405,210 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 			pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 			entity_root.add_child(pickup)
 		_material_maps[spec.node_id] = true
+	_sync_layer_visibility()
+
+
+## 只有当前箱庭的实体与草丛可见；其余隐藏并暂停。
+func _sync_layer_visibility() -> void:
 	for id: int in _map_entity_roots:
 		var map_root: Node2D = _map_entity_roots[id]
 		map_root.visible = id == _current_node
-		map_root.process_mode = Node.PROCESS_MODE_INHERIT if id == _current_node else Node.PROCESS_MODE_DISABLED
+		map_root.process_mode = (
+			Node.PROCESS_MODE_INHERIT if id == _current_node else Node.PROCESS_MODE_DISABLED
+		)
+	for id: int in _grass_roots:
+		var grass_root: Node2D = _grass_roots[id]
+		grass_root.visible = id == _current_node
+		grass_root.process_mode = (
+			Node.PROCESS_MODE_INHERIT if id == _current_node else Node.PROCESS_MODE_DISABLED
+		)
+
+
+func _setup_grass(spec: MapSpec) -> void:
+	if _generator == null:
+		return
+	_ensure_grass_context(spec)
+	# 换地图时丢掉上一张图没做完的队列，重新按新位置排。
+	_grass_queue.clear()
+	_grass_cursor = 0
+	_grass_queued.clear()
+	_grass_focus_chunk = INVALID_CHUNK
+	_queue_grass_around(spec)
+
+
+## 把玩家周围视野圈内已经铺好的区块排进队列，近的先做。
+## 换地图或换区块时重新排；整图的草丛不再在进图时一次算完。
+func _queue_grass_around(spec: MapSpec) -> void:
+	if _generator == null or player.active_map == null:
+		return
+	var focus: Vector2i = WorldGenerator.tile_to_chunk(
+		WorldGenerator.world_to_tile(player.global_position)
+	)
+	if focus == _grass_focus_chunk:
+		return
+	_grass_focus_chunk = focus
+	_queue_grass_ring(spec, focus)
+
+
+## 把以 focus 区块为中心的视野圈里、已经铺好的区块排进队列（近的先做）。
+## 过场动画预热下一张图时也走这里，只是中心换成到达点。
+func _queue_grass_ring(spec: MapSpec, focus: Vector2i) -> void:
+	if _generator == null:
+		return
+	var per_side: int = _grass_cells_per_chunk()
+	var origin: Vector2i = focus - Vector2i(GRASS_RADIUS_CHUNKS, GRASS_RADIUS_CHUNKS)
+	var span: int = GRASS_RADIUS_CHUNKS * 2 + 1
+	var pending: Array[Dictionary] = []
+	for cy: int in span:
+		for cx: int in span:
+			var chunk: Vector2i = origin + Vector2i(cx, cy)
+			if chunk_manager.get_cached_chunk(chunk) == null:
+				continue
+			for sub: int in per_side * per_side:
+				var cell: Vector2i = chunk * per_side + Vector2i(sub % per_side, sub / per_side)
+				var key := Vector3i(cell.x, cell.y, spec.node_id)
+				if _grass_queued.has(key) or _grass_cell_is_populated(spec, cell):
+					continue
+				_grass_queued[key] = true
+				pending.append({"spec_id": spec.node_id, "cell": cell, "chunk": chunk})
+	if pending.is_empty():
+		return
+	var center := Vector2(focus * WorldGenerator.CHUNK_SIZE)
+	pending.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return _grass_cell_distance(a["cell"], center) < _grass_cell_distance(b["cell"], center)
+	)
+	_grass_queue.append_array(pending)
+
+
+func _grass_cell_distance(cell: Vector2i, center_tile: Vector2) -> float:
+	return (Vector2(cell * GrassView.CELL_TILES) - center_tile).length_squared()
+
+
+func _grass_cell_is_populated(spec: MapSpec, cell: Vector2i) -> bool:
+	var views: Dictionary = _grass_views.get(spec.node_id, {})
+	var view: GrassView = views.get(cell)
+	return view != null and view.is_populated()
+
+
+## 每帧按预算把队列里的草丛长出来；转场黑屏期间可以多做。
+func _process_grass_queue() -> void:
+	if _generator == null or player.active_map == null:
+		return
+	var spec: MapSpec = player.active_map
+	_queue_grass_around(spec)
+	if _grass_cursor >= _grass_queue.size():
+		return
+	var budget: int = (
+		GRASS_CELLS_PER_FRAME_TRANSITION
+		if _transitioning or SceneManager.is_transitioning()
+		else GRASS_CELLS_PER_FRAME
+	)
+	var attempts: int = 0
+	while attempts < budget and _grass_cursor < _grass_queue.size():
+		attempts += 1
+		var entry: Dictionary = _grass_queue[_grass_cursor]
+		_grass_cursor += 1
+		var cell: Vector2i = entry["cell"]
+		_grass_queued.erase(Vector3i(cell.x, cell.y, int(entry["spec_id"])))
+		var entry_spec: MapSpec = _generator.map_spec(int(entry["spec_id"]))
+		if entry_spec != null:
+			_grow_grass_cell(entry_spec, cell, entry["chunk"])
+	if _grass_cursor >= _grass_queue.size():
+		_grass_queue.clear()
+		_grass_cursor = 0
+
+
+func _grow_grass_cell(spec: MapSpec, cell: Vector2i, chunk_coords: Vector2i) -> bool:
+	var data: ChunkData = chunk_manager.get_cached_chunk(chunk_coords)
+	if data == null:
+		return false
+	var view: GrassView = _grass_view_for(spec, cell)
+	if view == null or view.is_populated():
+		return false
+	view.populate(data, chunk_coords)
+	return true
+
+
+## 每张地图一层草丛，z 高于角色与怪物，高草因此能盖住人和怪。
+func _grass_root(map_node_id: int) -> Node2D:
+	if _grass_roots.has(map_node_id):
+		return _grass_roots[map_node_id]
+	var root := Node2D.new()
+	root.name = "GrassLayer_%d" % map_node_id
+	root.z_index = GRASS_Z_INDEX
+	root.visible = map_node_id == _current_node
+	add_child(root)
+	_grass_roots[map_node_id] = root
+	return root
+
+
+## 过场动画期间提前准备下一张箱庭：材料点位、草丛排除区与到达点周围的草丛。
+## 黑屏结束时草已经在位，切图本身只剩很轻的工作。
+func _prewarm_map(spec: MapSpec, side: int, gate_y: int) -> void:
+	if _generator == null or spec == null:
+		return
+	_ensure_grass_context(spec)
+	var arrival: Vector2 = _generator.entry_position(spec.node_id, side, gate_y)
+	_queue_grass_ring(spec, WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(arrival)))
+
+
+## 地面材料点位是纯函数结果，提前算好并缓存；进图时直接按点位建节点。
+func _ensure_material_plan(spec: MapSpec) -> void:
+	if _material_plans.has(spec.node_id):
+		return
+	var plan: Array[Dictionary] = GroundMaterials.plan(_generator, spec)
+	_material_plans[spec.node_id] = plan
+	var tiles: Dictionary = {}
+	for entry: Dictionary in plan:
+		tiles[entry["tile"]] = true
+	_material_tiles[spec.node_id] = tiles
+
+
+func _ensure_grass_context(spec: MapSpec) -> void:
+	if _grass_contexts.has(spec.node_id):
+		return
+	_ensure_material_plan(spec)
+	_grass_contexts[spec.node_id] = GrassContext.create(
+		_generator, spec, _material_tiles.get(spec.node_id, {})
+	)
+	if not _grass_cleared.has(spec.node_id):
+		_grass_cleared[spec.node_id] = {}
+
+
+## 一个区块覆盖多少个小块：区块 32 格、块 8 格，正好 4x4。
+func _grass_cells_per_chunk() -> int:
+	return WorldGenerator.CHUNK_SIZE / GrassView.CELL_TILES
+
+
+func _grass_view_for(spec: MapSpec, cell: Vector2i) -> GrassView:
+	if not _grass_contexts.has(spec.node_id) or not _grass_cleared.has(spec.node_id):
+		return null
+	if not _grass_views.has(spec.node_id):
+		_grass_views[spec.node_id] = {}
+	var views: Dictionary = _grass_views[spec.node_id]
+	if views.has(cell):
+		return views[cell]
+	var view := GrassView.new()
+	view.name = "Grass_%d_%d" % [cell.x, cell.y]
+	view.bind(
+		cell,
+		Rect2i(spec.origin, spec.extent),
+		_generator,
+		_grass_contexts[spec.node_id],
+		_grass_cleared[spec.node_id]
+	)
+	_grass_root(spec.node_id).add_child(view)
+	views[cell] = view
+	return view
+
+
+## 区块铺好后，可能正好落在玩家视野圈里：让下一帧重新按位置排队。
+func _on_grass_chunk_applied(_coords: Vector2i) -> void:
+	if _generator == null or player.active_map == null:
+		return
+	if not _grass_contexts.has(player.active_map.node_id):
+		return
+	_grass_focus_chunk = INVALID_CHUNK
 
 
 func _refresh_pickup() -> void:

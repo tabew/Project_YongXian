@@ -16,6 +16,15 @@ func _check(condition: bool, message: String) -> void:
 		push_error(message)
 
 
+func _wheel_event(at: Vector2) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_WHEEL_UP
+	event.pressed = true
+	event.position = at
+	event.global_position = at
+	return event
+
+
 func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	root.get_node("GameState").set("world_seed", 24681357)
@@ -75,7 +84,17 @@ func _run() -> void:
 	_check(player.health == remaining_health, "原路返回也不会补满生命")
 	minimap.set_expanded(false)
 	_check(minimap._image.get_size() == Vector2i(128, 128), "全屏模式返回箱庭总览小地图")
-	_check(minimap._sampler.world_seed == world._generator.world_seed, "独立总览采样与世界种子一致")
+	_check(minimap._explored_chunks.size() > 0, "小地图只用已探索区块绘制")
+	# 物品栏会在 _input 阶段消费滚轮，地图展开时必须先把滚轮让出来，
+	# 否则滚轮会去切快捷栏而不是缩放地图。
+	minimap.set_expanded(true)
+	var slot_before: int = player.inventory.get_selected_handy()
+	var zoom_before: float = minimap._zoom
+	for _step: int in 3:
+		root.push_input(_wheel_event(Vector2(640.0, 360.0)))
+	_check(minimap._zoom > zoom_before, "全屏地图滚轮缩放没生效")
+	_check(player.inventory.get_selected_handy() == slot_before, "全屏地图打开时滚轮仍被物品栏抢走")
+	minimap.set_expanded(false)
 	player.collide_with_terrain = false
 	var outside: Vector2 = WorldGenerator.tile_to_world(player.active_map.origin - Vector2i.ONE)
 	_check(not player.can_stand_at(outside), "关闭地形碰撞仍不能进入箱庭间隙")

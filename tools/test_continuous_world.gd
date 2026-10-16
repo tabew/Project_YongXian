@@ -286,7 +286,9 @@ func _check_visible_layers(node: Node, bounds: Rect2i) -> void:
 		_check_visible_layers(child, bounds)
 
 
-func _check_minimap(minimap: Minimap, generator: WorldGenerator) -> PackedByteArray:
+func _check_minimap(
+	minimap: Minimap, generator: WorldGenerator, require_explored: bool
+) -> PackedByteArray:
 	var started: int = Time.get_ticks_usec()
 	var pixels: PackedByteArray = minimap.build_pixels()
 	print("MINIMAP: seed=%d build_ms=%.2f, bytes=%d" % [generator.world_seed, float(Time.get_ticks_usec() - started) / 1000.0, pixels.size()])
@@ -297,14 +299,25 @@ func _check_minimap(minimap: Minimap, generator: WorldGenerator) -> PackedByteAr
 		if view.intersects(Rect2i(spec.origin, spec.extent)):
 			visible_regions += 1
 	_check(visible_regions >= 3, "小地图没有保留周边主干与岔路")
-	# 400个样本覆盖整个窗口，也验证没有渲染的邻图仍按真实世界着色。
+	# 小地图只画已探索区块：不是迷雾的像素必须与世界完全一致，没去过的保持迷雾。
+	var matched: int = 0
 	for index: int in 400:
 		var linear: int = (index * 47) % (Minimap.TEXTURE_SIZE * Minimap.TEXTURE_SIZE)
 		var pixel := Vector2i(linear % Minimap.TEXTURE_SIZE, linear / Minimap.TEXTURE_SIZE)
 		var tile: Vector2i = minimap._map_origin + pixel * Minimap.TILES_PER_PIXEL
-		var rgb: int = minimap._color_rgb(generator.sample_terrain(tile), generator.sample_route(tile))
 		var offset: int = (pixel.y * Minimap.TEXTURE_SIZE + pixel.x) * 3
+		if (
+			pixels[offset] == minimap._unknown_rgb[0]
+			and pixels[offset + 1] == minimap._unknown_rgb[1]
+			and pixels[offset + 2] == minimap._unknown_rgb[2]
+		):
+			continue
+		var rgb: int = minimap._color_rgb(generator.sample_terrain(tile), generator.sample_route(tile))
 		_check(pixels[offset] == ((rgb >> 16) & 255) and pixels[offset + 1] == ((rgb >> 8) & 255) and pixels[offset + 2] == (rgb & 255), "小地图与世界颜色不一致")
+		matched += 1
+	if require_explored:
+		_check(matched > 0, "小地图没有画出已探索区块")
+		_check(matched < 400, "小地图把没探索过的区块也画了出来")
 	return pixels
 
 
@@ -437,7 +450,7 @@ func _check_runtime() -> void:
 	await _settle(manager)
 	var generator: WorldGenerator = manager.get_generator()
 	var initial_epoch: int = manager._epoch
-	var pixels: PackedByteArray = _check_minimap(minimap, generator)
+	var pixels: PackedByteArray = _check_minimap(minimap, generator, true)
 	await _check_gate_transitions(game, manager, player, camera)
 	await _check_camera(game, manager, player, camera)
 	_start_workers(game, manager)
@@ -453,13 +466,13 @@ func _check_runtime() -> void:
 	_check(not manager._in_flight.is_empty(), "换seed测试没有派发worker")
 	game.build_world(97231)
 	_check(manager._epoch == initial_epoch + 1, "换种子未更新epoch")
-	_check(minimap._source_generator == manager.get_generator() and minimap._seed == 97231 and minimap._sampler.world_seed == 97231, "换种子残留旧小地图生成器")
+	_check(minimap._source_generator == manager.get_generator() and minimap._seed == 97231, "换种子残留旧小地图生成器")
 	_check(minimap._texture != null, "换种子没有同步重建当前小地图")
 	_check_active_map(game, manager, player, camera, 0)
 	await _settle(manager)
 	_check_world_data(manager)
 	var fresh: WorldGenerator = manager.get_generator()
-	var fresh_pixels: PackedByteArray = _check_minimap(minimap, fresh)
+	var fresh_pixels: PackedByteArray = _check_minimap(minimap, fresh, false)
 	_check(fresh_pixels != pixels and minimap._seed == 97231, "小地图换seed后未更新")
 	if "--capture" in OS.get_cmdline_user_args():
 		game.build_world(18473)

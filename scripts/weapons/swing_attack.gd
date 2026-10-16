@@ -85,6 +85,7 @@ func _sweep(from_angle: float, to_angle: float, from_origin: Vector2, to_origin:
 		_shape.points = Geometry2D.convex_hull(points)
 		_query.transform = Transform2D(0.0, global_position)
 		_query_hurtboxes(_query)
+		_clear_grass(points)
 
 
 func _blade_corners(angle: float, origin: Vector2) -> PackedVector2Array:
