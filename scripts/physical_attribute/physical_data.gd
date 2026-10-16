@@ -7,4 +7,3 @@ extends Resource
 ##物理交互
 func interact() -> void:
 	pass
-

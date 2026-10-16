@@ -12,5 +12,3 @@ func alchemical_text_update(attribute:AlchemicalData)->void:
 		amount_label.text = str(attribute.name)
 	else :
 		amount_label.text = str(attribute.name) + str(attribute.level)
-
-
