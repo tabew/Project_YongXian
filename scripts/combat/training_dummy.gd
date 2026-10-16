@@ -36,6 +36,25 @@ func apply_stat(stat: StringName, value: float) -> void:
 		health.defense = value
 
 
+# ===== AI 修改开始 (buff 标记：隐身) =====
+##当前是否处于隐身状态
+var invisible: bool = false
+
+
+##BuffHolder 通知标记类效果
+func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag != Buffs.FLAG_INVISIBLE:
+		return
+	invisible = active
+	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
+
+
+##和玩家/怪物保持同一套接口
+func is_invisible() -> bool:
+	return invisible
+# ===== AI 修改结束 =====
+
+
 
 func _physics_process(delta: float) -> void:
 	if not health.is_alive():

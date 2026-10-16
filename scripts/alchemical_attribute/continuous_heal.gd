@@ -10,5 +10,5 @@ class_name ContinuousHeal
 func use_effect(object: Node = null) -> void:
 	if buff == null:
 		return
-	Buffs.apply(object, buff, maxi(level, 1))
+	Buffs.apply(object, buff, level)
 

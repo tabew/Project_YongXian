@@ -12,6 +12,13 @@ enum ATTRIBUTE
 	WOODY = 4,
 	BINDING = 5,
 	EXPLOSIVE = 6,
+	# ===== AI 修改开始 (新增两个属性：火/隐身) =====
+	FIRE = 7,
+	INVISIBILITY = 8,
+	# ===== AI 修改结束 =====
+	# ===== AI 修改开始 (护己：药水不作用于使用者) =====
+	SELF_EXEMPT = 9,
+	# ===== AI 修改结束 =====
 }
 
 
@@ -25,7 +32,14 @@ enum ATTRIBUTE
 	preload("res://resources/alchemical_attribute/mineral.tres"),
 	preload("res://resources/alchemical_attribute/woody.tres"),
 	preload("res://resources/alchemical_attribute/binding.tres"),
-	preload("res://resources/alchemical_attribute/explosive.tres")
+	preload("res://resources/alchemical_attribute/explosive.tres"),
+	# ===== AI 修改开始 (新增两个属性：火/隐身) =====
+	preload("res://resources/alchemical_attribute/fire.tres"),
+	preload("res://resources/alchemical_attribute/invisibility.tres"),
+	# ===== AI 修改结束 =====
+	# ===== AI 修改开始 (护己：药水不作用于使用者) =====
+	preload("res://resources/alchemical_attribute/self_exempt.tres")
+	# ===== AI 修改结束 =====
 ]
 
 ##id -> 模板

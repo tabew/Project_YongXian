@@ -88,6 +88,25 @@ func apply_stat(stat: StringName, value: float) -> void:
 			if health_component != null:
 				health_component.defense = value
 
+
+# ===== AI 修改开始 (buff 标记：隐身) =====
+##当前是否处于隐身状态
+var invisible: bool = false
+
+
+##BuffHolder 通知标记类效果（隐身不是数值属性，所以单独一个入口）
+func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag != Buffs.FLAG_INVISIBLE:
+		return
+	invisible = active
+	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
+
+
+##感知用：隐身时看不见（EnemyPerception 会读这个）
+func is_invisible() -> bool:
+	return invisible
+# ===== AI 修改结束 =====
+
 ## 共享占位动画轨道；子类可替换动画库和 Visual 下的外形。
 var _visual_height: float = 0.0:
 	set(value):

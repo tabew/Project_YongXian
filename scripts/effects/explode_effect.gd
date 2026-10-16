@@ -26,6 +26,8 @@ var _shape: CircleShape2D = null
 var _elapsed: float = 0.0
 var _idle_seconds: float = 0.0
 var _playing: bool = false
+##"护己"：本次爆炸要跳过的人（药水带这个属性时就是使用者自己）
+var _exempt: Node = null
 
 
 ##在当前位置炸一次：radius 内的敌人(受击盒)与玩家都吃伤害与击退。
@@ -33,9 +35,25 @@ var _playing: bool = false
 func detonate(radius: float, enemy_damage: float, player_damage: float, knockback: float,  source: Node,hit_mask: int = 7,
 		edge_scale: float = 0.3, falloff_power: float = 1.0) -> void:
 	_prepare_shape(radius)
+	#"护己"：投掷者把它自己记在药水模型的 metadata 上，爆炸同样要跳过它
+	_exempt = _exempt_of(source)
 	_hit_hurtboxes(enemy_damage, knockback, hit_mask, _resolve_source(source), edge_scale, falloff_power)
 	_hit_player(player_damage, knockback, edge_scale, falloff_power)
 	_play_visual(radius)
+
+
+##从来源节点的 metadata 取"护己"记录（没有就是 null）
+func _exempt_of(source: Node) -> Node:
+	if source == null or not is_instance_valid(source) or not source.has_meta(SelfExempt.EXEMPT_META):
+		return null
+	return source.get_meta(SelfExempt.EXEMPT_META) as Node
+
+
+##这个节点（连同它下面的节点）是否是被排除的使用者
+func _is_exempt_entity(node: Node) -> bool:
+	if _exempt == null or node == null or not is_instance_valid(_exempt):
+		return false
+	return node == _exempt or _exempt.is_ancestor_of(node)
 
 
 ##按到爆心的距离算击退倍率：爆心 1.0，圈边 edge_scale，power 控制曲线形状
@@ -93,6 +111,10 @@ func _hit_hurtboxes(enemy_damage: float, knockback: float, hit_mask: int, source
 		if hurtbox == null or not hurtbox.can_receive_hit(source, SOURCE_TEAM):
 			continue
 
+		#护己：跳过使用者自己身上的受击盒
+		if hurtbox.health != null and _is_exempt_entity(hurtbox.health.get_parent()):
+			continue
+
 		var hit: CombatHit = CombatHit.new()
 		hit.source = source
 		hit.weapon_id = WEAPON_ID
@@ -115,6 +137,10 @@ func _hit_player(player_damage: float, knockback: float, edge_scale: float, fall
 			break
 
 	if player == null or not is_instance_valid(player):
+		return
+
+	#护己：使用者自己不受伤也不被推
+	if _is_exempt_entity(player):
 		return
 
 	var to_target: Vector2 = player.global_position - global_position

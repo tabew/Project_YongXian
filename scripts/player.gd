@@ -212,6 +212,25 @@ func apply_stat(stat: StringName, value: float) -> void:
 			damage_taken = value
 
 
+# ===== AI 修改开始 (buff 标记：隐身) =====
+##当前是否处于隐身状态
+var invisible: bool = false
+
+
+##BuffHolder 通知标记类效果（隐身不是数值属性，所以单独一个入口）
+func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag != Buffs.FLAG_INVISIBLE:
+		return
+	invisible = active
+	#半透明表示隐身：整棵子树（人物+武器）一起变淡
+	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
+
+
+func is_invisible() -> bool:
+	return invisible
+# ===== AI 修改结束 =====
+
+
 ##持续恢复之类的定时效果走这里
 func heal(amount: float) -> void:
 	if amount <= 0.0 or health <= 0.0:

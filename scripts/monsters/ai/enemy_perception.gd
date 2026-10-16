@@ -32,12 +32,21 @@ func hearing_radius() -> float:
 func can_see(target: Node2D) -> bool:
 	if host == null or target == null or not is_instance_valid(target):
 		return false
+	if _is_hidden(target):
+		return false
 	var to_target: Vector2 = target.global_position - host.global_position
 	if to_target.length() > vision_distance():
 		return false
 	if not _inside_vision_cone(to_target):
 		return false
 	return host.has_clear_line_to_position(target.global_position, target)
+
+
+## 隐身（buff 标记）：看不见就锁不上。
+## 只拦"看见"这一条：噪音与被攻击仍然会 push_suspicious，怪物会去查看最后位置，
+## 但 blackboard.can_see_target 保持 false，所以不会进入 Chase/Attack 追踪玩家。
+func _is_hidden(target: Node2D) -> bool:
+	return target.has_method("is_invisible") and bool(target.call("is_invisible"))
 
 
 func _inside_vision_cone(to_target: Vector2) -> bool:

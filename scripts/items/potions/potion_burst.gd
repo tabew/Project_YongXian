@@ -22,6 +22,9 @@ var attributes: Array[AlchemicalData] = []
 ##间隔下限
 const MIN_PULSE_INTERVAL: float = 0.05
 
+##被排除在效果之外的目标（药水带"护己"属性时是使用者自己）
+var exempt_target: Node = null
+
 ##下一个脉冲的时间点(相对 _elapsed)
 var _next_pulse_at: float = 0.0
 ##最近一次脉冲的时间点，用来画脉冲闪光
@@ -43,10 +46,13 @@ func _ready() -> void:
 
 
 ##由药水在碎点调用，设置范围参数并立刻放第一个脉冲
-func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attributes: Array[AlchemicalData]) -> void:
+##exempt：不参与效果的目标（带"护己"属性的药水会把使用者传进来）
+func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attributes: Array[AlchemicalData],
+		exempt: Node = null) -> void:
 	radius = burst_radius
 	duration = burst_duration
 	attributes = burst_attributes
+	exempt_target = exempt
 	global_position = at
 	if _shape != null:
 		_shape.radius = maxf(radius, 1.0)
@@ -122,13 +128,20 @@ func _query_bodies() -> Array:
 func _apply_to(bodies: Array) -> void:
 	for body: Variant in bodies:
 		var target: Node = body as Node
-		if target == null:
+		if target == null or _is_exempt(target):
 			continue
 		for attribute: AlchemicalData in attributes:
 			if attribute != null and attribute.has_method("use_effect"):
 				attribute.use_effect(target)
 				if attribute.is_take_only_one == true:
 					attributes.erase(attribute)
+
+
+##"护己"：使用者自己（连同它下面的节点）不算圈内目标
+func _is_exempt(target: Node) -> bool:
+	if exempt_target == null or not is_instance_valid(exempt_target):
+		return false
+	return target == exempt_target or exempt_target.is_ancestor_of(target)
 
 
 

@@ -44,11 +44,12 @@ func _ready() -> void:
 
 
 ##施加一个 buff：同一个 id 只保留一份，取最高级
-##新等级更高 → 升级并刷新时长；等级更低 → 什么都不做（返回 false）
-func apply(buff: BuffData, level: int = 1, source: Node = null) -> bool:
+##新等级更高 → 升级并刷新时长；同级 → 只刷新时长；更低 → 什么都不做（返回 false）
+##等级从 0 级开始：0 级就是基础数值，每高一级 +value_per_level
+func apply(buff: BuffData, level: int = 0, source: Node = null) -> bool:
 	if buff == null or buff.id == &"":
 		return false
-	var wanted: int = clampi(level, 1, maxi(buff.max_level, 1))
+	var wanted: int = clampi(level, 0, maxi(buff.max_level, 1))
 	var entry: Dictionary = _find(buff.id)
 
 	if not entry.is_empty():
@@ -197,6 +198,10 @@ func _tick(entry: Dictionary) -> void:
 					health.emit_signal("health_changed", health.get("current_health"), maximum)
 
 
+##标记类效果的当前状态（flag -> true），用来判断哪些需要通知宿主变化
+var _flags: Dictionary = {}
+
+
 func _recompute_all() -> void:
 	var stats: Dictionary = {}
 	for entry in _active:
@@ -212,6 +217,30 @@ func _recompute_all() -> void:
 		wrote = _rewrite(stat) or wrote
 	if wrote:
 		stats_changed.emit()
+	_sync_flags()
+
+
+##标记类效果（例如隐身）：集合发生增删时通知宿主一次，
+##宿主实现 set_buff_flag(flag, active) 才会收到，没实现就跳过
+func _sync_flags() -> void:
+	var wanted: Dictionary = {}
+	for entry in _active:
+		var buff: BuffData = entry["buff"]
+		for flag: StringName in buff.flags:
+			wanted[flag] = true
+	for flag: StringName in _flags.keys():
+		if not wanted.has(flag):
+			_notify_flag(flag, false)
+	for flag: StringName in wanted.keys():
+		if not _flags.has(flag):
+			_notify_flag(flag, true)
+	_flags = wanted
+
+
+func _notify_flag(flag: StringName, active: bool) -> void:
+	var host: Node = get_parent()
+	if host != null and host.has_method("set_buff_flag"):
+		host.call("set_buff_flag", flag, active)
 
 
 ##先认领、再算、最后记录。返回 true 表示确实写回了属性

@@ -43,15 +43,22 @@ extends Resource
 ##对宿主属性的修改列表
 @export var modifiers: Array[StatModifier] = []
 
+@export_group("标记")
+##标记类效果（不是数值属性，例如 &"invisible"）。宿主实现 set_buff_flag(flag, active)
+##时才会收到通知，所以附加在怪物/靶子上也不会报错；效果全部到期时同样会收到 active=false。
+@export var flags: Array[StringName] = []
+
 
 func has_tick() -> bool:
 	return tick_interval > 0.0 and (heal_per_tick != 0.0 or heal_per_tick_per_level != 0.0
 		or damage_per_tick != 0.0 or damage_per_tick_per_level != 0.0)
 
 
+##每次跳回多少血（0 级是基础值，每高一级 +heal_per_tick_per_level）
 func heal_amount(level: int) -> float:
-	return heal_per_tick + heal_per_tick_per_level * float(maxi(level - 2, 0))
+	return heal_per_tick + heal_per_tick_per_level * float(maxi(level, 0))
 
 
+##每次跳扣多少血（0 级是基础值，每高一级 +damage_per_tick_per_level）
 func damage_amount(level: int) -> float:
-	return damage_per_tick + damage_per_tick_per_level * float(maxi(level - 2, 0))
+	return damage_per_tick + damage_per_tick_per_level * float(maxi(level, 0))

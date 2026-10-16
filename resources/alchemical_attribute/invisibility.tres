@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Invisibility" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/invisibility.gd" id="1_invisibility"]
+[ext_resource type="Resource" path="res://resources/buffs/invisible.tres" id="2_invisible"]
+
+[resource]
+script = ExtResource("1_invisibility")
+attribute_id = 8
+name = "隐身"
+max_level = 0
+buff = ExtResource("2_invisible")

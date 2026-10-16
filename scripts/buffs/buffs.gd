@@ -9,6 +9,13 @@ extends RefCounted
 ##buff 容器在实体下的约定名字
 const HOLDER_NAME: String = "Buffs"
 
+# ===== AI 修改开始 (标记类效果的约定) =====
+##隐身标记：宿主实现 set_buff_flag(&"invisible", active) 时生效
+const FLAG_INVISIBLE: StringName = &"invisible"
+##隐身时的整体透明度（三个实体共用同一个值）
+const INVISIBLE_ALPHA: float = 0.35
+# ===== AI 修改结束 =====
+
 
 ##取目标身上的 buff 容器
 static func holder_of(target: Node) -> BuffHolder:
@@ -26,7 +33,8 @@ static func holder_of(target: Node) -> BuffHolder:
 
 
 ##施加一个 buff：同 id 取最高级（升级并刷新时长），等级低于现有则不做处理
-static func apply(target: Node, buff: BuffData, level: int = 1, source: Node = null) -> bool:
+##施加一个 buff：同 id 取最高级（0 级是基础数值，逐级递增）
+static func apply(target: Node, buff: BuffData, level: int = 0, source: Node = null) -> bool:
 	var holder: BuffHolder = holder_of(target)
 	if holder == null:
 		return false

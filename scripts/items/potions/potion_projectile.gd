@@ -131,9 +131,16 @@ func _break_at(at: Vector2) -> void:
 	_potion.global_position = at
 
 	var burst_attributes: Array[AlchemicalData] = []
+	#护己类属性是"药水级"修饰，不提交给 use_effect，只用来把使用者排除在效果之外
+	var exempt_target: Node = null
 
 	for attribute: AlchemicalData in _attributes:
 		if attribute == null or not attribute.has_method("use_effect"):
+			continue
+
+		if attribute.has_method("exempts_user") and attribute.exempts_user():
+			if is_instance_valid(_player):
+				exempt_target = _player
 			continue
 
 		if attribute.need_target:
@@ -142,6 +149,10 @@ func _break_at(at: Vector2) -> void:
 			#不需要目标：直接调用一次，效果自己从药水模型上取属性或碎点坐标
 			attribute.use_effect(_potion)
 
+	#把使用者记在药水模型上：爆炸那类直接结算的效果读它才能同样跳过使用者
+	if exempt_target != null:
+		_potion.set_meta(SelfExempt.EXEMPT_META, exempt_target)
+
 	var world: Node = _potion.get_parent()
 
 	if world != null and not burst_attributes.is_empty():
@@ -149,7 +160,7 @@ func _break_at(at: Vector2) -> void:
 
 		if burst != null:
 			world.add_child(burst)
-			burst.setup(at, _burst_radius, _burst_duration, burst_attributes)
+			burst.setup(at, _burst_radius, _burst_duration, burst_attributes, exempt_target)
 
 	_potion.queue_free()
 

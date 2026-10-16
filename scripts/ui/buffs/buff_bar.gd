@@ -159,7 +159,7 @@ func _apply_view(view: Dictionary, entry: Dictionary) -> void:
 		bar.visible = false
 		root.tooltip_text = "%s（等级 %d）\n%s" % [buff.display_name, level, buff.description]
 	level_label.text = str(level)
-	level_label.visible = level > 1
+	level_label.visible = level > 0
 
 
 func _on_buff_applied(buff: BuffData) -> void:
