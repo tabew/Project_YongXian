@@ -20,7 +20,14 @@ static func next_potion_id() -> int:
 	return potion_id
 
 
+## 左键喝下：把瓶内全部炼金属性作用到玩家身上。
+## “苦行”禁用时返回 0，不消耗药水。
 func left_use(player:PlayerCharacter) -> int:
+	if player == null or player.potions_blocked():
+		return 0
+	for attribute:AlchemicalData in alchemical_attribute:
+		if attribute != null and attribute.has_method("use_effect"):
+			attribute.use_effect(player)
 	return 1
 
 ##丢出手中药水：朝准心抛出去，撞到角色或地形就碎，碎点触发药水效果。
@@ -28,7 +35,7 @@ func left_use(player:PlayerCharacter) -> int:
 ##命中判定用每帧一条短射线补物理接触，地形则直接问 WorldGenerator。
 func right_use(player:PlayerCharacter) -> int:
 
-	if player == null or player.get_parent() == null:
+	if player == null or player.get_parent() == null or player.potions_blocked():
 		return 0
 
 	var potion: ItemModel = create_model()
@@ -50,7 +57,8 @@ func right_use(player:PlayerCharacter) -> int:
 	#朝准心投掷，鼠标压在身上时朝正面
 	var speed: float = 320.0        #飞行速度，像素/秒
 
-	var max_distance: float = 500 #最大射程，10格
+	# 投掷距离受升级卡“投掷精通”影响。
+	var max_distance: float = 500.0 * player.potion_range_mult() #最大射程，10格
 
 	var aim: Vector2 = player.get_global_mouse_position() - origin
 	var direction: Vector2 = aim.normalized() if aim.length() > 1.0 else Vector2.RIGHT

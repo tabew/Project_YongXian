@@ -372,7 +372,7 @@ func _test_long_staff() -> void:
 	invalid.near_pitch_degrees = 90.0
 	_check(not invalid.validation_errors().is_empty(), "Staff rejects degenerate depth projection")
 	invalid.near_pitch_degrees = LONG_STAFF.near_pitch_degrees
-	invalid.arc_degrees = 100.0
+	invalid.arc_degrees = 361.0
 	_check(not invalid.validation_errors().is_empty(), "Staff rejects an oversized fan")
 
 func _test_yoyo() -> void:

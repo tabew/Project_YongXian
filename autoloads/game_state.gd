@@ -12,6 +12,10 @@ func start_new_world(seed_value: int = 0) -> void:
 	world_seed = seed_value if seed_value != 0 else WorldGenerator.random_seed()
 	MapRng.set_shared_master(world_seed)
 	in_game = true
+	# 一局从零开始：等级、经验与已选升级卡在这里清空。
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if progress != null:
+		progress.reset()
 
 
 func reset() -> void:

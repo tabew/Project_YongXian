@@ -173,7 +173,7 @@ func _test_outside_aggro() -> bool:
 	await get_tree().create_timer(0.15).timeout
 	var passed: bool = (
 		not monster.has_player_aggro() and not monster.has_attack_intent()
-		and _player.health == 10
+		and _player.health == 100
 	)
 	_remove_node(monster)
 	print("OUTSIDE_AGGRO_RESULT=", passed)
@@ -191,7 +191,7 @@ func _check_initial_sight_gate(monster: GiveMonster) -> bool:
 	var idle_behind_wall: bool = (
 		not monster.has_player_aggro() and not monster.has_attack_intent()
 		and monster.global_position.is_equal_approx(original_monster_position)
-		and monster.is_path_empty() and _player.health == 10
+		and monster.is_path_empty() and _player.health == 100
 	)
 
 	# 玩家先沿墙同侧露面；冷却只用于避免这一阶段发动攻击。
@@ -234,7 +234,7 @@ func _test_wall_pathfinding() -> bool:
 			crossed_wall = true
 		if absf(monster.global_position.y - WorldGenerator.tile_to_world(Vector2i.ZERO).y) > 8.0:
 			moved_around_wall = true
-		if moved_around_wall and _player.health < 10:
+		if moved_around_wall and _player.health < 100:
 			break
 
 	var passed: bool = (
@@ -243,7 +243,7 @@ func _test_wall_pathfinding() -> bool:
 		and monster.has_player_aggro()
 		and not crossed_wall
 		and moved_around_wall
-		and _player.health == 9
+		and _player.health == 90
 	)
 	print("TERRAIN_WALL_RESULT=", passed)
 	_remove_node(monster)
@@ -289,12 +289,12 @@ func _test_physics_wall_pathfinding() -> bool:
 		await get_tree().physics_frame
 		if absf(monster.global_position.y - wall.global_position.y) > WorldGenerator.TILE_SIZE * 1.5:
 			moved_around_wall = true
-		if moved_around_wall and _player.health < 10:
+		if moved_around_wall and _player.health < 100:
 			break
 
 	var passed: bool = (
 		initial_sight_gate_passed and did_not_lock_through_wall
-		and monster.has_player_aggro() and moved_around_wall and _player.health == 9
+		and monster.has_player_aggro() and moved_around_wall and _player.health == 90
 	)
 	print(
 		"PHYSICS_WALL_RESULT=", passed,
@@ -324,13 +324,13 @@ func _test_cross_biome_pursuit() -> bool:
 
 	for _frame: int in 60:
 		await get_tree().physics_frame
-		if _player.health < 10:
+		if _player.health < 100:
 			break
 	var monster_tile: Vector2i = WorldGenerator.world_to_tile(monster.global_position)
 	var left_rainforest: bool = (
 		mixed_generator.sample_biome(monster_tile) != Biome.Kind.TROPICAL_RAINFOREST
 	)
-	var passed: bool = left_rainforest and _player.health == 9
+	var passed: bool = left_rainforest and _player.health == 90
 	_remove_node(monster)
 	print("CROSS_BIOME_RESULT=", passed, " tile=", monster_tile)
 	if not passed:
@@ -346,9 +346,9 @@ func _test_ranged_attack() -> bool:
 	stone.global_position = Vector2(8, 0)
 	for _frame: int in 90:
 		await get_tree().physics_frame
-		if _player.health < 10:
+		if _player.health < 100:
 			break
-	var passed: bool = _player.health == 9
+	var passed: bool = _player.health == 90
 	_remove_node(monster)
 	_remove_node(stone)
 	print("RANGED_ATTACK_RESULT=", passed, " health=", _player.health)
@@ -362,9 +362,9 @@ func _test_leap_attack() -> bool:
 	var monster: GiveMonster = _spawn_monster(Vector2.ZERO)
 	for _frame: int in 60:
 		await get_tree().physics_frame
-		if _player.health < 10:
+		if _player.health < 100:
 			break
-	var passed: bool = _player.health == 9
+	var passed: bool = _player.health == 90
 	_remove_node(monster)
 	print("LEAP_ATTACK_RESULT=", passed, " health=", _player.health)
 	if not passed:
@@ -378,7 +378,7 @@ func _test_ranged_without_stone() -> bool:
 	for _frame: int in 15:
 		await get_tree().physics_frame
 	var passed: bool = (
-		_player.health == 10
+		_player.health == 100
 		and not monster.has_attack_intent()
 		and is_zero_approx(monster.get_attack_cooldown())
 	)
@@ -397,9 +397,9 @@ func _test_max_range_attack() -> bool:
 	stone.global_position = Vector2(8, 0)
 	for _frame: int in 90:
 		await get_tree().physics_frame
-		if _player.health < 10:
+		if _player.health < 100:
 			break
-	var passed: bool = _player.health == 9
+	var passed: bool = _player.health == 90
 	_remove_node(monster)
 	_remove_node(stone)
 	print("MAX_RANGE_RESULT=", passed, " health=", _player.health)

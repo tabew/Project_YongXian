@@ -7,7 +7,7 @@ extends EnemyAttack
 ## 数值集中在这里，GiveMonster 以常量别名转发，方便旧测试与旧脚本继续引用。
 
 const TILE_SIZE: float = float(WorldGenerator.TILE_SIZE)
-const DAMAGE: int = 1
+const DAMAGE: int = 10
 const ATTACK_COOLDOWN: float = 1.0
 const FAILED_ATTACK_RETRY: float = 0.3
 const RANGED_MIN_RANGE: float = TILE_SIZE * 6.0

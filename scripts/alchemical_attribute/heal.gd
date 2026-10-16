@@ -33,5 +33,19 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 	return result
 			
 
+## 按最大生命百分比回复：等级 1/2/3 对应 30% / 45% / 60%。
+## 走 PlayerCharacter.heal，因此受“药材学”与“以血换知”影响。
+const BASE_RATIO: float = 0.30
+const RATIO_PER_LEVEL: float = 0.15
+
+
 func use_effect(object:Node) -> void:
-	pass
+	if object == null or not object.has_method("heal"):
+		return
+	var maximum: float = 0.0
+	if "max_health" in object:
+		maximum = float(object.get("max_health"))
+	if maximum <= 0.0:
+		return
+	var ratio: float = BASE_RATIO + RATIO_PER_LEVEL * float(maxi(level - 1, 0))
+	object.call("heal", maximum * ratio)

@@ -199,7 +199,8 @@ func spawn_monster(
 	var chunk_monsters: Array[BaseMonster] = _monsters_by_chunk[chunk_coords]
 	chunk_monsters.append(monster)
 	monster.tree_exited.connect(_on_monster_exited.bind(monster, chunk_coords), CONNECT_ONE_SHOT)
-	monster.killed.connect(_on_monster_killed.bind(spawn_id), CONNECT_ONE_SHOT)
+	monster.experience_reward = definition.experience_reward
+	monster.killed.connect(_on_monster_killed.bind(spawn_id, monster), CONNECT_ONE_SHOT)
 
 	monster.configure(_player, _generator, chunk_coords)
 	return monster
@@ -210,8 +211,37 @@ func _spawn_id(definition: MonsterSpawnData, tile: Vector2i) -> String:
 	return "%s:%d:%d" % [definition.monster_id, tile.x, tile.y]
 
 
-func _on_monster_killed(spawn_id: String) -> void:
+func _on_monster_killed(spawn_id: String, monster: BaseMonster = null) -> void:
 	_defeated_spawn_ids[spawn_id] = true
+	_award_kill(monster)
+
+
+## 击杀结算：掉落经验球，并触发玩家侧的嗜血 / 连锁。
+func _award_kill(monster: BaseMonster) -> void:
+	if monster == null or not is_instance_valid(monster):
+		return
+	if _player == null or not is_instance_valid(_player):
+		return
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if monster.experience_reward > 0:
+		var amount: float = float(monster.experience_reward)
+		if progress != null:
+			amount = progress.kill_experience(monster.experience_reward, _floor_index())
+		var orb := ExperienceOrb.new()
+		orb.bind(amount, _player)
+		# 挂在生成器下（和怪物、掉落同一个父节点），切图清理怪物时经验球一起走，
+		# 不会留在 GameWorld 上跨区域堆积。
+		add_child(orb)
+		orb.global_position = monster.global_position
+	var weapon: WeaponDefinition = _player.weapon_controller.equipped_weapon
+	_player.on_monster_killed(monster, weapon.damage if weapon != null else 0.0)
+
+
+## 当前区域的层数，用于经验与难度的线性缩放。
+func _floor_index() -> int:
+	if _active_map == null:
+		return 0
+	return RunGraph.floor_of(_active_map.node_id)
 
 
 ## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。

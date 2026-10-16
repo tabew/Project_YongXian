@@ -24,6 +24,24 @@ func reset() -> void:
 	health_changed.emit(current_health, max_health)
 
 
+## 回复生命，返回实际回复量。已死亡时不回复。
+func heal(amount: float) -> float:
+	if amount <= 0.0 or not is_alive():
+		return 0.0
+	var before: float = current_health
+	current_health = minf(current_health + amount, max_health)
+	var healed: float = current_health - before
+	if healed > 0.0:
+		health_changed.emit(current_health, max_health)
+	return healed
+
+
+## 直接改写当前生命（升级、重生等非战斗路径用），并按需要广播。
+func set_current_health(value: float) -> void:
+	current_health = clampf(value, 0.0, max_health)
+	health_changed.emit(current_health, max_health)
+
+
 func receive_hit(hit: CombatHit) -> bool:
 	if hit == null or not is_alive():
 		return false

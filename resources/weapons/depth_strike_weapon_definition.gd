@@ -32,8 +32,10 @@ func validation_errors() -> PackedStringArray:
 		errors.append("Staff dimensions must be positive; distances must be nonnegative.")
 	if grip_inset < 0.0 or grip_inset >= shaft_length:
 		errors.append("Grip inset must be smaller than shaft length.")
-	if arc_degrees < 0.0 or arc_degrees > 90.0:
-		errors.append("Staff swing arc must be in 0..90 degrees.")
+	# 上限放到整圈：升级卡“旋风”把长棍改成 360 度横扫，校验必须放行，
+	# 否则 equip() 会判定武器非法并静默保留旧武器，卡看起来生效其实没有。
+	if arc_degrees < 0.0 or arc_degrees > 360.0:
+		errors.append("Staff swing arc must be in 0..360 degrees.")
 	if absf(near_pitch_degrees) > 80.0 or absf(far_pitch_degrees) > 80.0 or is_equal_approx(near_pitch_degrees, far_pitch_degrees):
 		errors.append("Depth pitches must be different and within -80..80 degrees.")
 	if perspective_strength < 0.0 or perspective_strength > 0.35:

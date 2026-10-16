@@ -4,6 +4,8 @@ extends Control
 ## 底部操作提示，顶部临时消息。
 
 const REFRESH_INTERVAL: float = 0.2
+## 左下角经验条的尺寸。
+const XP_BAR_SIZE: Vector2 = Vector2(240.0, 8.0)
 
 @onready var info_label: Label = $InfoLabel
 @onready var minimap: Minimap = $Minimap
@@ -18,6 +20,8 @@ var _player: Node2D = null
 var _refresh_timer: float = 0.0
 var _toast_tween: Tween = null
 var _pickup_label: Label = null
+var _level_label: Label = null
+var _xp_fill: ColorRect = null
 
 
 func _ready() -> void:
@@ -41,9 +45,71 @@ func _ready() -> void:
 	_pickup_label.offset_top = -128
 	_pickup_label.offset_bottom = -100
 	_pickup_label.visible = false
+	_build_progress_readout()
 	toast_label.modulate.a = 0.0
 	EventBus.notification.connect(_on_notification)
 	EventBus.world_ready.connect(_on_world_ready)
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if progress != null and progress.has_signal("experience_changed"):
+		progress.experience_changed.connect(_on_experience_changed)
+	_refresh_progress()
+
+
+## 左下角等级与经验条：贴在武器信息上方，不抢左上角信息面板的位置。
+func _build_progress_readout() -> void:
+	_level_label = Label.new()
+	_level_label.name = "LevelLabel"
+	_level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_level_label.add_theme_color_override("font_color", Color("f3dbab"))
+	_level_label.add_theme_color_override("font_shadow_color", Color("29251c"))
+	_level_label.add_theme_constant_override("shadow_offset_x", 1)
+	_level_label.add_theme_constant_override("shadow_offset_y", 1)
+	_level_label.add_theme_font_size_override("font_size", 14)
+	add_child(_level_label)
+	_level_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_level_label.offset_left = 14.0
+	_level_label.offset_right = 314.0
+	_level_label.offset_top = -124.0
+	_level_label.offset_bottom = -102.0
+
+	var background := ColorRect.new()
+	background.name = "XpBarBackground"
+	background.color = Color(0.05, 0.06, 0.08, 0.72)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
+	background.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	background.offset_left = 14.0
+	background.offset_right = 14.0 + XP_BAR_SIZE.x
+	background.offset_top = -102.0
+	background.offset_bottom = -102.0 + XP_BAR_SIZE.y
+
+	_xp_fill = ColorRect.new()
+	_xp_fill.name = "XpBarFill"
+	_xp_fill.color = Color(0.62, 0.92, 0.86, 0.95)
+	_xp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background.add_child(_xp_fill)
+	_xp_fill.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	_xp_fill.offset_right = 0.0
+
+
+## 等级与经验条；由 experience_changed 或周期性刷新调用。
+func _refresh_progress() -> void:
+	if _level_label == null or _xp_fill == null:
+		return
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if progress == null:
+		_level_label.text = ""
+		return
+	_level_label.text = "等级 %d　经验 %d/%d" % [
+		int(progress.level),
+		int(floorf(progress.experience)),
+		int(progress.experience_required()),
+	]
+	_xp_fill.offset_right = XP_BAR_SIZE.x * clampf(progress.experience_ratio(), 0.0, 1.0)
+
+
+func _on_experience_changed(_current: float, _required: float, _level: int) -> void:
+	_refresh_progress()
 
 
 ## 由 GameWorld 注入区块管理器与主角。
@@ -99,6 +165,7 @@ func _process(delta: float) -> void:
 		return
 	_refresh_timer = REFRESH_INTERVAL
 	_refresh()
+	_refresh_progress()
 
 
 func _refresh() -> void:

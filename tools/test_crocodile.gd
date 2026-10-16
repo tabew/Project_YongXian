@@ -140,10 +140,10 @@ func _run() -> void:
 	f.monster.set_physics_process(true)
 	for frame: int in 240:
 		await physics_frame
-		if f.player.health < 10:
+		if f.player.health < 100:
 			break
 	f.monster.set_physics_process(false)
-	_check(f.monster.has_player_aggro() and f.player.health == 8, "real_shared_ai_swims_ashore_and_bites_for_two_damage")
+	_check(f.monster.has_player_aggro() and f.player.health == 80, "real_shared_ai_swims_ashore_and_bites_for_twenty_damage")
 	_check(not f.monster.is_in_water(), "water_chase_reaches_player_on_land")
 	await _clean(f.holder)
 
@@ -164,23 +164,23 @@ func _run() -> void:
 	f.monster.advance_monster_animation(0.12)
 	_check(f.monster.jaw_open > 0.5, "attack_animation_opens_crocodile_jaw")
 	f.monster.attack.update(f.monster,0.18)
-	_check(f.player.health == 8, "bite_hit_is_exactly_two_damage")
+	_check(f.player.health == 80, "bite_hit_is_exactly_twenty_damage")
 	f.monster.attack.update(f.monster,0.1)
-	_check(f.player.health == 8, "one_bite_cannot_apply_damage_twice")
+	_check(f.player.health == 80, "one_bite_cannot_apply_damage_twice")
 	f.monster.attack.update(f.monster,0.2)
 	f.monster.advance_monster_animation(0.3)
 	_check(not f.monster.attack.is_busy() and f.monster.monster_animation_state() == &"Idle", "bite_recovers_to_idle")
-	f.player.health = 10
+	f.player.health = 100
 	f.monster.attack.perform_attack(f.monster,f.player)
 	f.monster.take_damage(1)
 	_check(f.monster.monster_animation_state() == &"Hurt" and not f.monster.attack.is_busy(), "shared_hurt_interrupts_bite")
 	f.monster.attack.update(f.monster,0.4)
-	_check(f.player.health == 10, "interrupted_bite_cannot_hit_later")
+	_check(f.player.health == 100, "interrupted_bite_cannot_hit_later")
 	f.monster.advance_monster_animation(0.2)
 	f.monster.attack.perform_attack(f.monster,f.player)
 	f.player.global_position += Vector2(64,0)
 	f.monster.attack.update(f.monster,0.2)
-	_check(f.player.health == 10, "bite_windup_can_be_evaded")
+	_check(f.player.health == 100, "bite_windup_can_be_evaded")
 	await _clean(f.holder)
 
 	f = _fixture(Vector2i(40,16),Vector2i(8,16))

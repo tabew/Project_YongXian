@@ -14,6 +14,8 @@
 [ext_resource type="Resource" path="res://resources/monsters/shi_spawn_data.tres" id="10_shi_spawn"]
 [ext_resource type="PackedScene" uid="uid://862mtq7arhfy" path="res://scenes/alchemy/alchemy.tscn" id="8_lsk7w"]
 [ext_resource type="PackedScene" uid="uid://cei2bfjxogxkp" path="res://scenes/ui/inventory/bottom_bag_ui.tscn" id="12_nms8r"]
+[ext_resource type="PackedScene" path="res://scenes/ui/upgrade/upgrade_panel.tscn" id="13_upgrade_panel"]
+[ext_resource type="Script" path="res://scripts/ui/upgrade/upgrade_manager.gd" id="14_upgrade_manager"]
 
 [node name="GameWorld" type="Node2D" unique_id=408146263]
 script = ExtResource("1_world")
@@ -44,3 +46,9 @@ player = NodePath("../../Player")
 
 [node name="Alchemy" parent="GameHUD" unique_id=389668861 instance=ExtResource("8_lsk7w")]
 visible = false
+
+[node name="UpgradePanel" parent="GameHUD" unique_id=774120536 instance=ExtResource("13_upgrade_panel")]
+visible = false
+
+[node name="UpgradeManager" type="Node" parent="GameHUD" unique_id=883451907]
+script = ExtResource("14_upgrade_manager")

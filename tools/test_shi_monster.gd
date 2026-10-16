@@ -135,9 +135,9 @@ func _run() -> void:
 	projectile.launch(actor, f.player, actor.global_position)
 	projectile.set_physics_process(false)
 	projectile._physics_process(1.0)
-	check(f.player.health == 9.5, "actual_slime_projectile_damage_is_half_point")
+	check(f.player.health == 95.0, "actual_slime_projectile_damage_is_five_points")
 	projectile._physics_process(1.0)
-	check(f.player.health == 9.5, "one_projectile_cannot_damage_twice")
+	check(f.player.health == 95.0, "one_projectile_cannot_damage_twice")
 	# 真碰撞箱接触才伤害，并限制持续重叠不能每帧扣3血。
 	f.player.global_position = actor.global_position
 	await physics_frame
@@ -145,7 +145,7 @@ func _run() -> void:
 	var before: float = f.player.health
 	impl._contact_remaining = 0.0
 	impl.update(actor, 0.01)
-	check(f.player.health == before - 3.0, "group_collision_deals_three_damage")
+	check(f.player.health == before - 30.0, "group_collision_deals_thirty_damage")
 	var after: float = f.player.health
 	impl.update(actor, 0.01)
 	check(f.player.health == after, "contact_damage_not_every_frame")

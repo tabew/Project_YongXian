@@ -302,7 +302,9 @@ func _refresh_pickup() -> void:
 	var pickup_roots: Array[Node2D] = [monster_spawner]
 	if entity_root != null:
 		pickup_roots.append(entity_root)
-	var closest: float = PICKUP_RADIUS * PICKUP_RADIUS
+	# 拾取范围受升级卡“拾荒”影响。
+	var radius: float = player.pickup_radius_tiles() * float(WorldGenerator.TILE_SIZE)
+	var closest: float = radius * radius
 	for pickup_root: Node2D in pickup_roots:
 		for child: Node in pickup_root.get_children():
 			if not child is GroundPickup or child.is_queued_for_deletion():

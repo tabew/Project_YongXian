@@ -79,10 +79,10 @@ func _run() -> void:
 	f.monster.set_physics_process(true)
 	for frame: int in 120:
 		await physics_frame
-		if f.player.health < 10:
+		if f.player.health < 100:
 			break
 	f.monster.set_physics_process(false)
-	_check(f.player.health == 9, "actual_enemy_brain_throws_real_stone_for_one_damage")
+	_check(f.player.health == 90, "actual_enemy_brain_throws_real_stone_for_ten_damage")
 	_check(not f.stone._in_flight and f.stone.amount == 1, "hit_stone_lands_without_consuming_material")
 	_check(f.stone.collect(f.player), "landed_stone_can_be_picked_up")
 	_check(f.player.inventory.get_count(2) == 1, "landed_stone_adds_exactly_one_inventory_item")
@@ -99,12 +99,12 @@ func _run() -> void:
 	f.stone.set_physics_process(false)
 	f.player.global_position += Vector2(0, 64)
 	f.stone._physics_process(1.0)
-	_check(f.player.health == 10 and f.stone.global_position == Vector2(136, 8), "moving_target_evades_fixed_aim_throw")
+	_check(f.player.health == 100 and f.stone.global_position == Vector2(136, 8), "moving_target_evades_fixed_aim_throw")
 	_check(f.stone.can_be_thrown(), "missed_stone_is_ammo_again_after_landing")
 	await _clean(f.holder)
 
 	f = _fixture(3)
-	_check(f.stone.throw_at(f.player, 1), "stack_can_supply_one_throw")
+	_check(f.stone.throw_at(f.player, GiveMonsterAttack.DAMAGE), "stack_can_supply_one_throw")
 	var piece: GroundPickup = null
 	var total: int = 0
 	for child: Node in f.holder.get_children():
@@ -116,7 +116,7 @@ func _run() -> void:
 	if piece != null:
 		piece.set_physics_process(false)
 		piece._physics_process(1.0)
-		_check(f.player.health == 9, "fast_swept_throw_does_not_tunnel_through_target")
+		_check(f.player.health == 100 - GiveMonsterAttack.DAMAGE, "fast_swept_throw_does_not_tunnel_through_target")
 		_check(f.stone.collect(f.player) and piece.collect(f.player), "both_remaining_stack_and_landed_piece_are_collectible")
 		_check(f.player.inventory.get_count(2) == 3, "stack_throw_preserves_total_inventory_quantity")
 	await _clean(f.holder)
@@ -126,7 +126,7 @@ func _run() -> void:
 	_check(f.stone.throw_at(f.player, 1), "terrain_wall_fixture_launches")
 	f.stone.set_physics_process(false)
 	f.stone._physics_process(1.0)
-	_check(f.player.health == 10 and f.stone.global_position.x < 48.0, "fast_throw_stops_before_virtual_terrain_wall")
+	_check(f.player.health == 100 and f.stone.global_position.x < 48.0, "fast_throw_stops_before_virtual_terrain_wall")
 	_check(f.stone.can_be_thrown(), "blocked_stone_lands_and_can_be_retrieved")
 	f.source.blocked_tiles.clear()
 	f.source.blocked_tiles[Vector2i(1, 0)] = true
@@ -147,7 +147,7 @@ func _run() -> void:
 	_check(f.stone.throw_at(f.player, 1), "physical_wall_fixture_launches")
 	f.stone.set_physics_process(false)
 	f.stone._physics_process(1.0)
-	_check(f.player.health == 10 and f.stone.global_position.x < 63.0, "fast_throw_stops_before_physics_wall")
+	_check(f.player.health == 100 and f.stone.global_position.x < 63.0, "fast_throw_stops_before_physics_wall")
 	await _clean(f.holder)
 
 	f = _fixture()
@@ -226,7 +226,7 @@ func _test_actual_world_stone() -> void:
 	world._enter_map(3)
 	world.player.global_position = destination
 	await _wait_stone(stone)
-	_check(world.player.health == 9, "returning_map_resumes_real_stone_flight_and_damage")
+	_check(world.player.health == 90, "returning_map_resumes_real_stone_flight_and_damage")
 	world._refresh_pickup()
 	_check(world._nearby_pickup == stone, "landed_real_stone_returns_to_world_pickup_prompt")
 	var before: int = world.player.inventory.get_count(2)
