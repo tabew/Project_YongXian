@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://c3gqtaytfjbq6"]
+
+[ext_resource type="Texture2D" uid="uid://d2otfvioujnwj" path="res://assets/ui/buffs/holy.png" id="1_ntq0o"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_hcaog"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_xuspy"]
+
+[sub_resource type="Resource" id="Resource_5idjl"]
+script = ExtResource("2_hcaog")
+stat = &"damage_taken"
+mode = 1
+value = -0.25
+value_per_level = -0.05
+
+[resource]
+script = ExtResource("3_xuspy")
+id = &"holy"
+display_name = "圣佑"
+description = "受到伤害减少，并缓慢回复生命，持续 6 秒。"
+icon = ExtResource("1_ntq0o")
+tick_interval = 1.0
+heal_per_tick = 0.5
+heal_per_tick_per_level = 0.25
+modifiers = Array[ExtResource("2_hcaog")]([SubResource("Resource_5idjl")])

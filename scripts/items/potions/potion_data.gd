@@ -38,9 +38,20 @@ static func next_potion_id() -> int:
 func left_use(player:PlayerCharacter) -> int:
 	if player == null or player.potions_blocked():
 		return 0
+
+	#是否有护己属性
+	var exempt: bool = false
+
 	for attribute: AlchemicalData in alchemical_attribute:
-		if attribute != null and attribute.has_method("use_effect"):
-			attribute.use_effect(player)
+		if attribute != null and attribute.has_method("exempts_user") and attribute.exempts_user():
+			exempt = true
+
+	for attribute: AlchemicalData in alchemical_attribute:
+		if attribute == null or not attribute.has_method("use_effect"):
+			continue
+		if exempt and attribute.is_negative_effect():
+			continue
+		attribute.use_effect(player)
 	return 1
 
 ##投掷药水，朝准心抛出去，撞到受击盒或地形才碎
@@ -53,6 +64,10 @@ func right_use(player:PlayerCharacter) -> int:
 		return 0
 
 	var potion: ItemModel = create_model()
+
+	#修改药水大小
+	for child in potion.get_children():
+		(child as Node2D).scale = Vector2(0.5,0.5)
 
 	if potion == null:
 		return 0

@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://bqx03vjk4bhfd"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/regen.png" id="1_o3rny"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_lec83"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_mgjnb"]
+[ext_resource type="Texture2D" uid="uid://b3ew28g1qmxoq" path="res://assets/ui/buffs/regen.png" id="1_o3rny"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_lec83"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_mgjnb"]
 
 [resource]
 script = ExtResource("3_mgjnb")
 id = &"regen"
-display_name = "持续恢复"
+display_name = "恢复"
 description = "每秒回复生命，持续 6 秒。"
 icon = ExtResource("1_o3rny")
 tick_interval = 1.0

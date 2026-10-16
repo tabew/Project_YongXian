@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="SelfExempt" format=3 uid="uid://dfrxptdcjp3ae"]
+
+[ext_resource type="Script" uid="uid://cyb6p2txr76oq" path="res://scripts/alchemical_attribute/self_exempt.gd" id="1_self_exempt"]
+
+[resource]
+script = ExtResource("1_self_exempt")
+attribute_id = 9
+name = "护己"

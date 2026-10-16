@@ -28,6 +28,7 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 				else:
 					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.CONTINUOUS_HEAL,level))
 
+
 		#除了升级会continue外，其它情况直接break
 		break
 	return result

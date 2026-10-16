@@ -5,13 +5,28 @@ extends Node
 
 enum ATTRIBUTE
 {
-    HEAL = 0,
+	HEAL = 0,
 	HOLY = 1,
 	CONTINUOUS_HEAL = 2,
 	MINERAL = 3,
 	WOODY = 4,
 	BINDING = 5,
 	EXPLOSIVE = 6,
+	FIRE = 7,
+	INVISIBILITY = 8,
+	SELF_EXEMPT = 9,
+	POISON = 10,
+	SLOW = 11,
+	SWIFT = 12,
+	GUARD = 13,
+	POWERFUL = 14,
+	CLEANSE = 15,
+	THORNS = 16,
+	WEAKNESS = 17,
+	VULNERABLE = 18,
+	LIFESTEAL = 19,
+	FORTIFY = 20,
+	ABSORB = 21,
 }
 
 
@@ -25,7 +40,22 @@ enum ATTRIBUTE
 	preload("res://resources/alchemical_attribute/mineral.tres"),
 	preload("res://resources/alchemical_attribute/woody.tres"),
 	preload("res://resources/alchemical_attribute/binding.tres"),
-	preload("res://resources/alchemical_attribute/explosive.tres")
+	preload("res://resources/alchemical_attribute/explosive.tres"),
+	preload("res://resources/alchemical_attribute/fire.tres"),
+	preload("res://resources/alchemical_attribute/invisibility.tres"),
+	preload("res://resources/alchemical_attribute/self_exempt.tres"),
+	preload("res://resources/alchemical_attribute/poison.tres"),
+	preload("res://resources/alchemical_attribute/slow.tres"),
+	preload("res://resources/alchemical_attribute/swift.tres"),
+	preload("res://resources/alchemical_attribute/guard.tres"),
+	preload("res://resources/alchemical_attribute/powerful.tres"),
+	preload("res://resources/alchemical_attribute/cleanse.tres"),
+	preload("res://resources/alchemical_attribute/thorns.tres"),
+	preload("res://resources/alchemical_attribute/weakness.tres"),
+	preload("res://resources/alchemical_attribute/vulnerable.tres"),
+	preload("res://resources/alchemical_attribute/lifesteal.tres"),
+	preload("res://resources/alchemical_attribute/fortify.tres"),
+	preload("res://resources/alchemical_attribute/absorb.tres")
 ]
 
 ##id -> 模板

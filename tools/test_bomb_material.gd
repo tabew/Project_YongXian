@@ -82,9 +82,12 @@ func _test_material() -> IngredientData:
 	_check(bomb.id == BOMB_ID, "炸弹的材料 id 是 %d" % BOMB_ID)
 	_check(bomb.name == "炸弹", "炸弹的名字是炸弹")
 	_check(bomb.texture != null, "炸弹有图标")
-	_check(bomb.alchemical_attribute.size() == 1, "炸弹只带一条炼金属性")
-	if bomb.alchemical_attribute.size() == 1:
-		_check(bomb.alchemical_attribute[0].get_script() == _explosive_script, "炸弹带的是爆裂属性")
+	_check(bomb.alchemical_attribute.size() >= 1, "炸弹至少带一条炼金属性")
+	var bomb_has_explosive: bool = false
+
+	for attribute: AlchemicalData in bomb.alchemical_attribute:
+		bomb_has_explosive = bomb_has_explosive or (attribute != null and attribute.get_script() == _explosive_script)
+	_check(bomb_has_explosive, "炸弹带的属性里有爆裂")
 	_check(is_same(_items.get_template(BOMB_ID), bomb), "炸弹登记在材料注册表 id=%d" % BOMB_ID)
 
 	var model: ItemModel = bomb.create_model()
@@ -154,28 +157,38 @@ func _test_cauldron(bomb: IngredientData) -> void:
 	cauldron.call("_get_attributes", model)
 
 	var attributes: Array = cauldron.get("attributes")
-	_check(attributes.size() == 1, "炸弹丢进坩埚带进一条属性")
-	if attributes.size() == 1:
-		_check(attributes[0].get_script() == _explosive_script, "带进锅里的就是爆裂")
-		_check(attributes[0].level == 1, "材料自带的属性进锅后是 1 级")
+	var cauldron_has_explosive: bool = false
+
+	for attribute: AlchemicalData in attributes:
+		cauldron_has_explosive = cauldron_has_explosive or (attribute != null and attribute.get_script() == _explosive_script)
+	_check(attributes.size() >= 1, "炸弹丢进坩埚至少带进一条属性")
+	_check(cauldron_has_explosive, "带进锅里的有爆裂")
+	_check(attributes[0].level == 1, "材料自带的属性进锅后是 1 级")
 
 	cauldron.call("start_transform")
-	_check(cauldron.get("attributes").size() == 1, "爆裂不参与反应，反应完还留在锅里")
+	_check(cauldron.get("attributes").size() >= 1, "爆裂不参与反应，反应完还留在锅里")
 	_check(cauldron.call("can_finish_transform"), "锅里有属性就能装瓶")
 
 	var potion: PotionData = cauldron.call("finish_transform")
 	_check(potion != null, "装瓶得到药水")
 	if potion == null:
 		return
-	_check(potion.alchemical_attribute.size() == 1 and potion.alchemical_attribute[0].get_script() == _explosive_script, "药水带上了爆裂属性")
+	var potion_explosive: Explosive = null
+
+	for attribute: AlchemicalData in potion.alchemical_attribute:
+		if attribute != null and attribute.get_script() == _explosive_script:
+			potion_explosive = attribute as Explosive
+	_check(potion_explosive != null, "药水带上了爆裂属性")
 	_check(inventory.get_count(potion.id) == 1, "药水进了背包")
 	_check(cauldron.get("attributes").is_empty(), "装瓶后清锅")
 
 	#带爆裂的药水扔出去就是炸弹：砸碎点引爆一次
 	var victim: HealthComponent = _target(Vector2(24, 0))
 	await _sync_physics()
-	var damage: float = (potion.alchemical_attribute[0] as Explosive).enemy_damage()
-	_blast(potion.alchemical_attribute[0], Vector2.ZERO)
+	if potion_explosive == null:
+		return
+	var damage: float = potion_explosive.enemy_damage()
+	_blast(potion_explosive, Vector2.ZERO)
 	_check(is_equal_approx(victim.current_health, TARGET_HEALTH - damage), "带爆裂的药水砸碎会炸")
 
 

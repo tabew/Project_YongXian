@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Lifesteal" format=3 uid="uid://dpnt6e0sku66d"]
+
+[ext_resource type="Script" uid="uid://cqj2jmfjblhtj" path="res://scripts/alchemical_attribute/lifesteal.gd" id="1_lifesteal"]
+[ext_resource type="Resource" uid="uid://qmndbhducrkc" path="res://resources/buffs/lifesteal.tres" id="2_lifesteal_buff"]
+
+[resource]
+script = ExtResource("1_lifesteal")
+attribute_id = 19
+name = "吸血"
+max_level = 3
+can_be_interacted_attribute = Array[int]([19])

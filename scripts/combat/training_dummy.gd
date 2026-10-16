@@ -25,16 +25,44 @@ func _ready() -> void:
 
 ##BuffHolder 读当前属性值
 func read_stat(stat: StringName) -> float:
-	if stat == &"defense":
-		return health.defense
+	match stat:
+		&"defense":
+			return health.defense
+		&"damage_taken":
+			return health.damage_taken
+		&"max_health":
+			return health.max_health
 	return 0.0
 
 
 ##BuffHolder 把算好的值写回属性（其它属性训练靶不支持，直接忽略）
 func apply_stat(stat: StringName, value: float) -> void:
-	if stat == &"defense":
-		health.defense = value
+	match stat:
+		&"defense":
+			health.defense = value
+		&"damage_taken":
+			health.damage_taken = value
+		&"max_health":
+			health.max_health = maxf(value, 1.0)
+			health.current_health = minf(health.current_health, health.max_health)
+			health.health_changed.emit(health.current_health, health.max_health)
 
+
+##当前是否处于隐身状态
+var invisible: bool = false
+
+
+##BuffHolder 通知标记类效果
+func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag != Buffs.FLAG_INVISIBLE:
+		return
+	invisible = active
+	modulate.a = Buffs.HIDDEN_ALPHA if active else 1.0
+
+
+##和玩家/怪物保持同一套接口
+func is_invisible() -> bool:
+	return invisible
 
 
 func _physics_process(delta: float) -> void:

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Fortify" format=3 uid="uid://tvv30e84ixy7"]
+
+[ext_resource type="Script" uid="uid://b1ak6oascebkr" path="res://scripts/alchemical_attribute/fortify.gd" id="1_fortify"]
+[ext_resource type="Resource" uid="uid://de3h7t6adaos7" path="res://resources/buffs/fortify.tres" id="2_fortify_buff"]
+
+[resource]
+script = ExtResource("1_fortify")
+attribute_id = 20
+name = "强身"
+max_level = 3
+can_be_interacted_attribute = Array[int]([20])

@@ -55,6 +55,10 @@ var active_map: MapSpec = null
 ##受到的伤害倍率：1.0 表示正常，减伤类 buff 会把它调小。
 ##升级卡的减伤走 RunProgress，这里是 buff 的那一层，两者相乘。
 var damage_taken: float = 1.0
+##造成的伤害倍率：1.0 表示正常，攻击类 buff 会改它（武器结算时乘算）
+var damage_dealt: float = 1.0
+##吸血比例：造成伤害时按这个比例回血（0 = 不吸血）
+var lifesteal: float = 0.0
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -161,6 +165,9 @@ func _base_weapon() -> WeaponDefinition:
 
 func _physics_process(delta: float) -> void:
 	weapon_controller.set_aim(get_global_mouse_position() - global_position)
+	#挥武器会显形（隐身 buff 不消失，动作停下就恢复）
+	if weapon_controller.is_attacking():
+		reveal_by_action()
 	_tick_progress(delta)
 	if health <= 0.0:
 		velocity = Vector2.ZERO
@@ -204,6 +211,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 			inventory.left_use_handy_slot(self)
+			reveal_by_action()
 			weapon_controller.set_trigger_pressed(true)
 			get_viewport().set_input_as_handled()
 			return
@@ -214,6 +222,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 			inventory.right_use_handy_slot(self)
+			reveal_by_action()
 			get_viewport().set_input_as_handled()
 			return
 		
@@ -331,6 +340,12 @@ func read_stat(stat: StringName) -> float:
 			return base_defense
 		&"damage_taken":
 			return damage_taken
+		&"damage_dealt":
+			return damage_dealt
+		&"lifesteal":
+			return lifesteal
+		&"max_health":
+			return base_max_health
 	return 0.0
 
 
@@ -346,10 +361,46 @@ func apply_stat(stat: StringName, value: float) -> void:
 				health_component.defense = defense
 		&"damage_taken":
 			damage_taken = value
+		&"damage_dealt":
+			damage_dealt = value
+		&"lifesteal":
+			lifesteal = value
+		&"max_health":
+			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
+			base_max_health = maxf(value, 1.0)
+			if is_instance_valid(health_component):
+				health_component.max_health = max_health
+				if health > max_health:
+					health = max_health
+
+
+##当前是否处于隐身状态
+var invisible: bool = false
+
+
+##BuffHolder 通知标记类效果（目前只有隐身使用）
+func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag != Buffs.FLAG_INVISIBLE:
+		return
+	invisible = active
+	modulate.a = Buffs.INVISIBLE_ALPHA if active else 1.0
+
+
+func is_invisible() -> bool:
+	return invisible
+
+
+##出手（用道具/挥武器）会显形：隐身 buff 不消失，动作结束就恢复
+func reveal_by_action() -> void:
+	var holder: BuffHolder = Buffs.holder_of(self)
+
+	if holder != null:
+		holder.reveal_by_action()
 
 
 ## 受到伤害：先过 buff 的倍率、升级卡的倍率与固定减伤，再交给生命组件。
-func take_damage(amount: float) -> void:
+## source 是攻击者（可为空），供吸血、荆棘这类需要追溯来源的结算使用。
+func take_damage(amount: float, source: Node = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
 	var scaled: float = _incoming_damage(amount)
@@ -360,7 +411,10 @@ func take_damage(amount: float) -> void:
 	_combo_targets.clear()
 	_combo_timers.clear()
 	var hit: CombatHit = CombatHit.new()
-	hit.source = null
+	if source is Node2D:
+		hit.source = source as Node2D
+	else:
+		hit.source = null
 	hit.damage = scaled
 	hit.position = global_position
 	health_component.receive_hit(hit)

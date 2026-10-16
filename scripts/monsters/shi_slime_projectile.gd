@@ -45,7 +45,7 @@ func _physics_process(delta: float) -> void:
 		blocked = minf(blocked, from.distance_to(wall["position"]) / maxf(from.distance_to(to), 0.001))
 	var hit: float = 0.0 if from.distance_to(_target.global_position) <= 7.0 else Geometry2D.segment_intersects_circle(from, to, _target.global_position, 7.0)
 	if hit >= 0.0 and hit < blocked:
-		_target.take_damage(_host.outgoing_damage(DAMAGE))
+		_target.take_damage(_host.outgoing_damage(DAMAGE), _host)
 		_spend()
 	elif blocked <= 1.0:
 		_spend()

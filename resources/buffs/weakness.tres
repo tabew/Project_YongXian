@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cbiomgqosct0q"]
+
+[ext_resource type="Texture2D" uid="uid://drbfh03y0iavi" path="res://assets/ui/buffs/weakness.png" id="1_5rfe7"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_o8v5g"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_5rfe7"]
+
+[sub_resource type="Resource" id="Resource_jhcpe"]
+script = ExtResource("1_o8v5g")
+stat = &"damage_dealt"
+mode = 1
+value = -0.3
+value_per_level = -0.1
+
+[resource]
+script = ExtResource("2_5rfe7")
+id = &"weakness"
+display_name = "虚弱"
+description = "造成的伤害降低，持续 6 秒。"
+icon = ExtResource("1_5rfe7")
+is_debuff = true
+modifiers = Array[ExtResource("1_o8v5g")]([SubResource("Resource_jhcpe")])

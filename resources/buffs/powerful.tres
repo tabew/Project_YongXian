@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://de0np05q7ohwn"]
+
+[ext_resource type="Texture2D" uid="uid://b5lbg1a3g0xuh" path="res://assets/ui/buffs/sharp.png" id="1_lvece"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_22h3a"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_74vdw"]
+
+[sub_resource type="Resource" id="Resource_1dwbi"]
+script = ExtResource("2_22h3a")
+stat = &"damage_dealt"
+mode = 1
+value = 0.25
+value_per_level = 0.1
+
+[resource]
+script = ExtResource("3_74vdw")
+id = &"sharp"
+display_name = "力量"
+description = "造成的伤害提高，持续 8 秒。"
+icon = ExtResource("1_lvece")
+duration = 8.0
+modifiers = Array[ExtResource("2_22h3a")]([SubResource("Resource_1dwbi")])

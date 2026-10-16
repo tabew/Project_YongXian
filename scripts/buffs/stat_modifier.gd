@@ -25,6 +25,6 @@ enum Mode
 @export var value_per_level: float = 0.0
 
 
-##本等级下的数值
+##本等级下的数值：0 级就是基础值，每高一级 +value_per_level
 func amount(level: int) -> float:
-	return value + value_per_level * float(maxi(level - 2, 0))
+	return value + value_per_level * float(maxi(level, 0))

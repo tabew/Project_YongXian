@@ -8,12 +8,12 @@ has_items = Array[int]([0, 1, 201, 202, 203, 204, 300, 5])
 items = Dictionary[int, int]({
 0: 5,
 1: 999,
+5: 5,
 201: 1,
 202: 1,
 203: 1,
 204: 1,
-300: 999,
-5: 5
+300: 999
 })
 handy_items_pos = Dictionary[int, int]({
 0: 200,

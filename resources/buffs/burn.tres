@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/burn.png" id="1_xk7kj"]
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_4fqu2"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_gxtow"]
+
+[resource]
+script = ExtResource("3_gxtow")
+id = &"burn"
+display_name = "燃烧"
+description = "每秒受到伤害，持续 4 秒。"
+icon = ExtResource("1_xk7kj")
+is_debuff = true
+duration = 4.0
+tick_interval = 1.0
+damage_per_tick = 2.0
+damage_per_tick_per_level = 1.0

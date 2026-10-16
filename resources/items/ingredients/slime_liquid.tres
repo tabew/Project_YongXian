@@ -1,11 +1,18 @@
-[gd_resource type="Resource" script_class="IngredientData" load_steps=3 format=3]
+[gd_resource type="Resource" format=3 uid="uid://df3i6d3js27ww"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/slime_liquid.svg" id="2_icon"]
+[ext_resource type="Texture2D" uid="uid://d2283bsbnthad" path="res://assets/items/ingredients/slime_liquid.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/invisibility.tres" id="4_invisibility"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_can4l"]
+[ext_resource type="Resource" uid="uid://clue3wk0joahh" path="res://resources/alchemical_attribute/slow.tres" id="5_slow"]
+[ext_resource type="Resource" uid="uid://bhhq45ferenin" path="res://resources/alchemical_attribute/vulnerable.tres" id="6_vulnerable"]
+[ext_resource type="Script" uid="uid://3hmcglhm3f6e" path="res://scripts/items/ingredients/slime_liquid.gd" id="7_slime"]
 
 [resource]
-script = ExtResource("1_data")
+script = ExtResource("7_slime")
+for_use_attribute = Array[ExtResource("3_attribute")]([ExtResource("5_slow")])
 id = 9
 name = "凝液"
 texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_invisibility"), ExtResource("5_slow"), ExtResource("6_vulnerable")])
 item_scene_path = "res://scenes/items/ingredients/slime_liquid.tscn"
