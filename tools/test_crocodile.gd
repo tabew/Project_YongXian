@@ -281,11 +281,22 @@ func _test_actual_world() -> void:
 	for actor: BaseMonster in world.monster_spawner.monsters:
 		if actor is CrocodileMonster:
 			crocodiles.append(actor)
-			_check(_definition.can_spawn_at(world._generator,WorldGenerator.world_to_tile(actor.global_position)), "actual_swamp_actors_use_valid_crocodile_habitat")
-	_check(not crocodiles.is_empty(), "actual_swamp_naturally_spawns_crocodiles")
+			_check(_definition.can_spawn_at(world._generator,actor.original_spawn_tile), "actual_swamp_actors_use_valid_crocodile_habitat")
+	var planned_count: int = 0
+	for group: Array in world.monster_spawner._supply_guards_by_chunk.values():
+		planned_count += group.size()
+	var actual_guards: int = 0
+	var actual_scattered: int = 0
+	for actor: BaseMonster in world.monster_spawner.monsters:
+		if actor.has_supply_post:
+			actual_guards += 1
+		else:
+			actual_scattered += 1
+	_check(actual_guards == planned_count and actual_scattered > 0 and count == actual_guards + actual_scattered, "actual_swamp_adds_supply_guards_to_scattered_monsters")
+	_check(not crocodiles.is_empty(), "actual_swamp_still_spawns_ordinary_crocodiles")
 	if not crocodiles.is_empty():
 		var victim: BaseMonster = crocodiles[0]
-		var tile: Vector2i = WorldGenerator.world_to_tile(victim.global_position)
+		var tile: Vector2i = victim.original_spawn_tile
 		victim.kill()
 		var drops: Array[GroundPickup] = _drops(world.monster_spawner)
 		_check(drops.size() == 1 and drops[0].data.id in [6,7,8], "actual_swamp_death_is_single_configured_drop")
@@ -297,7 +308,7 @@ func _test_actual_world() -> void:
 			await process_frame
 		_check(world.monster_spawner.monsters.size() == count-1, "actual_swamp_return_does_not_replace_dead_crocodile")
 		for actor: BaseMonster in world.monster_spawner.monsters:
-			_check(WorldGenerator.world_to_tile(actor.global_position) != tile, "actual_swamp_dead_identity_stays_absent")
+			_check(actor.original_spawn_tile != tile, "actual_swamp_dead_identity_stays_absent")
 		if not drops.is_empty():
 			var pickup: GroundPickup = drops[0]
 			_check(pickup.is_visible_in_tree(), "actual_swamp_return_restores_uncollected_drop")

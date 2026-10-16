@@ -30,6 +30,7 @@ static func build_path(
 		maxi(start_tile.y, target_tile.y)
 	) + margin
 
+	var guard_patrol: bool = host.has_supply_post and host.brain != null and host.get_ai_state() == EnemyState.State.PATROL and not host.brain.is_returning_to_supply_post()
 	var grid := AStarGrid2D.new()
 	grid.region = Rect2i(min_tile, max_tile - min_tile + Vector2i.ONE)
 	grid.cell_size = Vector2.ONE
@@ -41,7 +42,7 @@ static func build_path(
 			var tile := Vector2i(x, y)
 			var blocked: bool = not host.is_navigation_tile_allowed(tile)
 			if not blocked:
-				blocked = physics_solids.has(tile)
+				blocked = physics_solids.has(tile) or (guard_patrol and not host.supply_patrol_allows(tile))
 			if blocked:
 				grid.set_point_solid(tile, true)
 

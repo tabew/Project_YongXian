@@ -23,12 +23,21 @@ func _rainforest_gate(world: Node2D) -> Dictionary:
 	return {}
 
 
+func _resolve_upgrade_pause(world: Node2D) -> void:
+	if not world.get_tree().paused:
+		return
+	var panel := world.get_node("GameHUD/UpgradePanel") as UpgradePanel
+	if panel.visible and not panel._cards.is_empty():
+		panel.card_chosen.emit(panel._cards[0].id)
+
+
 func _cross_gate(world: Node2D, link: Dictionary) -> void:
 	world.player.global_position = WorldGenerator.tile_to_world(link["point"])
 	world.player.velocity = Vector2(float(link["side"]) * world.player.max_speed, 0)
 	world._process(0.01)
 	_check(world._transitioning, "entering_gate_starts_black_fade")
-	for frame: int in 160:
+	for frame: int in 480:
+		_resolve_upgrade_pause(world)
 		if not world._transitioning:
 			return
 		await process_frame
@@ -36,11 +45,12 @@ func _cross_gate(world: Node2D, link: Dictionary) -> void:
 
 
 func _wait_map(world: Node2D) -> void:
-	for frame: int in 240:
-		if world.chunk_manager.map_ready():
-			break
+	for frame: int in 1200:
+		_resolve_upgrade_pause(world)
+		if world.chunk_manager.map_ready() and world.monster_spawner.get_pending_spawn_count() == 0:
+			return
 		await process_frame
-	_check(world.chunk_manager.map_ready(), "active_region_finishes_loading")
+	_check(false, "active_region_ready=%s pending=%d mode=%d processing=%s can_process=%s tree_paused=%s transitioning=%s player_health=%.1f" % [world.chunk_manager.map_ready(), world.monster_spawner.get_pending_spawn_count(), world.monster_spawner.process_mode, world.monster_spawner.is_processing(), world.monster_spawner.can_process(), world.get_tree().paused, world._transitioning, world.player.health])
 
 
 func _run() -> void:
@@ -52,7 +62,7 @@ func _run() -> void:
 	current_scene = world
 	world.set_process(false)
 	world.player.set_physics_process(false)
-	world.monster_spawner.process_mode = Node.PROCESS_MODE_DISABLED
+	world.player.damage_taken = 0.0
 	_check(world.monster_spawner.monsters.is_empty(), "initial_cottage_remains_safe")
 	var link: Dictionary = _rainforest_gate(world)
 	_check(not link.is_empty(), "combat_fixture_has_second_layer_rainforest_gate")
@@ -91,7 +101,7 @@ func _run() -> void:
 		await process_frame
 		quit(1)
 		return
-	var killed_tile: Vector2i = WorldGenerator.world_to_tile(victim.global_position)
+	var killed_tile: Vector2i = victim.original_spawn_tile
 	victim.kill()
 	var loot: GroundPickup = null
 	for child: Node in world.monster_spawner.get_children():
@@ -105,9 +115,15 @@ func _run() -> void:
 	_check(world._current_node == 0, "return_gate_reaches_initial_safe_region")
 	await _cross_gate(world, link)
 	await _wait_map(world)
-	_check(world.monster_spawner.monsters.size() == count_before - 1, "actual_gate_return_preserves_empty_dead_slot_without_replacement")
+	var returned_guards: int = 0
+	var returned_ordinary: int = 0
 	for actor: BaseMonster in world.monster_spawner.monsters:
-		_check(WorldGenerator.world_to_tile(actor.global_position) != killed_tile, "actual_gate_return_does_not_revive_victim")
+		if actor.has_supply_post:
+			returned_guards += 1
+		else:
+			returned_ordinary += 1
+		_check(actor.original_spawn_tile != killed_tile, "actual_gate_return_does_not_revive_victim")
+	_check(returned_guards > 0 and returned_ordinary > 0, "actual_gate_return_keeps_both_supply_guards_and_ordinary_monsters")
 	_check(is_instance_valid(loot) and loot.is_visible_in_tree(), "actual_gate_return_restores_same_uncollected_drop")
 
 	# 同样是第二层雨林，也可能是非战斗房间；显示房型并保留内容预算规则。

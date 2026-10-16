@@ -143,6 +143,9 @@ func follow() -> FollowResult:
 	if not host.is_navigation_tile_allowed(next_tile):
 		clear()
 		return FollowResult.NO_PATH
+	if host.has_supply_post and host.get_ai_state() == EnemyState.State.PATROL and not host.brain.is_returning_to_supply_post() and not host.supply_patrol_allows(next_tile):
+		clear()
+		return FollowResult.NO_PATH
 
 	var next_position: Vector2 = WorldGenerator.tile_to_world(next_tile)
 	host.velocity = host.global_position.direction_to(next_position) * host.movement_speed()

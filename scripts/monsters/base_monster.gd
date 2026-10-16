@@ -8,6 +8,9 @@ var _death_committed: bool = false
 var difficulty_entry: int = 1
 var difficulty_multiplier: float = 1.0
 var _difficulty_applied: bool = false
+const SUPPLY_PATROL_RADIUS_TILES: float = 8.0
+var has_supply_post: bool = false
+var supply_post: Vector2 = Vector2.ZERO
 
 ## 所有怪物共用的模板：生命、受击、动画、感知/寻路原语，以及通用四状态 AI 的装配。
 ##
@@ -42,6 +45,7 @@ var _slow_ratio: float = 0.0
 var player: PlayerCharacter = null
 var world_generator: WorldGenerator = null
 var spawn_chunk: Vector2i = Vector2i.ZERO
+var original_spawn_tile: Vector2i = Vector2i.ZERO
 ## 击杀基础经验，由 MonsterSpawner 按生成配置写入。
 var experience_reward: int = 0
 
@@ -182,6 +186,18 @@ func _build_ai() -> void:
 		attack.setup(self, ai_config)
 	brain = EnemyBrain.new()
 	brain.setup(self, ai_config, blackboard, perception, navigator, attack, _ai_seed())
+
+
+func set_supply_post(position: Vector2) -> void:
+	has_supply_post = true
+	supply_post = position
+	ai_config.patrol_radius_tiles = SUPPLY_PATROL_RADIUS_TILES
+	blackboard.patrol_anchor = position
+
+
+func supply_patrol_allows(tile: Vector2i) -> bool:
+	var radius: float = SUPPLY_PATROL_RADIUS_TILES * WorldGenerator.TILE_SIZE
+	return not has_supply_post or WorldGenerator.tile_to_world(tile).distance_squared_to(supply_post) <= radius * radius
 
 
 ## 子类返回自己的攻击实现；默认没有攻击，怪物只会巡逻与追击。

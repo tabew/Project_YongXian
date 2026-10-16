@@ -85,7 +85,7 @@ func is_navigation_tile_allowed(tile: Vector2i) -> bool:
 	if not _amphibious_tile_allowed(tile):
 		return false
 	# 在水中巡逻不抄岸上近路；岸边出生/失去目标时允许走向水中巡逻点。
-	if get_ai_state() == EnemyState.State.PATROL and is_in_water():
+	if get_ai_state() == EnemyState.State.PATROL and is_in_water() and not (has_supply_post and brain != null and brain.is_returning_to_supply_post()):
 		return CrocodileSpawnData.is_swamp_water(world_generator, tile)
 	return true
 

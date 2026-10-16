@@ -113,6 +113,27 @@ func _run() -> void:
 	await cleanup(f.holder)
 
 	f = fixture()
+	var posted: Array[ShiMonster] = [spawn(f, Vector2i(2, 2)), spawn(f, Vector2i(3, 2)), spawn(f, Vector2i(2, 3))]
+	posted[0].set_supply_post(WorldGenerator.tile_to_world(Vector2i(2, 2)))
+	posted[1].set_supply_post(WorldGenerator.tile_to_world(Vector2i(3, 2)))
+	posted[2].set_supply_post(posted[0].supply_post)
+	check(not posted[0].nearby_partners().has(posted[1]) and posted[0].nearby_partners().has(posted[2]), "supply_guards_only_group_with_their_own_post")
+	posted[1].set_supply_post(posted[0].supply_post)
+	check(posted[0].nearby_partners().size() == 2, "same_supply_post_keeps_normal_group_formation")
+	var leader: ShiMonster = posted[0]
+	f.player.global_position = leader.global_position + Vector2(7.0 * WorldGenerator.TILE_SIZE, 0)
+	check(leader.attack.perform_attack(leader, f.player) and leader.is_group_leader(), "same_post_supply_guards_can_form_group")
+	leader.global_position += Vector2(2.0 * WorldGenerator.TILE_SIZE, 0)
+	f.player.global_position = leader.global_position + Vector2(9.0 * WorldGenerator.TILE_SIZE, 0)
+	leader.blackboard.state = EnemyState.State.ATTACK
+	leader.brain.tick(0.01)
+	check(leader.brain.is_returning_to_supply_post() and not leader.attack.is_busy(), "group_leader_cancels_attack_and_returns_when_player_far")
+	leader.global_position += Vector2(8, 0)
+	leader._physics_process(0.016)
+	check(posted[1].global_position == leader.global_position and posted[2].global_position == leader.global_position, "inactive_group_members_follow_leader_during_return")
+	await cleanup(f.holder)
+
+	f = fixture()
 	var trio: Array[ShiMonster] = [spawn(f, Vector2i(2, 2)), spawn(f, Vector2i(3, 2)), spawn(f, Vector2i(2, 3))]
 	actor = trio[0]
 	f.player.global_position = actor.global_position + Vector2(128, 0)

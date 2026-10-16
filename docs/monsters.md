@@ -67,22 +67,22 @@ BaseMonster (CharacterBody2D)
 
 ## 生成流程
 
-1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player, active_map, combat_entry)`。
-2. `setup()` 清空旧怪物，订阅 `ChunkManager.chunk_applied`；箱庭入口组立即实例化，其余已加载区块先确定原始生成格，再按每帧预算实例化。
-3. 每个区块内遍历 `spawn_definitions`；RNG 种子由世界种子、区块坐标和 `monster_id` 共同产生。
+1. `GameWorld._setup_map_monsters()` 调用 `MonsterSpawner.setup(generator, chunk_manager, player, active_map, combat_entry, transitioning, true)` 启用正式箱庭的补给点守卫模式。
+2. `setup()` 从 `WorldGenerator.population_for()` 读取废弃补给点，按世界种子和点位稳定规划每处 2–3 只额外守卫；仅战斗 / Boss 房启用。区块加载时先预留守卫的原始格，再执行原有入口遭遇与随机散怪生成；已加载区块的非入口怪物按每帧预算实例化。离图重返时重放同一组原始生成格。
+3. 未启用守卫的独立流式调用仍按 `spawn_definitions`、世界种子、区块和 `monster_id` 生成，不受补给点机制影响。
 4. `MonsterSpawnData.can_spawn_at()` 要求当前格可通行，且当前格群系在 `allowed_biomes` 中或列表为空。
 5. 生成成功时把怪物加入 spawner 子节点、`monsters` 存活数组和 `_monsters_by_chunk` 字典，并调用 `monster.configure(player, generator, chunk_coords)`。
 6. `tree_exited` 一次性连接会从存活数组与区块字典移除怪物；当前箱庭的空区块标记保留至切图，以防尚在队列的名额因同块最后一只怪死亡而丢失。
 
-当前 `GameWorld` 会让整张地图长期加载，切图时调用 `setup()` 替换当前地图的存活怪物。箱庭模式的 `MonsterSpawner._process()` 不做距离回收：入口组同步出现，其余区块先确定原始生成格，每帧最多实例化4只；远离玩家36格、处于巡逻且无技能/击退/警报的怪物暂停处理，玩家进入24格、受击或听到警报时恢复。睡眠前清除待处理路径，切图时清空未生成队列而保留本局击杀身份。独立测试和不指定 `active_map` 的流式世界仍同步生成；流式世界仍按 `unload_radius + despawn_margin_chunks` 回收怪物。高密度场景（种子18473的沼泽战斗区域，43只）物理帧基线约28毫秒，远距休眠后约7至15毫秒；首次进入的可见区块同步铺图仍有单独开销。
+当前 `GameWorld` 会让整张地图长期加载，切图时调用 `setup()` 替换当前地图的存活怪物。箱庭模式的 `MonsterSpawner._process()` 不做距离回收：补给点守卫与普通散怪都按原始生成格确定名额，入口组同步出现，其余怪物每帧最多实例化4只；远离玩家36格且闲置巡逻的怪物暂停处理，玩家进入24格、受击或听到警报时恢复；返回补给点途中的守卫不会休眠。睡眠前清除待处理路径，切图时清空未生成队列而保留本局击杀身份。独立测试和不指定 `active_map` 的流式世界仍同步生成；流式世界仍按 `unload_radius + despawn_margin_chunks` 回收怪物。
 
-怪物难度按本局进入**有敌人预算**的房间次数计算，与地图显示的楼层不同；每次返图也推进一次，安全房间不推进，同种子新开一局归零。第1至7次的累计倍率依次为 `1、1.5、2、2.4、2.8、3.1、3.4`；第 `n >= 8` 次使用 `3.4 + 0.7 * ln(1 + (n - 7) / 3)`，持续增长而逐步放缓。`BaseMonster.difficulty_entry` 和 `difficulty_multiplier` 存放在每只怪物实例上：首次生成时按倍率调整满生命和最大生命，所有近战、投石、粘液弹、接触及音波伤害从攻击来源读取倍率；移动速度、防御、掉落不受影响。入口组及排队生成的怪物都使用本次入房档位，原始生成位置和本局死亡记录不受倍率影响。
+怪物难度按本局进入**有敌人预算**的房间次数计算，与地图显示的楼层不同；每次返图也推进一次，安全房间不推进，同种子新开一局归零。第1至7次的累计倍率依次为 `1、1.5、2、2.4、2.8、3.1、3.4`；第 `n >= 8` 次使用 `3.4 + 0.7 * ln(1 + (n - 7) / 3)`，持续增长而逐步放缓。`BaseMonster.difficulty_entry` 和 `difficulty_multiplier` 存放在每只怪物实例上：首次生成时按倍率调整满生命和最大生命，所有近战、投石、粘液弹、接触及音波伤害从攻击来源读取倍率；移动速度、防御、掉落不受影响。补给点守卫、入口组和散怪都使用本次入房档位，原始生成位置和本局死亡记录不受倍率影响。
 
 本局击杀记录保存在 `MonsterSpawner._defeated_spawn_ids`，身份为 `monster_id + 原始生成格坐标`，巡逻或追击后的位置不会改变身份。`BaseMonster.kill()` 只在真正死亡时发出一次 `killed`；正常伤害死亡和 K 调试击杀都会记录，切图清理、距离回收、隐藏邻图裁剪则不会记录。重放区块的确定性生成序列时，死怪仍占用原有名额，所以返回旧箱庭既不会复活，也不会在另一个位置补刷替代怪物；未击杀的生成名额仍正常出现。连续调用 `setup()` 且使用同一生成器时保留记录，`build_world()` 创建新生成器时清空，包括使用相同种子重开一局。记录目前仅在本局内存中保存。
 
-正式战斗箱庭可通过 `gate_encounter_count` 配置稳定入口遭遇：“给”为2只，“史”为3只，鳄鱼仍按水域栖地规则。锚点取真实弯曲道路的入口落位点，向地图内侧偏移10格，再在同一区块内挑可通行格。该区块使用入口组替代随机内部分布，仍受 `max_per_chunk` 上限约束，死亡格占用原名额；入口组不依赖内部区块的稀疏生成概率，非战斗预算0时不启用。用户种子1741004498的第六层沼泽原来26只均远离入口，最近约79格，入口画面0只；修正后两侧入口均有3只史，战斗雨林两侧有“给”。
+正式战斗与 Boss 箱庭保留原有的入口遭遇和区块散怪，并额外在废弃补给点生成守卫。每处补给点从本区域已有怪物池中按种子稳定安排 2–3 只，出生格必须可通行、符合该种怪物的群系与栖地条件，并在补给点中心 8 格内；水栖怪物若点位周围没有合适栖地，就由其他符合条件的当地怪物占领。守卫固定以补给点为中心在 8 格圆内巡逻，路径经过的格子也须在圆内；战斗追击可越界，与玩家距离大于 8 格时停止攻击、寻路返回补给点，抵达后才重新警戒。普通流式怪物仍沿用丢失目标后在当前位置巡逻的逻辑。起点与其他非战斗房虽也有废弃补给点，但不会有守卫。
 
-正式箱庭在生成前通过 `active_map` 剔除邻图候选格，避免两个区域共享一个区块时，邻图先占满 `max_per_chunk` 名额再被地图裁剪，导致当前入口无怪。未传此参数的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数与待生成数量；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
+正式箱庭先为当前 `active_map` 的补给点守卫预留格子，入口组与普通散怪继续使用同图的剩余可用格；邻图即使共享区块也不会占用本区的名额。未启用补给点模式的通用流式生成调用保持原行为。HUD 显示当前房间类型，F3 面板显示本区域存活怪物数与待生成数量；雨林和森林仅代表群系，只有战斗 / Boss 房间有敌人预算，开局和非战斗房间仍不刷怪。
 
 地图切换时，非怪物掉落物会保存到所属地图的 `MapEntities_<map_id>` 根节点；离开当前箱庭后隐藏并暂停，返回后恢复。每帧 `GameWorld._confine_map_monsters()` 会把怪物位置限制在当前地图矩形内，已加载的隐藏邻图也不会留下跨图怪物。
 
@@ -97,7 +97,7 @@ BaseMonster (CharacterBody2D)
 | `Attack` | 在攻击距离内且可见 | 面向玩家，按冷却/前摇/后摇出手 | 离开攻击距离但仍可见 -> `Chase`；丢失视野超过宽限 -> 改写锚点后 `Patrol` |
 | `Search` | 噪音、警报、被攻击但没看到玩家 | 在 `SearchCenter` 附近逐个搜索点移动、停留、环顾 | 搜索超时或走完所有点 -> 改写锚点后 `Patrol`；看到玩家 -> `Chase` |
 
-硬性规则：**丢失玩家视野后不回出生点、不回原巡逻点**。`Chase` / `Attack` 的宽限计时一过，`EnemyBrain._lose_target()` 会把 `blackboard.patrol_anchor` 改写成怪物当时所在的位置、清空目标与搜索状态，再切回 `Patrol`，所以怪物会在“最后看到玩家的地方”附近继续巡逻；`Search` 结束时同样把锚点改写成当前位置。开启 `config.search_on_lost_sight` 时，`Chase` / `Attack` 丢失视野会先经过一次 `Search` 再回到 `Patrol`，锚点规则不变。
+普通流式怪物丢失玩家视野后不回出生点、不回原巡逻点：`Chase` / `Attack` 的宽限计时一过，`EnemyBrain._lose_target()` 会把 `blackboard.patrol_anchor` 改写成怪物当时所在的位置；`Search` 结束时同样改写。开启 `config.search_on_lost_sight` 时仍可先进入 `Search`。正式箱庭的补给点守卫是例外：其锚点固定在补给点，追击时与玩家拉开超过 8 格即中断动作并返回；失去视线但玩家仍在 8 格内时继续追踪最后已知位置。
 
 组件职责与共享边界：
 
@@ -114,7 +114,7 @@ BaseMonster (CharacterBody2D)
 - `EventBus.alert_raised`：队友警报 / 警戒事件，与噪音同一条通道。
 - 被攻击但看不到攻击者：`BaseMonster._on_monster_damaged()` 在 `EnemyPerception.can_see()` 为假时把受击来源位置记为可疑信息；这里用感知判定，所以"视线被挡"和"超出视野距离"两种情况都会触发搜索。
 
-初始巡逻锚点（`PatrolAnchor`）：怪物场景里存在名为 `PatrolAnchor` 的子节点时用它的位置（配置点 / 房间中心），否则用出生点。之后只有"丢失目标"和"搜索结束"两种情况会改写锚点。
+初始巡逻锚点（`PatrolAnchor`）：普通怪物使用场景中同名子节点的位置，否则用出生点；之后在丢失目标或搜索结束时改写。补给点守卫在实例化后覆盖为所属补给点，不会改写。
 
 确定性与性能：
 
@@ -243,6 +243,7 @@ godot --headless --path . --script res://tools/test_give_loot.gd
 godot --headless --path . res://tests/test_monster_active_map.tscn
 godot --headless --path . --script res://tools/test_monster_region_entry.gd
 godot --headless --path . --script res://tools/test_gate_encounters.gd
+godot --headless --path . --script res://tools/test_supply_guards.gd
 godot --headless --path . --script res://tools/test_give_ground_stone.gd
 godot --headless --path . res://tests/test_enemy_ai.tscn
 godot --headless --path . res://tests/test_give_monster.tscn
