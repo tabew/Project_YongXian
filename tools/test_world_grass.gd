@@ -11,13 +11,15 @@ const GROWING_TERRAINS: Array[int] = [
 ]
 const WEAPON_SCENES: Array[String] = [
 	"res://scenes/weapons/swing_attack.tscn",
+	"res://scenes/weapons/spear_attack.tscn",
 	"res://scenes/weapons/yoyo_attack.tscn",
-	"res://scenes/weapons/depth_strike_attack.tscn",
+	"res://scenes/weapons/swarm_yoyo_attack.tscn",
 ]
 ## 切割一次允许的耗时上限（微秒）：只查邻近小块，不应随全图草量增长。
 const CUT_BUDGET_USEC: int = 400
-## 进入一张地图允许的耗时上限（微秒）：草丛与材料都已预热，整图草量不进这一笔。
-const ENTRY_BUDGET_USEC: int = 60000
+## 进入一张地图允许的耗时上限（微秒）：草丛与材料都已预热，整图草量不进这一笔；
+## 实际约 25ms，这里留足余量避免机器负载造成偶发失败。
+const ENTRY_BUDGET_USEC: int = 80000
 
 var _checks: int = 0
 var _failures: int = 0
