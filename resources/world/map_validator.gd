@@ -90,6 +90,28 @@ static func _check_overlap(generator: WorldGenerator) -> PackedStringArray:
 			var b := Rect2i(specs[j].origin, specs[j].extent)
 			if a.intersects(b):
 				problems.append("区域 %d 与 %d 重叠" % [specs[i].node_id, specs[j].node_id])
+	var previous: Array[MapSpec] = []
+	for ids: PackedInt32Array in generator.run.floors:
+		var column: Array[MapSpec] = []
+		for id: int in ids:
+			column.append(generator.map_spec(id))
+		column.sort_custom(func(a: MapSpec, b: MapSpec) -> bool: return a.origin.y < b.origin.y)
+		for index: int in column.size():
+			var region: MapSpec = column[index]
+			if region.origin.x != column[0].origin.x or region.extent.x != column[0].extent.x:
+				problems.append("同列区域东西边界未对齐")
+			if index > 0 and column[index - 1].origin.y + column[index - 1].extent.y != region.origin.y:
+				problems.append("同列区域存在空隙或重叠")
+		if not previous.is_empty():
+			if previous[0].origin.x + previous[0].extent.x != column[0].origin.x:
+				problems.append("相邻箱庭列没有贴合")
+			var shared: bool = false
+			for left: MapSpec in previous:
+				for right: MapSpec in column:
+					shared = shared or mini(left.origin.y + left.extent.y, right.origin.y + right.extent.y) - maxi(left.origin.y, right.origin.y) >= 12
+			if not shared:
+				problems.append("相邻箱庭列只有角落接触")
+		previous = column
 	return problems
 
 

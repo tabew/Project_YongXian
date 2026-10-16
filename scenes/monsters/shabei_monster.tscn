@@ -1,0 +1,24 @@
+[gd_scene load_steps=8 format=3]
+[ext_resource type="PackedScene" path="res://scenes/monsters/base_monster.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/monsters/shabei_monster.gd" id="2_script"]
+[ext_resource type="Script" path="res://scripts/monsters/shabei_monster_visual.gd" id="3_visual"]
+[ext_resource type="AnimationLibrary" path="res://resources/monsters/shabei_animation_library.tres" id="4_library"]
+[ext_resource type="AnimationNodeStateMachine" path="res://resources/monsters/shabei_animation_state_machine.tres" id="5_tree"]
+[ext_resource type="Resource" path="res://resources/monsters/shabei_ai_config.tres" id="6_ai"]
+[ext_resource type="Resource" path="res://resources/monsters/shabei_loot_table.tres" id="7_loot"]
+[node name="ShabeiMonster" instance=ExtResource("1_base")]
+script = ExtResource("2_script")
+ai_config = ExtResource("6_ai")
+death_loot = ExtResource("7_loot")
+[node name="Placeholder" parent="Visual" index="0"]
+visible = false
+[node name="Body" type="Node2D" parent="Visual" index="1"]
+script = ExtResource("3_visual")
+[node name="AnimationPlayer" parent="." index="1"]
+libraries = {&"": ExtResource("4_library")}
+[node name="AnimationTree" parent="." index="2"]
+tree_root = ExtResource("5_tree")
+[node name="Health" parent="." index="3"]
+max_health = 80.0
+[node name="NameLabel" parent="." index="7"]
+text = "啥杯"

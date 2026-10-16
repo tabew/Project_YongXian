@@ -107,7 +107,7 @@ func update(monster: BaseMonster, delta: float) -> void:
 	if is_instance_valid(monster.player) and (
 		monster.global_position.distance_to(monster.player.global_position) <= MELEE_HIT_RANGE
 	):
-		monster.player.take_damage(DAMAGE)
+		monster.player.take_damage(monster.outgoing_damage(DAMAGE))
 
 
 func set_attacking(value: bool) -> void:
@@ -141,7 +141,7 @@ func _try_throw_stone(monster: BaseMonster, target: Node2D) -> bool:
 		monster.stop_navigation()
 		return false
 	monster.play_monster_animation(&"Throw", true)
-	var result: Variant = stone.call("throw_at", target, DAMAGE)
+	var result: Variant = stone.call("throw_at", target, monster.outgoing_damage(DAMAGE))
 	if result is bool and not result:
 		_set_intent(monster, false)
 		return false

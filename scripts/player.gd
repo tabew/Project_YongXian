@@ -52,6 +52,10 @@ var terrain_source: WorldGenerator = null
 ## 当前箱庭的矩形通行边界，出口由 GameWorld 瞬切。
 var active_map: MapSpec = null
 
+##受到的伤害倍率：1.0 表示正常，减伤类 buff 会把它调小。
+##升级卡的减伤走 RunProgress，这里是 buff 的那一层，两者相乘。
+var damage_taken: float = 1.0
+
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
 var _cached_walkable: bool = true
@@ -193,24 +197,25 @@ func _tick_progress(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("attack"):
-		#选中物品左键使用
-		if is_ui_blocking():
-			return
+	if health > 0.0:
+		if event.is_action_pressed("attack"):
+			#选中物品左键使用
+			if is_ui_blocking():
+				return
 
-		inventory.left_use_handy_slot(self)
-		weapon_controller.set_trigger_pressed(true)
-		get_viewport().set_input_as_handled()
-		return
-	
-	elif event.is_action_pressed("throw"):
-		#选中物品右键使用
-		if is_ui_blocking():
+			inventory.left_use_handy_slot(self)
+			weapon_controller.set_trigger_pressed(true)
+			get_viewport().set_input_as_handled()
 			return
+		
+		elif event.is_action_pressed("throw"):
+			#选中物品右键使用
+			if is_ui_blocking():
+				return
 
-		inventory.right_use_handy_slot(self)
-		get_viewport().set_input_as_handled()
-		return
+			inventory.right_use_handy_slot(self)
+			get_viewport().set_input_as_handled()
+			return
 		
 
 func handy_item_changed()->void:
@@ -313,7 +318,37 @@ func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec
 		apply_progress(true)
 
 
-## 受到伤害：先过升级卡的倍率与固定减伤，再交给生命组件。
+##BuffHolder 读当前属性值（认基准用）。
+##
+## 必须返回“不含 buff 的基础值”：BuffHolder 的算法是“读基准 → 加 buff 修正 → 写回”，
+## 如果这里返回已经含 buff 或含升级卡的值，每次重算都会把加成再叠一遍、越滚越大。
+## 升级卡的加成由各自的 getter 叠在最上层，不参与 buff 的基准。
+func read_stat(stat: StringName) -> float:
+	match stat:
+		&"move_speed":
+			return max_speed
+		&"defense":
+			return base_defense
+		&"damage_taken":
+			return damage_taken
+	return 0.0
+
+
+##BuffHolder 把算好的值写回基础属性。
+func apply_stat(stat: StringName, value: float) -> void:
+	match stat:
+		&"move_speed":
+			max_speed = value
+		&"defense":
+			base_defense = value
+			#固定减伤最终由生命组件扣，buff 改完要同步过去。
+			if is_instance_valid(health_component):
+				health_component.defense = defense
+		&"damage_taken":
+			damage_taken = value
+
+
+## 受到伤害：先过 buff 的倍率、升级卡的倍率与固定减伤，再交给生命组件。
 func take_damage(amount: float) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
@@ -331,12 +366,13 @@ func take_damage(amount: float) -> void:
 	health_component.receive_hit(hit)
 
 
-## 固定减伤在生命组件里扣，这里只负责倍率部分（坚韧 / 薄刃 / 濒死）。
+## 固定减伤在生命组件里扣，这里只负责倍率部分（buff 的 damage_taken / 坚韧 / 薄刃 / 濒死）。
 func _incoming_damage(amount: float) -> float:
+	var scaled: float = amount * maxf(damage_taken, 0.0)
 	var progress: Node = _run_progress()
 	if progress == null:
-		return amount
-	var scaled: float = amount * progress.damage_taken_mult()
+		return maxf(scaled, 0.0)
+	scaled *= progress.damage_taken_mult()
 	var low: float = progress.low_health_reduction()
 	if low > 0.0 and health_component.max_health > 0.0 and health / health_component.max_health < 0.3:
 		scaled *= 1.0 - low

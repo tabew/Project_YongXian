@@ -3,13 +3,16 @@ extends Resource
 
 ## 一局地图骨架的可调参数。
 ##
-## 全部有默认值，不配置也能跑；默认值与改造前的固定 8 层 14 区域完全一致，
-## 所以不传配置时地图与旧版本逐位相同。策划可保存成 .tres 后挂到 WorldGenerator。
+## 全部有默认值，不配置也能跑；保留原8层主线和原有14个节点编号，
+## 默认在第三列增设一个分支。策划可保存成 .tres 后挂到 WorldGenerator。
 
 ## 层数（等于主路径长度）。
 @export_range(3, 32, 1) var floor_count: int = 8
 ## 哪些层带岔路；留空则自动取首尾层之外的中间层。
 @export var branch_floors: Array[int] = []
+
+## 第三列增加一个分支；关闭时恢复原来的每层最多两块地图。
+@export var pyramid_third_branch: bool = true
 
 ## 主路径长度约束。
 @export_range(3, 32, 1) var min_path_len: int = 6

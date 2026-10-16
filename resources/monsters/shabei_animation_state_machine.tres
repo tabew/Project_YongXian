@@ -1,0 +1,44 @@
+[gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://ct4jdr24j168h"]
+
+[sub_resource type="AnimationNodeAnimation" id="Death"]
+animation = &"Death"
+
+[sub_resource type="AnimationNodeAnimation" id="Hop"]
+animation = &"Hop"
+
+[sub_resource type="AnimationNodeAnimation" id="Hurt"]
+animation = &"Hurt"
+
+[sub_resource type="AnimationNodeAnimation" id="Idle"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="Rest"]
+animation = &"Rest"
+
+[sub_resource type="AnimationNodeAnimation" id="Scream"]
+animation = &"Scream"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="Start"]
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="Travel"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="Auto"]
+switch_mode = 2
+advance_mode = 2
+
+[resource]
+states/Death/node = SubResource("Death")
+states/Death/position = Vector2(240, 320)
+states/Hop/node = SubResource("Hop")
+states/Hop/position = Vector2(440, 0)
+states/Hurt/node = SubResource("Hurt")
+states/Hurt/position = Vector2(440, 320)
+states/Idle/node = SubResource("Idle")
+states/Idle/position = Vector2(240, 160)
+states/Rest/node = SubResource("Rest")
+states/Rest/position = Vector2(640, 0)
+states/Scream/node = SubResource("Scream")
+states/Scream/position = Vector2(440, 160)
+states/Start/position = Vector2(40, 160)
+transitions = ["Start", "Idle", SubResource("Start"), "Idle", "Hop", SubResource("Travel"), "Hop", "Idle", SubResource("Travel"), "Hop", "Rest", SubResource("Travel"), "Rest", "Hop", SubResource("Travel"), "Rest", "Idle", SubResource("Travel"), "Idle", "Scream", SubResource("Travel"), "Hop", "Scream", SubResource("Travel"), "Rest", "Scream", SubResource("Travel"), "Scream", "Idle", SubResource("Travel"), "Idle", "Hurt", SubResource("Travel"), "Hop", "Hurt", SubResource("Travel"), "Rest", "Hurt", SubResource("Travel"), "Scream", "Hurt", SubResource("Travel"), "Hurt", "Idle", SubResource("Auto"), "Idle", "Death", SubResource("Travel"), "Hop", "Death", SubResource("Travel"), "Rest", "Death", SubResource("Travel"), "Scream", "Death", SubResource("Travel"), "Hurt", "Death", SubResource("Travel")]

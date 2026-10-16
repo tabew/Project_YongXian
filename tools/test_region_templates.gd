@@ -40,9 +40,11 @@ func _check_world(seed_value: int) -> void:
 			"模板与房间类型不匹配 seed=%d node=%d 得到=%s 期望=%s" % [seed_value, spec.node_id, spec.template_id, expected])
 		# 尺寸必须落在所选模板的范围内。
 		var template: RegionTemplate = _find_template(expected)
-		_check(spec.extent.x >= template.min_extent and spec.extent.x <= template.max_extent
-			and spec.extent.y >= template.min_extent and spec.extent.y <= template.max_extent,
-			"区域尺寸超出模板范围 seed=%d node=%d extent=%s" % [seed_value, spec.node_id, spec.extent])
+		_check(spec.template_extent.x >= template.min_extent and spec.template_extent.x <= template.max_extent
+			and spec.template_extent.y >= template.min_extent and spec.template_extent.y <= template.max_extent
+			and spec.extent.y == spec.template_extent.y,
+			"模板抽样尺寸超出范围或列拼接改写高度 seed=%d node=%d" % [seed_value, spec.node_id])
+		_check(spec.extent.x >= spec.template_extent.x, "列拼接不应缩窄原有区域")
 
 	# 区域不重叠。
 	for i: int in specs.size():

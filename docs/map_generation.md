@@ -1,6 +1,6 @@
 # 地图生成架构：固定骨架 + 随机血肉 + 约束校验 + 种子系统
 
-本文档描述关卡地图的生成架构：可配置房间骨架、按种子分配的区域单一群系、起始小屋、低频大片地形，以及出入口瞬切、区块流式加载和生成约束校验。每个区域的群系身份固定，区域内部的噪声只改变地形与轮廓。
+本文档描述关卡地图的生成架构：可配置房间骨架、按种子分配的区域单一群系、起始小屋、低频柏林噪声大片地形，以及出入口黑屏淡入淡出、区块流式加载和生成约束校验。每个区域的群系身份固定，区域内部的噪声只改变地形与轮廓。
 
 ## 分层
 
@@ -17,6 +17,7 @@
 | 校验 | `resources/world/map_validator.gd` | 硬约束校验与同种子变体重生成 |
 | 评分 | `resources/world/map_scorer.gd` | 软约束评分，best-of-N |
 | 内容 | `resources/world/map_content.gd` | 按房间类型产出内容预算与落点 |
+| 地表兴趣点 | `resources/world/world_population.gd` | 营地、遗迹、石阵、补给点、药草园、随机宝箱与散落物资 |
 | 调试 | `resources/world/map_debug.gd` | 报告、ASCII 布局 |
 
 入口：`scenes/game/game_world.gd` 的 `build_world(seed)` → `MapScorer.build_best(seed)`。
@@ -32,14 +33,24 @@
 
 ## 配置
 
-`MapConfig` 有完整默认值，不配置也能跑，默认值与改造前的 8 层 14 区域一致。
+`MapConfig` 有完整默认值：原 8 层主线和 14 个节点 ID 均保留，第 3 列额外加入一个分支（共 15 个箱庭）；将 `pyramid_third_branch` 设为 `false` 可恢复原节点数量。
 
-- 骨架：`floor_count`、`branch_floors`、`min_path_len`/`max_path_len`、`min_branches`/`max_branches`。
+- 骨架：`floor_count`、`branch_floors`、`pyramid_third_branch`、`min_path_len`/`max_path_len`、`min_branches`/`max_branches`。
 - 关键房间：`shop_count`、`min_rewards`/`max_rewards`、`rest_every_floors`/`min_rests`、`boss_key_buffer`。
 - 节奏：`rhythm_templates`（留空用 `DEFAULT_RHYTHM_TEMPLATES`）。模板长度与 `floor_count` 不一致时自动伸缩，只增删战斗位，不丢关键房间；随后按配置强制校正关键房间数量与位置。
 - 分支：`branch_reward_chance`。
 - 校验/评分：`max_retries`、`candidate_count`、`weight_*`。
 - 区域模板：`RegionTemplates.defaults()` 按房间类型给出尺寸倾向；`RegionTemplate.matches()` 按类型 + 门朝向 + 形状筛选，无匹配时降级到 `fallback()`。
+
+## 横向金字塔列
+
+关卡仍有 8 层原主路径，旧节点编号和所有旧双向连接保持不变。默认在第 3 列加一个真正可到达的新岔路：前 3 列分别为 1、2、3 个箱庭，之后的双房列和最后的单房列继续使用原节奏。新岔路由第 2 列下侧分支进入，再经下一列下侧分支返回主线；启用 `pyramid_third_branch=false` 可恢复原 14 个节点。
+
+同列箱庭上下边相接，相邻列东西边相接；同列统一宽度，`MapSpec.template_extent` 保留抽样的原模板尺寸，非小屋箱庭的庭室中心、池塘位置随最终宽度等比例伸展。整个地图呈横向连片金字塔，不允许矩形重叠、断层或只在角点碰触，这些布局规则现由 `MapValidator` 验证。图边仍由原有东/西门控制，部分上下错位的图边仍在黑屏中传送，不能从任意地块接缝步行跨区。
+
+玩家触门后复用 `SceneManager` 的黑幕：先淡入全黑并冻结玩家与攻击，黑屏绘制完成时执行原 `_enter_map` 同步加载、限相机和保留背包/实体的流程，目标视口铺好后淡出。期间拒绝重复切换；无图形的自动化环境不等待渲染回调。
+
+按 M 展开的地图包含整局所有箱庭，以低亮度群系底色显示未探索区的布局轮廓，已探索的地形仍使用每格快照；隐藏邻图预加载不会计入探索。compact 小地图仍按世界坐标采样当前周边区域。
 
 ## 区域单一群系与大片地形
 
@@ -47,7 +58,7 @@
 
 `RegionBiomes` 将区域主题序列按主种子打乱分配；同种子与同布局变体的分配保持确定。START 0 固定为森林。正式游戏通过 `MapConfig.combat_biomes` 从现有怪物定义派生可用群系并集，所有 COMBAT/BOSS 区域匹配这个内容池；目前为稀树草原、草原、森林和热带雨林，其他房型保留多样主题。配置允许雨林时保证至少一个雨林战斗区域，不会强行覆盖仅支持其他主题的自定义池。独立生成器的该参数留空时仍不限制主题；区块与小地图采样继续使用主生成器的同一配置。数据层仍保留全部 14 种群系定义，实际陆地区域从主题列表分配。
 
-区域内降低地形噪声空间频率，以大簇同主题地面、连续森林与岩壁形成大片地形，减少高频点缀和单格阻挡碎片。道路、屋墙和水岸仍会产生必要的地形边界。回归脚本统计完整矩形中水平/垂直相邻格子的地形变更率，以及可走地面和阻挡格子的四连通簇；出生连通块和可走主连通块至少覆盖 95% 的可走格子，单格阻挡簇数量最多占全部格子的 0.5%。邻格变更率同时输出测量值，以 0.13 作为包含道路、墙与水边的初步上限，后续调整需结合地图外观和通行质量。
+区域内的地表、树林和边缘使用同种子的世界坐标低频 `FastNoiseLite.TYPE_PERLIN`，单 octave 生成大簇同主题地面、连续森林与岩壁；共享箱庭边缘另外在 8 格宽度内轻微混合相邻主题，只改变图集显示，不改各地图独立的群系与碰撞。道路、屋墙和水岸仍会产生必要的地形边界。回归脚本统计完整矩形中水平/垂直相邻格子的地形变更率，以及可走地面和阻挡格子的四连通簇；出生连通块和可走主连通块至少覆盖 95% 的可走格子，单格阻挡簇数量最多占全部格子的 0.5%。邻格变更率同时输出测量值，以 0.13 作为包含道路、墙与水边的初步上限，后续调整需结合地图外观和通行质量。
 
 ## 地块视觉过渡
 
@@ -62,6 +73,25 @@
 靠近后按 E 拾取最近且通路无遮挡的材料；背包、炼金界面打开或任何 GUI 拖拽进行时关闭世界拾取，保留快捷栏拖拽中 E 键旋转物品的原操作。界面显示名称和数量，材料进入背包并可堆叠。地面节点归属地图实体根，离图隐藏暂停，返回保留未拾取的物品且不补刷已拾取点位；换世界时清理旧节点并生成新分布，沿用背包保留规则。
 
 石头（id=2）提供矿物属性，木棍（id=3）提供木质属性。通过原背包拖拽及炼金投放区生成独立 IngredientModel 刚体，坩埚消耗两者反应为固结属性（id=5）；固结目前作为终产物属性，不提供直接使用效果。地面 [GroundPickup](../scripts/items/ground_pickup.gd) 不使用炼金刚体，避免世界物品滚动或阻挡通行。
+
+## 地表结构、宝箱与掉落物
+
+`WorldPopulation` 在基础地形完成后为每个区域规划 6–16 处结构，包含营地、残垣遗迹、石阵、废弃补给点和药草园；类型轮换保证多样性，位置、配色变体按种子随机。完整结构及周边一格必须是无水、无道路的可通行空地，并避开小屋、出生点、出入口和其他兴趣点。帐篷、遗迹石柱、立石和补给箱的实心格由 `WorldGenerator` 统一覆盖为阻挡地形，画面与玩家、怪物的通行查询使用同一份数据，主道路保持畅通。
+
+每个区域另有 2–4 个随机宝箱，奖励区域增加 2 个；每个宝箱有 25% 概率为珍稀宝箱。普通箱掉落 3 堆、每堆 1–3 件，珍稀箱掉落 4 堆、每堆 2–5 件。当前物品池为已有的草药、木棍、石头、炸弹，不引入新物品 ID，也不将怪物专属材料放入宝箱。每区还散落 10–24 堆草药、木棍和石头，与原有材料点共同避让。
+
+靠近后按 E 开箱，再靠近掉落物按 E 拾取入包；交互提示同时显示目标名称。统一选择最近且可达的宝箱或物品，背包、炼金界面、拖拽、死亡和切图期间沿用世界交互限制。宝箱和掉落物归属地图实体根，切图隐藏暂停，返回保留本局开启及拾取状态；重开世界重置分布。此状态与现有材料一样保存在当前游戏会话中，不包含磁盘存档。
+
+规划使用独立 DECOR/LOOT 子随机流，主种子、区域和布局变体相同时结果一致。区块工作线程共享已完成的只读兴趣点数据，各自保留独立噪声实例，避免反复规划整局结构。`GroundPickup` 将世界物品图标限制在 16 像素内，兼容炸弹等较大分辨率的原始图标。
+
+专项验证：
+
+```sh
+godot --headless --path . --script res://tools/test_world_population.gd
+godot --path . --rendering-method gl_compatibility --script res://tools/test_world_population.gd -- --capture --runtime-only
+```
+
+数据检查覆盖四个种子的全部区域，验证布局复现、不同种子差异、结构碰撞、完整四连通可达性、工作线程区块一致性和原材料点避让；运行时检查 E 开箱、落地拾取、重复操作、界面阻断、离图暂停、回图不补刷和新世界重置。截图保存为 `.godot/population-*.png`。
 
 ## 起始小屋
 
@@ -112,6 +142,7 @@ godot --headless --path . --script res://tools/test_map_validation.gd
 godot --headless --path . --script res://tools/test_map_scorer.gd
 godot --headless --path . --script res://tools/test_map_content.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd
+godot --headless --path . --script res://tools/test_pyramid_world.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_transitions_materials.gd
 godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
@@ -119,10 +150,16 @@ godot --headless --path . --script res://tools/test_inventory_material_compatibi
 
 `test_cottage_biomes.gd` 使用四个种子与两个变体，比较整张 `MapSpec`（含小屋与群系）及覆盖全部区域的区块数据，检查完整矩形单群系、起始屋安全预算、不同种子布局多样性与 `MapValidator.validate()` 空结果。四个种子各选初图和至少两个非初始区域进行整图四连通 BFS，验证出生点可达全部有效门和侧庭，并打印地形碎片统计。运行时加载真实游戏场景，检查小屋显示/隐藏/返回、初始位置、相机 limits、种子重建内容变化和原有状态保留；等 autoload 注册后动态加载场景，避免测试编译提前引用运行时单例。
 
-可选截图需要正常图形渲染运行：
+金字塔专项测试覆盖 4 个种子 × 2 种布局变体、相接边的混色、原主线和新增岔路双向通行、全屏总览不泄露隐藏地图，以及黑幕期间输入锁。Godot 4.6 的无图形模式通过 1,076 项检查；有图形渲染时另验证画布中央与边角像素全黑，共 1,079 项。金字塔地图及全黑切换截图需要正常图形渲染：
+
+```sh
+godot --path . --script res://tools/test_pyramid_world.gd -- --capture
+```
+
+输出 `.godot/pyramid-map-preview.png` 和 `.godot/pyramid-gate-fade.png`，实际图形帧均已检视；全屏视图中未探索区域仅显示低亮度群系底色，已探索区域显示真实逐格地形。小屋的可选截图也需要正常图形渲染运行：
 
 ```sh
 godot --path . --script res://tools/test_cottage_biomes.gd -- --capture
 ```
 
-在 `RenderingServer.frame_post_draw` 后读取真实 viewport，保存 `.godot/cottage-preview.png` 和 `.godot/region-biome-preview.png`（非初始热带雨林区域），并检查图片非空、保存错误码与文件存在。本轮已使用 Godot 4.6 实际运行：生成验收采样 3,138,467 格和 4,282 个区块，12 次整图 BFS 的出生连通块覆盖率为 99.85%–100%，邻格地形变更率为 0.97%–2.75%；另外 29 项带截图运行时检查通过，覆盖小屋显隐、状态保留和已释放怪物的感知队列清理。截图已确认屋内玩家位于地板绘制层之上。既有连续箱庭回归通过 69,457 个通路采样；种子确定性、地图校验（100/100）、内容、26 项切图状态检查、小地图模式及怪物四状态 AI 检查均通过。仅需截图或运行时复核时可加 `-- --capture --runtime-only`，避免重复已通过的完整区块采样。
+在 `RenderingServer.frame_post_draw` 后读取真实 viewport，保存 `.godot/cottage-preview.png` 和 `.godot/region-biome-preview.png`（非初始热带雨林区域），并检查图片非空、保存错误码与文件存在。本轮使用 Godot 4.6 生成验收采样 3,723,787 格、4,963 个区块；12 次整图 BFS 的出生连通块覆盖率均为 100%，邻格地形变更率为 0.96%–2.00%，无单格阻挡碎片。专项脚本还验证 100/100 个种子通过硬约束、约 88,546 个道路样本连续，回程怪物死亡记录和已拾取物品不会补刷；黑幕截图确认真实全黑。仅需截图或运行时复核时可加 `-- --capture --runtime-only`，避免重复已通过的完整区块采样。

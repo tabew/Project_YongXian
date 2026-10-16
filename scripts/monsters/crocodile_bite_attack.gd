@@ -46,7 +46,7 @@ func update(host: BaseMonster, delta: float) -> void:
 	if not _resolved and _elapsed >= WINDUP:
 		_resolved = true
 		if is_instance_valid(_target) and _target.has_method("take_damage") and host.global_position.distance_to(_target.global_position) <= BITE_RANGE and host.has_clear_line_to_position(_target.global_position, _target as CollisionObject2D):
-			_target.call("take_damage", DAMAGE)
+			_target.call("take_damage", host.outgoing_damage(DAMAGE))
 	if _elapsed >= DURATION:
 		_busy = false
 		_target = null

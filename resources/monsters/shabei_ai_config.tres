@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EnemyAIConfig" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/monsters/ai/enemy_ai_config.gd" id="1_ai"]
+[resource]
+script = ExtResource("1_ai")
+ai_id = &"shabei"
+patrol_radius_tiles = 4.0
+patrol_wait_time = 0.0
+patrol_start_delay = 0.6
+attack_range_tiles = 15.0
+move_speed = 48.0

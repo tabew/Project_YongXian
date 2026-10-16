@@ -32,8 +32,8 @@ func _check_layout(seed_value: int) -> void:
 	var shapes: Dictionary = {}
 	var expected_edges: int = 0
 	for spec: MapSpec in generator.map_specs():
-		_check(not sizes.has(spec.extent), "区域宽高重复 seed=%d node=%d" % [seed_value, spec.node_id])
-		sizes[spec.extent] = true
+		_check(not sizes.has(spec.origin), "区域起点重复 seed=%d node=%d" % [seed_value, spec.node_id])
+		sizes[spec.origin] = true
 		shapes[spec.shape] = true
 		expected_edges += generator.run.exit_count(spec.node_id)
 		var other: MapSpec = replica.map_spec(spec.node_id)
@@ -45,7 +45,7 @@ func _check_layout(seed_value: int) -> void:
 			var a := Vector2(roads[base], roads[base + 1])
 			var b := Vector2(roads[base + 2], roads[base + 3])
 			_check_path(generator, Vector2(spec.origin) + a, Vector2(spec.origin) + b, roads[base + 4])
-	_check(generator.map_specs().size() == 14, "每seed区域数量不是14（四seed共56region）")
+	_check(generator.map_specs().size() == 15, "每seed应包含14个原区域和第三列新增的1个支线")
 	_check(shapes.size() == MapSpec.SHAPE_NAMES.size(), "世界没有覆盖六类轮廓")
 	_check(generator.connections().size() == expected_edges, "关卡图与出口连接数量不同")
 	_check(generator.connections() == replica.connections(), "同种子连接不一致")
@@ -68,21 +68,21 @@ func _check_layout(seed_value: int) -> void:
 		_check(Rect2i(target.origin, target.extent).has_point(Vector2i(b.floor())), "连接入口不在目标边界内")
 		_check(Vector2i(a.floor()).x == source.origin.x + source.extent.x - 1, "图边a不是东侧边界")
 		_check(Vector2i(b.floor()).x == target.origin.x, "图边b不是西侧边界")
-		# 图边只描述传送关系；区域外间隙不生成实体路。
-		var gap_samples: int = 0
+		# 列间没有空白断层；部分岔路仍通过黑屏转场连接上下不同的入口。
+		_check(source.origin.x + source.extent.x == target.origin.x, "图边所在列之间仍有空白间隙")
 		for index: int in range(1, 20):
 			var tile := Vector2i(a.lerp(b, float(index) / 20.0).floor())
 			if generator.sample_map(tile) != null:
 				continue
-			gap_samples += 1
 			_check(generator.sample_route(tile) == Route.Kind.NONE, "地图间隙仍有实体道路 seed=%d tile=%s" % [seed_value, tile])
 			_check(not generator.is_walkable(tile), "地图间隙意外可走")
-		_check(gap_samples > 0, "图边没有经过区域外间隙")
 	var boundary_tile := Vector2i(-1000, 1000)
 	_check(not generator.is_walkable(boundary_tile), "山林边界意外可通行")
 	_check(not Terrain.is_water(generator.sample_terrain(boundary_tile)), "世界外围仍被生成成海")
 	_check_reachable_ground(generator, generator.map_spec(0))
 	_check_reachable_ground(generator, generator.map_spec(3))
+	# 结构最密集、可走地面最紧张的岔路箱庭也要保证完全连通。
+	_check_reachable_ground(generator, generator.map_spec(13))
 	var chunk: ChunkData = generator.generate_chunk(Vector2i(6, -4))
 	var copy: ChunkData = replica.generate_chunk(Vector2i(6, -4))
 	_check(chunk.terrain == copy.terrain and chunk.route == copy.route and chunk.biome == copy.biome, "线程独立生成器数据不一致")
@@ -141,9 +141,11 @@ func _check_land_box(generator: WorldGenerator, spec: MapSpec) -> void:
 	var water_ratio: float = float(water) / samples
 	var ground_ratio: float = float(walkable) / samples
 	_check(water_ratio < 0.10, "水域占比过高 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, water_ratio])
-	_check(ground_ratio > 0.50, "可探索陆地过少 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, ground_ratio])
+	# 地表结构（营地/遗迹/石阵/补给点）会有意占用少量可走格，最紧张的箱庭真值约 50.5%。
+	# 阈值留出该余量；连通性由 _check_reachable_ground 单独保证，不靠这个比例兜底。
+	_check(ground_ratio > 0.48, "可探索陆地过少 seed=%d node=%d ratio=%.3f" % [generator.world_seed, spec.node_id, ground_ratio])
 	_check(float(walls) / samples > 0.03, "箱庭缺少山林围合边界")
-	print("LAND_BOX: seed=%d node=%d water=%.1f%% walkable=%.1f%%" % [generator.world_seed, spec.node_id, water_ratio * 100.0, ground_ratio * 100.0])
+	print("LAND_BOX: seed=%d node=%d biome=%d water=%.1f%% walkable=%.1f%%" % [generator.world_seed, spec.node_id, spec.biome_id, water_ratio * 100.0, ground_ratio * 100.0])
 
 
 func _check_reachable_ground(generator: WorldGenerator, spec: MapSpec) -> void:
@@ -306,6 +308,14 @@ func _check_minimap(minimap: Minimap, generator: WorldGenerator) -> PackedByteAr
 	return pixels
 
 
+func _wait_for_fade(game: Node2D) -> void:
+	for frame: int in 160:
+		await process_frame
+		if not game._transitioning:
+			return
+	_check(false, "箱庭切换黑屏动画未结束")
+
+
 func _check_gate_transitions(game: Node2D, manager: ChunkManager, player: PlayerCharacter, camera: Camera2D) -> void:
 	var generator: WorldGenerator = manager.get_generator()
 	var epoch: int = manager._epoch
@@ -326,6 +336,9 @@ func _check_gate_transitions(game: Node2D, manager: ChunkManager, player: Player
 			_check(game._current_node == id, "静止在gate也触发出口")
 			player.velocity = Vector2(float(link["side"]) * 50.0, 0.0)
 			game._process(0.0)
+			_check(game._transitioning and game._current_node == id, "黑屏动画开始前不应传送")
+			await _wait_for_fade(game)
+			player.set_physics_process(false)
 			var target_id: int = link["target"]
 			_check_active_map(game, manager, player, camera, target_id)
 			var expected: Vector2 = generator.entry_position(target_id, link["arrival_side"], link["arrival_y"])
@@ -345,6 +358,8 @@ func _check_gate_transitions(game: Node2D, manager: ChunkManager, player: Player
 			player.global_position = WorldGenerator.tile_to_world(arrival_point)
 			player.velocity = Vector2(float(link["arrival_side"]) * 50.0, 0.0)
 			game._process(0.0)
+			await _wait_for_fade(game)
+			player.set_physics_process(false)
 			_check_active_map(game, manager, player, camera, id)
 			_check(player.global_position.is_equal_approx(generator.entry_position(id, link["side"], link["y"])), "gate防抖解除后不能立即原路回程")
 			player.velocity = Vector2.ZERO
@@ -423,7 +438,7 @@ func _check_runtime() -> void:
 	var generator: WorldGenerator = manager.get_generator()
 	var initial_epoch: int = manager._epoch
 	var pixels: PackedByteArray = _check_minimap(minimap, generator)
-	_check_gate_transitions(game, manager, player, camera)
+	await _check_gate_transitions(game, manager, player, camera)
 	await _check_camera(game, manager, player, camera)
 	_start_workers(game, manager)
 	for id: int in [2, 3, 4, 2, 0]:

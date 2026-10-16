@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://d4g0pjv5o20dn"]
+
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_8ohj8"]
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_c5sn5"]
+[ext_resource type="Texture2D" uid="uid://bb7hy6cj402wd" path="res://assets/items/ingredients/carrot.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_data")
+can_be_used = true
+id = 13
+name = "操操操。！"
+texture = ExtResource("2_icon")
+item_scene_path = "res://scenes/items/ingredients/carrot.tscn"

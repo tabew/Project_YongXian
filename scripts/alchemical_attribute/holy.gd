@@ -20,6 +20,3 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 		break
 	return result
 			
-
-func use_effect(object:Node) -> void:
-	pass

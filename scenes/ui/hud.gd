@@ -27,7 +27,8 @@ var _xp_fill: ColorRect = null
 func _ready() -> void:
 	# ==========================================================================
 	# ↓↓↓↓ 改动：操作提示跟着新的物品栏选中/使用方式走 ↓↓↓↓
-	hint_label.text = "WASD 移动　·　E 拾取　·　左键 使用选中物品　·　1-9/滚轮/点格子 选中　·　右键格子 使用　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开"
+	#操作提示分两行放在物品栏上方：物品栏常驻显示，提示压在它下面就会被挡住
+	hint_label.text = "WASD 移动　·　E 拾取/开箱　·　左键 使用选中物品　·　右键 使用/投掷选中物品\n1-9 / 滚轮 / 点格子 换选中　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开世界"
 	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
 	# ==========================================================================
 	_pickup_label = Label.new()
@@ -42,8 +43,8 @@ func _ready() -> void:
 	_pickup_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_pickup_label.offset_left = -200
 	_pickup_label.offset_right = 200
-	_pickup_label.offset_top = -128
-	_pickup_label.offset_bottom = -100
+	_pickup_label.offset_top = -196
+	_pickup_label.offset_bottom = -166
 	_pickup_label.visible = false
 	_build_progress_readout()
 	toast_label.modulate.a = 0.0
@@ -141,6 +142,14 @@ func _on_weapon_changed(weapon: WeaponDefinition) -> void:
 	weapon_label.text = "%s\n%s 伤害  ·  %.1f 次/秒" % [weapon.display_name, str(weapon.damage), weapon.attacks_per_second()] if weapon != null else ""
 
 
+func show_chest(chest: WorldChest) -> void:
+	if _pickup_label == null:
+		return
+	_pickup_label.visible = chest != null and not chest.opened
+	if _pickup_label.visible:
+		_pickup_label.text = "E · 打开%s" % chest.display_name()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
@@ -209,7 +218,7 @@ func _refresh() -> void:
 	stats_lines.append("共生成 %d　缓存命中 %d" % [stats["generated"], stats["cache_hits"]])
 	var spawner := _world.get_parent().get_node_or_null("MonsterSpawner") as MonsterSpawner
 	if spawner != null:
-		stats_lines.append("本区域怪物 %d" % spawner.get_spawned_monster_count())
+		stats_lines.append("本区域怪物 %d　待生成 %d" % [spawner.get_spawned_monster_count(), spawner.get_pending_spawn_count()])
 	stats_lines.append("FPS %d" % Engine.get_frames_per_second())
 	stats_label.text = "\n".join(stats_lines)
 

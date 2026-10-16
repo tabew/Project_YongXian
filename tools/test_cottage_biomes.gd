@@ -403,10 +403,10 @@ func _check_runtime() -> void:
 	var bag: Node = game.get_node("GameHUD/BagUi")
 	var alchemy: Node = game.get_node("GameHUD/Alchemy")
 	var controller: Variant = player.get("weapon_controller")
-	_check(controller.equipped_weapon == null, "开局不再自带武器")
-	player.inventory.select_handy_slot(0)
-	player.inventory.use_handy_slot(player)
-	_check(controller.equipped_weapon != null, "物品栏装备接口未保留")
+	_check(controller.equipped_weapon != null, "新版快捷栏开局选中武器未装备")
+	var initial_weapon: Variant = controller.equipped_weapon
+	player.inventory.select_handy_slot(1)
+	_check(controller.equipped_weapon != null and controller.equipped_weapon != initial_weapon, "切换物品栏未自动装备另一把武器")
 	var equipped: Variant = controller.equipped_weapon
 	player.take_damage(3)
 	var health: int = player.get("health")
@@ -441,7 +441,12 @@ func _check_runtime() -> void:
 	var fresh_start: MapSpec = fresh.map_spec(0)
 	_check(fresh.world_seed == 97231 and fresh_world != original_world, "换seed重建未改变地图内容")
 	_check(fresh_start.cottage != null and _snapshot(fresh_start.cottage) != original_layout, "换seed重建未改变小屋布局")
-	_check(player.get("health") == player.get("max_health") and controller.equipped_weapon == equipped, "换世界生命重置/装备保留行为改变")
+	# 装备保留看“同一把武器”而非同一个实例：局内成长会在重建世界时拿基础定义重新叠卡生成武器副本，
+	# 实例必然换新，但玩家手上仍是同一把。
+	_check(
+		player.get("health") == player.get("max_health") and controller.equipped_weapon != null and controller.equipped_weapon.id == equipped.id,
+		"换世界生命重置/装备保留行为改变"
+	)
 	_check(game.get_node("GameHUD/BagUi") == bag and game.get_node("GameHUD/Alchemy") == alchemy, "换世界未保留背包/炼金实例")
 	_check(fresh_start.cottage != null and WorldGenerator.world_to_tile(player.global_position) - fresh_start.origin == fresh_start.cottage.spawn_tile, "换世界未重新出生于小屋")
 	var fresh_view: CanvasItem = game.get_node_or_null("CottageView") as CanvasItem

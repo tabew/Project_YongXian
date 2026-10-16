@@ -1,7 +1,7 @@
 class_name GameWorld
 extends Node2D
 
-## 传统 RPG 箱庭：触及出口立即换到目标入口，主视图只显示当前区域。
+## 箱庭出口保留双向传送关系，切换画面使用黑屏淡入淡出。
 
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
@@ -20,14 +20,18 @@ var _training_dummy: TrainingDummy
 var _training_dummy_map: int = -1
 var _generator: WorldGenerator = null
 var _current_node: int = -1
+var _transitioning: bool = false
 var _base_zoom: Vector2 = Vector2(2.0, 2.0)
 var _hud_bound: bool = false
 var _monster_map: int = -1
+var _combat_entry_count: int = 0
 ## 怪物已释放到地上的道具按地图保存，离图暂停，回图继续。
 var _map_entity_roots: Dictionary = {}
 ## 每张地图的地面材料只生成一次；拾取后返回地图不会补刷。
 var _material_maps: Dictionary = {}
 var _nearby_pickup: GroundPickup = null
+var _nearby_chest: WorldChest = null
+var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
 
 
@@ -41,7 +45,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _generator == null or player.active_map == null:
+	if _generator == null or player.active_map == null or _transitioning:
 		return
 	_sync_training_dummy()
 	_confine_map_monsters()
@@ -57,23 +61,52 @@ func _process(_delta: float) -> void:
 		if absi(local.y - int(link["y"])) > MapSpec.GATE_HALF_HEIGHT:
 			continue
 		if (side < 0 and local.x <= 1) or (side > 0 and local.x >= spec.extent.x - 2):
-			var carried_velocity: Vector2 = player.velocity
-			_enter_map(link["target"], link["arrival_side"], link["arrival_y"])
-			AudioManager.play_sfx(&"gate_transition")
-			# 落点与出口带分离，按住同方向即可走进新箱庭，不会立即弹回。
-			player.velocity = carried_velocity
-			EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
+			_transition_to_map(link)
 			return
 
 
+func _transition_to_map(link: Dictionary) -> void:
+	if _transitioning or SceneManager.is_transitioning():
+		return
+	_transitioning = true
+	var carried_velocity: Vector2 = player.velocity
+	var was_physics_processing: bool = player.is_physics_processing()
+	var was_handling_input: bool = player.is_processing_unhandled_input()
+	var monster_mode: Node.ProcessMode = monster_spawner.process_mode
+	player.weapon_controller.cancel_attack()
+	player.set_physics_process(false)
+	player.set_process_unhandled_input(false)
+	monster_spawner.process_mode = Node.PROCESS_MODE_DISABLED
+	var swap: Callable = func() -> void:
+		_enter_map(int(link["target"]), int(link["arrival_side"]), int(link["arrival_y"]))
+	await SceneManager.transition_in_place(swap)
+	if not is_inside_tree():
+		return
+	# 出口落点向里八格，保留前进方向也不会当帧触发回程。
+	player.velocity = carried_velocity
+	player.set_physics_process(was_physics_processing)
+	player.set_process_unhandled_input(was_handling_input)
+	monster_spawner.process_mode = monster_mode
+	AudioManager.play_sfx(&"gate_transition")
+	EventBus.notification.emit("进入 %s · %s" % [_generator.run.describe(_current_node), player.active_map.shape_name()])
+	_transitioning = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _transitioning:
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("regenerate_world"):
 		regenerate_world()
 	elif event.is_action_pressed("kill_all_monsters"):
 		kill_all_monsters()
 	elif event.is_action_pressed("pickup_item") and not event.is_echo():
 		_refresh_pickup()
-		if is_instance_valid(_nearby_pickup):
+		if is_instance_valid(_nearby_chest):
+			if _nearby_chest.open():
+				EventBus.notification.emit("已打开%s，靠近掉落物按 E 拾取" % _nearby_chest.display_name())
+			_refresh_pickup()
+		elif is_instance_valid(_nearby_pickup):
 			var material_name: String = _nearby_pickup.data.name
 			var quantity: int = _nearby_pickup.amount
 			if _nearby_pickup.collect(player):
@@ -96,6 +129,7 @@ static func kill_monsters_in_tree(tree: SceneTree) -> void:
 ## 用指定种子重建整个世界；只有重建世界才恢复玩家生命。
 func build_world(seed_value: int) -> void:
 	_hud_bound = false
+	_combat_entry_count = 0
 	_clear_map_entities()
 	_generator = MapScorer.build_best(seed_value, _map_config_for_monsters())
 	GameState.world_seed = _generator.world_seed
@@ -139,6 +173,8 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
+	if monster_spawner.content != null and monster_spawner.content.budget_of(map_node_id, MapContent.ENEMY) > 0:
+		_combat_entry_count += 1
 	if _cottage_view == null:
 		_cottage_view = CottageView.new()
 		_cottage_view.name = "CottageView"
@@ -149,6 +185,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	player.spawn_on(_generator, _generator.entry_position(map_node_id, side, gate_y), spec, reset_health)
 	_limit_camera(spec)
 	chunk_manager.load_map(map_node_id)
+	_setup_world_population(spec)
 	_setup_ground_materials(spec)
 	_refresh_pickup()
 	if _hud_bound:
@@ -236,10 +273,9 @@ func _setup_map_monsters() -> void:
 		root.visible = is_active
 		root.process_mode = Node.PROCESS_MODE_INHERIT if is_active else Node.PROCESS_MODE_DISABLED
 	_monster_map = _current_node
-	monster_spawner.setup(_generator, chunk_manager, player, player.active_map)
-	# 新加载器长期保留整张地图，不能沿用旧版按距离卸载且等区块重铺才刷新的逻辑。
-	# 只关闭 spawner 的距离回收；怪物子节点仍正常处理，切图由 setup 统一回收。
-	monster_spawner.set_process(false)
+	# 箱庭保留整图怪物；spawner 自身只运行限额生成与远处休眠，不做距离回收。
+	monster_spawner.set_process(true)
+	monster_spawner.setup(_generator, chunk_manager, player, player.active_map, _combat_entry_count, _transitioning)
 	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
 	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
 	_on_monster_chunk_applied(Vector2i.ZERO)
@@ -256,6 +292,10 @@ func _map_entity_root(map_node_id: int) -> Node2D:
 
 
 func _clear_map_entities() -> void:
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(false)
+	_nearby_chest = null
+	_population_maps.clear()
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
@@ -269,6 +309,37 @@ func _clear_map_entities() -> void:
 			monster_spawner.remove_child(child)
 			child.queue_free()
 	_monster_map = -1
+
+
+func _setup_world_population(spec: MapSpec) -> void:
+	if _population_maps.has(spec.node_id):
+		return
+	var entity_root: Node2D = _map_entity_root(spec.node_id)
+	var population: Dictionary = _generator.population_for(spec.node_id)
+	for entry: Dictionary in population.get("structures", []):
+		var structure := WorldStructure.new()
+		structure.name = "Structure_%s_%d_%d" % [entry["kind"], entry["tile"].x, entry["tile"].y]
+		structure.kind = entry["kind"]
+		structure.variant = int(entry["variant"])
+		structure.biome_id = spec.biome_id
+		structure.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(structure)
+	for entry: Dictionary in population.get("chests", []):
+		var chest := WorldChest.new()
+		chest.name = "Chest_%d_%d" % [entry["tile"].x, entry["tile"].y]
+		chest.bind(entry, _generator)
+		chest.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(chest)
+	for entry: Dictionary in population.get("drops", []):
+		var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
+		if data == null:
+			continue
+		var pickup := GroundPickup.new()
+		pickup.name = "WorldLoot_%d_%d" % [entry["tile"].x, entry["tile"].y]
+		pickup.bind(data, int(entry["amount"]), _generator)
+		pickup.position = WorldGenerator.tile_to_world(entry["tile"])
+		entity_root.add_child(pickup)
+	_population_maps[spec.node_id] = true
 
 
 func _setup_ground_materials(spec: MapSpec) -> void:
@@ -291,6 +362,9 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 
 
 func _refresh_pickup() -> void:
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(false)
+	_nearby_chest = null
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
@@ -307,6 +381,13 @@ func _refresh_pickup() -> void:
 	var closest: float = radius * radius
 	for pickup_root: Node2D in pickup_roots:
 		for child: Node in pickup_root.get_children():
+			if child is WorldChest and not child.opened and not child.is_queued_for_deletion():
+				var chest_distance: float = player.global_position.distance_squared_to(child.global_position)
+				if chest_distance < closest and _can_reach_pickup(child.global_position):
+					closest = chest_distance
+					_nearby_chest = child
+					_nearby_pickup = null
+				continue
 			if not child is GroundPickup or child.is_queued_for_deletion():
 				continue
 			var pickup := child as GroundPickup
@@ -316,9 +397,13 @@ func _refresh_pickup() -> void:
 			if distance < closest and _can_reach_pickup(pickup.global_position):
 				closest = distance
 				_nearby_pickup = pickup
+				_nearby_chest = null
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(true)
 	hud.show_pickup(_nearby_pickup)
+	if is_instance_valid(_nearby_chest):
+		_nearby_chest.set_highlighted(true)
+		hud.show_chest(_nearby_chest)
 
 
 func _can_reach_pickup(target: Vector2) -> bool:

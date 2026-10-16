@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/regen.png" id="1_o3rny"]
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_lec83"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_mgjnb"]
+
+[resource]
+script = ExtResource("3_mgjnb")
+id = &"regen"
+display_name = "持续恢复"
+description = "每秒回复生命，持续 6 秒。"
+icon = ExtResource("1_o3rny")
+tick_interval = 1.0
+heal_per_tick = 10.0
+heal_per_tick_per_level = 5.0

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MonsterLootTable" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/monsters/monster_loot_table.gd" id="1_table"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/rabbit_hide.tres" id="2_hide"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/shabei_meat.tres" id="3_meat"]
+[ext_resource type="Resource" path="res://resources/items/ingredients/carrot.tres" id="4_carrot"]
+
+[resource]
+script = ExtResource("1_table")
+items = Array[Resource]([ExtResource("2_hide"), ExtResource("3_meat"), ExtResource("4_carrot")])
+weights = PackedFloat32Array(30, 50, 20)

@@ -3,7 +3,7 @@ extends Control
 
 ## 右上角小地图与全屏探索地图。
 ##
-## 小地图独立采样玩家周围 512x512 格；按 M 铺满窗口显示已观察区域。
+## 小地图独立采样玩家周围 512x512 格；按 M 显示整局贴合箱庭轮廓及已观察地形。
 ## compact 的世界像素缓存与全屏逐格探索快照相互独立。
 
 const TERRAIN_ATLAS: String = "res://assets/terrain_tiles.png"
@@ -409,6 +409,12 @@ func _build_explored_pixels() -> PackedByteArray:
 	var bytes := PackedByteArray()
 	var min_chunk: Vector2i = _focus_chunk - FULL_MAP_HALF_CHUNKS
 	var max_chunk: Vector2i = _focus_chunk + FULL_MAP_HALF_CHUNKS
+	# 世界总览覆盖全部箱庭轮廓；未知地形仍保持探索迷雾。
+	for spec: MapSpec in _specs:
+		var first: Vector2i = WorldGenerator.tile_to_chunk(spec.origin)
+		var last: Vector2i = WorldGenerator.tile_to_chunk(spec.origin + spec.extent - Vector2i.ONE)
+		min_chunk = min_chunk.min(first)
+		max_chunk = max_chunk.max(last)
 	for coords: Vector2i in _explored_chunks.keys():
 		min_chunk.x = mini(min_chunk.x, coords.x)
 		min_chunk.y = mini(min_chunk.y, coords.y)
@@ -553,8 +559,7 @@ func _draw() -> void:
 	if is_instance_valid(_player):
 		if show_camera_view:
 			_draw_camera_view(map_rect, scale_factor)
-		if not _expanded:
-			_draw_regions(map_rect, scale_factor)
+		_draw_regions(map_rect, scale_factor)
 		var tile: Vector2 = _player.global_position / float(WorldGenerator.TILE_SIZE)
 		var player_position: Vector2 = _tile_to_minimap(tile, map_rect, scale_factor)
 		if map_rect.has_point(player_position):
@@ -579,11 +584,20 @@ func _draw_regions(map_rect: Rect2, scale_factor: Vector2) -> void:
 
 	var font: Font = get_theme_default_font()
 	for spec: MapSpec in _specs:
+		if _expanded:
+			var start: Vector2 = _tile_to_minimap(Vector2(spec.origin), map_rect, scale_factor)
+			var end: Vector2 = _tile_to_minimap(Vector2(spec.origin + spec.extent), map_rect, scale_factor)
+			var bounds: Rect2 = Rect2(start, end - start).intersection(map_rect)
+			if bounds.has_area():
+				var rgb: int = _color_rgb(RegionBiomes.ground_for(spec.biome_id), Route.Kind.NONE)
+				var shade := Color(float((rgb >> 16) & 255) / 255.0, float((rgb >> 8) & 255) / 255.0, float(rgb & 255) / 255.0, 0.24)
+				draw_rect(bounds, shade, true)
+				draw_rect(bounds, Color(0.67, 0.78, 0.71, 0.18), false, 1.0)
 		var center: Vector2 = _tile_to_minimap(Vector2(spec.origin) + Vector2(spec.center), map_rect, scale_factor)
 		if not map_rect.has_point(center):
 			continue
 		var label: String = str(RunGraph.floor_of(spec.node_id) + 1)
-		if RunGraph.variant_of(spec.node_id) == RunGraph.BRANCH_VARIANT:
+		if RunGraph.variant_of(spec.node_id) != RunGraph.MAIN_VARIANT:
 			label += "·岔"
 		var color: Color = ACTIVE_LABEL_COLOR if spec.node_id == _map_node else LABEL_COLOR
 		var label_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE)

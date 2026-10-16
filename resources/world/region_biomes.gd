@@ -55,9 +55,9 @@ static func terrain_for(biome: int, variation: float, grove: float) -> int:
 	match biome:
 		Biome.Kind.FOREST, Biome.Kind.TAIGA, Biome.Kind.TROPICAL_RAINFOREST:
 			# 同一片缓慢变化的树林，不再用高频噪声逐格切换森林、雪地和沙漠。
-			return boundary_for(biome) if grove > 0.38 else ground
+			return boundary_for(biome) if grove > 0.62 else ground
 		Biome.Kind.MOUNTAIN, Biome.Kind.ALPINE:
-			return boundary_for(biome) if grove > 0.32 else ground
+			return boundary_for(biome) if grove > 0.62 else ground
 		Biome.Kind.DESERT:
 			return Terrain.Kind.SAND if variation > 0.69 else ground
 		Biome.Kind.TUNDRA:

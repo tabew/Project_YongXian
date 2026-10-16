@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/defense.png" id="1_xtyoq"]
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_2p4an"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_qp1io"]
+
+[sub_resource type="Resource" id="Resource_1wun4"]
+script = ExtResource("2_2p4an")
+value = 10.0
+value_per_level = 5.0
+
+[resource]
+script = ExtResource("3_qp1io")
+id = &"defense_up"
+display_name = "护体"
+description = "受到的伤害减少，持续 8 秒。"
+icon = ExtResource("1_xtyoq")
+duration = 8.0
+modifiers = Array[ExtResource("2_2p4an")]([SubResource("Resource_1wun4")])
