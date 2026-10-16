@@ -194,6 +194,7 @@ Enemy (Node2D / CharacterBody2D)
 
 ### 叠加规则
 
+- 只有 `AlchemicalData.can_be_weapon_enchant = true` 的属性上得了武器：炼药专属属性默认 `false`，拖到武器上会被直接拒绝、药水原样退回；附魔专属属性在自己的 `.tres` 里把这个开关打开。
 - 不同 `attribute_id` 可以叠加，一把武器能挂多条不同附魔。
 - 同一个 `attribute_id` 只保留一条，**只有等级更高才会顶替**；同级或更低整条忽略，武器不回退（`WeaponDefinition.can_enchant_with()` / `add_enchant()`）。
 
@@ -202,11 +203,11 @@ Enemy (Node2D / CharacterBody2D)
 | 位置 | 作用 |
 | --- | --- |
 | `resources/weapons/weapon_definition.gd` | `enchant_attributes` + `can_enchant_with()` / `add_enchant()`：附魔数据与叠加规则 |
-| `scripts/alchemical_attribute/alchemical_data.gd` | `enchant_target`：作为附魔时作用到 `HIT_TARGET`（默认）还是 `WIELDER`（治疗/恢复对自己） |
+| `scripts/alchemical_attribute/alchemical_data.gd` | `enchant_target`：作为附魔时作用到 `HIT_TARGET`（默认）还是 `WIELDER`（治疗/恢复对自己）；`can_be_weapon_enchant`：这条属性能不能上武器，默认 false |
 | `scripts/items/weapons/weapon_data.gd` | `INSTANCE_ID_START = 400` 与 `next_instance_id()`：附魔武器是独立实例 |
-| `scripts/ui/inventory/inventory.gd` | `enchant_bag_weapon()` / `enchant_handy_weapon()`：造实例、附属性、换 id、扣药水、注销药水实例 |
+| `scripts/ui/inventory/inventory.gd` | `enchant_bag_weapon()` / `enchant_handy_weapon()`：造实例、附属性、只换走一份、扣药水、注销药水实例 |
 | `scripts/ui/inventory/slot_button.gd` | 药水→武器的拖放判定与 `enchant_item_signal` |
-| `scripts/ui/inventory/bag_ui.gd` / `bottom_bag_ui.gd` | 转发拖放请求；背包侧附魔后换 id 要收掉旧格子 |
+| `scripts/ui/inventory/bag_ui.gd` / `bottom_bag_ui.gd` | 转发拖放请求；背包侧附魔只换走一份，旧格子按剩余数量保留或收掉 |
 | `scripts/weapons/weapon_attack.gd` | `_apply_enchant_effects()`：命中后把附魔逐个作用出去 |
 | `scripts/player.gd` | 按类型判断武器；附魔把武器换成实例后自动重新装备 |
 
@@ -215,6 +216,7 @@ Enemy (Node2D / CharacterBody2D)
 - **附魔写在武器定义上，不写在模板上。** 模板武器（id 200-202）第一次被附魔时复制成运行时实例（id 400+，走 `ItemListGlobal.register_instance`），并把自己那份 `WeaponDefinition` 深拷贝出来再挂附魔，所以共享 `.tres` 和别的同款武器都不受影响。
 - **`id >= 300` 不再一律当药水。** `ItemListGlobal` 按区间分派：300-399 药水实例、400+ 附魔武器实例（必须登记过，否则视为无效 id）。
 - `need_target = false` 的属性（爆炸）作用在**命中点**：用一个临时标记点当作用位置，不把效果挂到怪物身上（怪死了会把挂在它下面的特效一起带走）。
+- **武器不可堆叠，附魔只动一份。** 背包用 id→数量存东西，同 id 武器会堆在一条记录里；附魔时只迁走一份（`_swap_one_bag_item_id()`），剩下的还留在原 id。快捷栏那一格换成附魔实例，多出来的同款模板武器退回背包；不然一瓶药水会把整堆都变成同一个实例。
 - 附魔目前是永久的，还没有充能/次数限制。
 
 ## 判定与边界

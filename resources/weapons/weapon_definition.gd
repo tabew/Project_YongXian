@@ -53,13 +53,18 @@ func validation_errors() -> PackedStringArray:
 @export_group("Enchant")
 ## 附魔属性：命中时逐个 use_effect 到目标/命中点。不同 attribute_id 可以叠加；
 ## 同一个 attribute_id 只保留最高级（见 add_enchant）。
+## 只有 AlchemicalData.can_be_weapon_enchant 为 true 的属性上得了武器。
 @export var enchant_attributes: Array[AlchemicalData] = []
 
 
-## 这条属性能不能附到本武器上：没有同类属性，或同类但等级更高。
+## 这条属性能不能附到本武器上：属性自己得先允许武器附魔
+## (AlchemicalData.can_be_weapon_enchant，炼药专属属性默认 false)，
+## 再看有没有同类属性、同类是否等级更高。
 ## 等级相同或更低时整条忽略，也就是低级药水不会让武器回退。
 func can_enchant_with(attribute: AlchemicalData) -> bool:
 	if attribute == null:
+		return false
+	if not attribute.can_be_weapon_enchant:
 		return false
 	for existing: AlchemicalData in enchant_attributes:
 		if existing != null and existing.attribute_id == attribute.attribute_id:

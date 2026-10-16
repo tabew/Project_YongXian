@@ -6,4 +6,5 @@
 script = ExtResource("1_u4gvl")
 attribute_id = 1
 name = "神圣"
+can_be_weapon_enchant = true
 metadata/_custom_type_script = "uid://bakux1700e72"

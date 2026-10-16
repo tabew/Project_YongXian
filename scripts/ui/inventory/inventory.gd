@@ -337,9 +337,9 @@ func enchant_bag_weapon(weapon_item_id:int,potion_item_id:int) ->bool:
         _return_enchant_potion(potion_item_id,consumed)
         return false
 
-    #模板武器换成附魔实例：背包这份记录跟着换 id
+    #模板武器换成附魔实例：武器不可堆叠，只换走一份，剩下的同款留在原 id
     if instance.id != weapon_item_id:
-        _replace_bag_item_id(weapon_item_id,instance.id)
+        _swap_one_bag_item_id(weapon_item_id,instance.id)
 
     _finish_enchant(instance,applied,potion_item_id)
 
@@ -366,9 +366,9 @@ func enchant_handy_weapon(pos:int,potion_item_id:int) ->bool:
         _return_enchant_potion(potion_item_id,consumed)
         return false
 
-    #模板武器换成附魔实例：这一格的 id 换掉
+    #模板武器换成附魔实例：本格换成实例，多出来的同款模板武器退回背包
     if instance.id != weapon_item_id:
-        _replace_handy_item_id(pos,weapon_item_id,instance.id)
+        _swap_one_handy_item_id(pos,weapon_item_id,instance.id)
 
     _finish_enchant(instance,applied,potion_item_id)
 
@@ -443,34 +443,41 @@ func _return_enchant_potion(potion_item_id:int,consumed:bool) ->void:
     if consumed:
         add_item(potion_item_id,1)
 
-    _notify("附魔失败：药水等级不高于武器已有的同类附魔")
+    _notify("附魔失败：药水没有能上武器的属性(属性没开武器附魔，或等级不高于已有的同类附魔)")
 
-##背包里某种物品换一个 id(模板武器 -> 附魔实例)
-func _replace_bag_item_id(old_id:int,new_id:int) ->void:
+##背包里某种物品只换走一份(模板武器 -> 附魔实例)。
+##武器是不可堆叠的独立实例：同 id 堆叠时只迁移一份，剩下的还留在原 id 里，
+##否则一瓶药水会把整堆武器都变成同一个实例、数量也一起搬过去。
+func _swap_one_bag_item_id(old_id:int,new_id:int) ->void:
 
-    if !items.has(old_id):
+    if get_count(old_id) <= 0:
         return
 
-    var count:int = items[old_id]
+    remove_item(old_id,1)
 
-    items.erase(old_id)
-    has_items.erase(old_id)
-
-    items[new_id] = count
+    items[new_id] = 1
 
     if !has_items.has(new_id):
         has_items.append(new_id)
 
     get_item_data[new_id] = get_item_template(new_id)
 
-##物品栏某一格的物品换一个 id(模板武器 -> 附魔实例)
-func _replace_handy_item_id(pos:int,old_id:int,new_id:int) ->void:
+##物品栏某一格的物品只换走一份(模板武器 -> 附魔实例)。
+##本格留给附魔实例(数量 1)，多出来的同款模板武器退回背包：物品栏一格只能装一种 id。
+func _swap_one_handy_item_id(pos:int,old_id:int,new_id:int) ->void:
 
     if get_handy_slot_id(pos) != old_id:
         return
 
+    var leftover:int = get_handy_slot_count(pos) - 1
+
     handy_items_pos[pos] = new_id
+    handy_items[pos] = 1
+
     get_item_data[new_id] = get_item_template(new_id)
+
+    if leftover > 0:
+        add_item(old_id,leftover)
 
 ##事件总线：UI 提示用。取不到就安静跳过，--script 测试里没有 HUD 也不会炸
 func _notify(message:String) ->void:

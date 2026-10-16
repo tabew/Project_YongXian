@@ -86,24 +86,13 @@ func _on_slot_quick_move(item_id:int,num:int) ->void:
 
 	_refresh_slot(item_id)
 
-##药水拖到武器上：交给背包附魔。成功后武器换成实例 id，旧格子要收掉
+##药水拖到武器上：交给背包附魔。附魔只换走一份，原来的 id 还有剩余(同款武器堆叠)
+##就保留旧格子，整份都被换走才把格子收掉。
 func _on_slot_enchant(weapon_item_id:int,potion_item_id:int) ->void:
 	if !inventory.enchant_bag_weapon(weapon_item_id,potion_item_id):
 		return
 
-	_forget_slot(weapon_item_id)
-
-##扔掉某个 id 的格子显示（id 变了或者东西被拿完）
-func _forget_slot(item_id:int) ->void:
-	if !item_for_button.has(item_id):
-		return
-
-	var node:SlotButton = item_for_button[item_id]
-
-	item_for_button.erase(item_id)
-
-	if is_instance_valid(node):
-		node.queue_free()
+	_refresh_slot(weapon_item_id)
 
 ##背包里某种物品的数量变了就同步显示，整堆拿完就把格子收掉
 func _refresh_slot(item_id:int) ->void:

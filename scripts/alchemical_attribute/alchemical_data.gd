@@ -21,6 +21,10 @@ enum EnchantTarget
 
 @export var enchant_target: EnchantTarget = EnchantTarget.HIT_TARGET
 
+##能不能用于武器附魔。默认 false：普通炼金属性只参与炼药，不做武器附魔；
+##附魔专属属性(单独出的附魔资源)把自己的模板设成 true。
+@export var can_be_weapon_enchant: bool = false
+
 ##可反应属性名单
 @export var can_be_interacted_attribute:Array[int];
 

@@ -1,11 +1,13 @@
 extends SceneTree
 
 ## 武器附魔验收：
-##   1) 数据规则：同 attribute_id 只有更高等级顶替，同级/低级整条忽略（不会回退）；
+##   1) 数据规则：只有 can_be_weapon_enchant 的属性上得了武器；
+##      同 attribute_id 只有更高等级顶替，同级/低级整条忽略（不会回退）；
 ##   2) 拖放判定：药水拖到武器上，等级够才收下，不够直接拒绝（药水自动回原格）；
 ##   3) 附魔把模板武器变成独立实例(400+)，共享模板不被污染；
 ##   4) 附魔后手持武器换成带附魔的那把，药水被消耗、运行时实例被注销；
-##   5) 命中时附魔属性真的作用出去：WIELDER 作用到持武器的人，HIT_TARGET 作用到被打的目标。
+##   5) 命中时附魔属性真的作用出去：WIELDER 作用到持武器的人，HIT_TARGET 作用到被打的目标；
+##   6) 背包里同款武器堆叠时，一次附魔只换走一份，剩下的还留在原 id。
 ##
 ## 运行：godot --headless --path . --script res://tools/test_weapon_enchant.gd
 
@@ -18,6 +20,7 @@ const LONG_STAFF_TEMPLATE_ID: int = 201
 ## AlchemicalAttributeList.ATTRIBUTE 的取值；用字面量，避免 --script 模式依赖自动加载标识符
 const ATTRIBUTE_HOLY: int = 1
 const ATTRIBUTE_CONTINUOUS_HEAL: int = 2
+const ATTRIBUTE_MINERAL: int = 3
 const ATTRIBUTE_EXPLOSIVE: int = 6
 
 var _checks: int = 0
@@ -75,6 +78,13 @@ func _test_enchant_rules() -> void:
 
 	_check(definition.add_enchant(holy_lv0), "不同属性可以叠加")
 	_check(definition.enchant_attributes.size() == 2, "武器上现在有两条附魔")
+
+	# 只有 can_be_weapon_enchant 的属性才上得了武器：炼药属性(矿物这类)默认 false
+	var mineral_lv0: AlchemicalData = _attribute(ATTRIBUTE_MINERAL, 0)
+	_check(not mineral_lv0.can_be_weapon_enchant, "炼药属性默认不允许武器附魔")
+	_check(not definition.can_enchant_with(mineral_lv0), "默认 false 的属性附不上去")
+	_check(not definition.add_enchant(mineral_lv0), "默认 false 的属性附魔不生效")
+	_check(definition.enchant_attributes.size() == 2, "被拒绝的属性没有进附魔表")
 
 
 ## 2) 拖放判定：够级才收，不够让拖拽失败
@@ -199,6 +209,35 @@ func _test_hit_effects(game: Node2D, player: PlayerCharacter) -> void:
 	_check(Buffs.has(dummy, &"regen"), "对目标生效的属性作用到被打的目标身上")
 
 
+## 6) 背包里同款武器堆叠时，附魔只换走一份
+func _test_stacked_weapon_enchant(game: Node2D, inventory: Inventory) -> void:
+	var bag: Control = game.get_node("GameHUD/BagUi")
+	var potion: PotionData = _make_potion([_attribute(ATTRIBUTE_EXPLOSIVE, 1)])
+
+	inventory.add_item(LONG_STAFF_TEMPLATE_ID, 2)
+	inventory.add_item(potion.id, 1)
+	_check(inventory.get_count(LONG_STAFF_TEMPLATE_ID) == 2, "背包里堆着两把同款武器")
+
+	var ids_before: Array[int] = []
+	for item_id: int in inventory.has_items:
+		ids_before.append(item_id)
+
+	_check(inventory.enchant_bag_weapon(LONG_STAFF_TEMPLATE_ID, potion.id), "堆叠的武器可以附魔")
+
+	var instance_id: int = -1
+	for item_id: int in inventory.has_items:
+		if item_id >= WeaponData.INSTANCE_ID_START and not ids_before.has(item_id):
+			instance_id = item_id
+
+	_check(instance_id > 0, "出现附魔后的武器实例")
+	_check(inventory.get_count(instance_id) == 1, "附魔实例只占一份，没把整堆搬过去")
+	_check(inventory.get_count(LONG_STAFF_TEMPLATE_ID) == 1, "同款模板武器还剩一份")
+	_check(inventory.get_count(potion.id) == 0, "只消耗了一瓶药水")
+	_check(bag.item_for_button.has(LONG_STAFF_TEMPLATE_ID), "原武器格子没被收掉")
+	_check(bag.item_for_button[LONG_STAFF_TEMPLATE_ID].slot_item.count == 1, "原武器格子显示还剩 1 把")
+	_check(bag.item_for_button.has(instance_id), "附魔实例有自己的格子")
+
+
 func _run() -> void:
 	Engine.max_fps = 120
 	root.size = Vector2i(1280, 720)
@@ -222,6 +261,7 @@ func _run() -> void:
 	await _test_drop_guard(inventory, hotbar)
 	await _test_instance_and_equip(inventory, player)
 	await _test_ui_drop_path(game, inventory, hotbar)
+	_test_stacked_weapon_enchant(game, inventory)
 	await _test_hit_effects(game, player)
 
 	print("WEAPON_ENCHANT: checks=%d failures=%d" % [_checks, _failures])
