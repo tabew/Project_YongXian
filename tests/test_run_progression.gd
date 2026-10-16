@@ -4,7 +4,7 @@ extends SceneTree
 ## 运行：godot --headless --path . --script tests/test_run_progression.gd
 
 const LONGSWORD: SwingWeaponDefinition = preload("res://resources/weapons/longsword.tres")
-const LONG_STAFF: DepthStrikeWeaponDefinition = preload("res://resources/weapons/long_staff.tres")
+const SPEAR: SpearWeaponDefinition = preload("res://resources/weapons/spear.tres")
 const YOYO: YoyoWeaponDefinition = preload("res://resources/weapons/yoyo.tres")
 const PLAYER_SCENE: PackedScene = preload("res://scenes/game/player.tscn")
 const GIVE_MONSTER: PackedScene = preload("res://scenes/monsters/give_monster.tscn")
@@ -347,39 +347,45 @@ func _test_weapon_cards() -> void:
 	_check(is_equal_approx(press.lunge_tiles, 1.0), "sword press adds a lunge")
 
 	_progress.reset()
-	_take(&"staff_reach")
-	var reach: DepthStrikeWeaponDefinition = _progress.build_weapon(LONG_STAFF) as DepthStrikeWeaponDefinition
-	_check(is_equal_approx(reach.shaft_length, LONG_STAFF.shaft_length * 1.4), "staff reach lengthens the shaft")
-	_check(is_equal_approx(reach.hit_width, LONG_STAFF.hit_width + 2.0), "staff reach widens the hit box")
-	_check(_controller_accepts(reach), "the longer staff can be equipped")
+	_take(&"spear_reach")
+	var reach: SpearWeaponDefinition = _progress.build_weapon(SPEAR) as SpearWeaponDefinition
+	_check(is_equal_approx(reach.shaft_length, SPEAR.shaft_length * 1.35), "spear reach lengthens the shaft")
+	_check(is_equal_approx(reach.thrust_distance, SPEAR.thrust_distance * 1.35), "spear reach extends forward travel")
+	_check(is_equal_approx(reach.hit_width, SPEAR.hit_width), "spear reach preserves narrow aiming")
+	_check(_controller_accepts(reach), "the longer spear can be equipped")
 
 	_progress.reset()
-	_take(&"staff_reverse")
-	var reverse: DepthStrikeWeaponDefinition = _progress.build_weapon(LONG_STAFF) as DepthStrikeWeaponDefinition
-	_check(reverse.reverse_strike, "reverse strike flips the staff sweep")
-	_check(is_equal_approx(reverse.damage, LONG_STAFF.damage * 1.25), "reverse strike adds 25% damage")
+	_take(&"spear_heavy")
+	var heavy_spear: SpearWeaponDefinition = _progress.build_weapon(SPEAR) as SpearWeaponDefinition
+	_check(is_equal_approx(heavy_spear.damage, SPEAR.damage * 1.4), "heavy thrust adds 40% damage")
+	_check(is_equal_approx(heavy_spear.windup_seconds, SPEAR.windup_seconds + 0.1), "heavy thrust adds windup")
 
 	_progress.reset()
-	_take(&"staff_whirl")
-	var whirl: DepthStrikeWeaponDefinition = _progress.build_weapon(LONG_STAFF) as DepthStrikeWeaponDefinition
-	_check(is_equal_approx(whirl.arc_degrees, 360.0), "whirl turns the staff into a full circle")
-	_check(is_equal_approx(whirl.active_seconds, 0.45), "whirl extends the active sweep")
-	_check(is_equal_approx(whirl.reuse_delay, 0.20), "whirl slows the recovery loop")
-	_check(whirl.validation_errors().is_empty(), "the 360 degree staff passes validation")
-	_check(_controller_accepts(whirl), "the 360 degree staff can actually be equipped")
-	_check(whirl.attacks_per_second() < LONG_STAFF.attacks_per_second(), "whirl attacks slower than the base staff")
+	_take(&"spear_flurry")
+	var flurry: SpearWeaponDefinition = _progress.build_weapon(SPEAR) as SpearWeaponDefinition
+	_check(flurry.thrust_count == 2, "flurry produces two forward thrusts")
+	_check(is_equal_approx(flurry.damage, SPEAR.damage * 0.8), "flurry lowers damage per thrust")
+	_check(is_equal_approx(flurry.active_seconds, 0.30), "flurry extends the active sequence")
+	_check(flurry.validation_errors().is_empty() and _controller_accepts(flurry), "flurry stays valid and equips")
 
-	# 迅捷必须对旋风写死的绝对值同样有效，不能被绝对赋值吃掉。
 	_progress.reset()
-	_take(&"staff_whirl")
+	_take(&"spear_flurry")
 	_take(&"haste", 4)
-	var fast_whirl: DepthStrikeWeaponDefinition = _progress.build_weapon(LONG_STAFF) as DepthStrikeWeaponDefinition
+	var fast_flurry: SpearWeaponDefinition = _progress.build_weapon(SPEAR) as SpearWeaponDefinition
 	var haste_speed: float = 1.32
-	_check(is_equal_approx(fast_whirl.reuse_delay, 0.20 / haste_speed), "haste still shortens the whirl reuse delay")
-	_check(is_equal_approx(fast_whirl.active_seconds, 0.45 / haste_speed), "haste still shortens the whirl sweep")
-	_check(fast_whirl.attacks_per_second() > whirl.attacks_per_second(), "haste makes the whirl staff faster")
-	_check(fast_whirl.validation_errors().is_empty(), "the hasted whirl staff stays valid")
-	_check(_controller_accepts(fast_whirl), "the hasted whirl staff can be equipped")
+	_check(is_equal_approx(fast_flurry.reuse_delay, SPEAR.reuse_delay / haste_speed), "haste shortens the flurry reuse delay")
+	_check(is_equal_approx(fast_flurry.active_seconds, 0.30 / haste_speed), "haste shortens the whole flurry sequence")
+	_check(fast_flurry.attacks_per_second() > flurry.attacks_per_second(), "haste makes flurries faster")
+	_check(_controller_accepts(fast_flurry), "the hasted flurry can be equipped")
+
+	var spear_cards: int = 0
+	for card: UpgradeCard in UpgradePool.candidates({}, &"spear", 1.0):
+		if card.scope == UpgradeCard.Scope.WEAPON:
+			_check(card.weapon_id == &"spear", "spear candidates never include another weapon's cards")
+			spear_cards += 1
+	_check(spear_cards == 4, "spear offers four dedicated upgrades")
+	for retired: StringName in [&"staff_reach", &"staff_reverse", &"staff_whirl", &"staff_bind"]:
+		_check(UpgradePool.get_card(retired) == null, "retired staff cards are removed from the catalog")
 
 	_progress.reset()
 	_take(&"yoyo_long", 1)
@@ -390,8 +396,8 @@ func _test_weapon_cards() -> void:
 	_check(_controller_accepts(fast_yoyo), "the hasted long-string yoyo can be equipped")
 
 	_progress.reset()
-	_take(&"staff_bind")
-	var bind: WeaponDefinition = _progress.build_weapon(LONG_STAFF)
+	_take(&"spear_pin")
+	var bind: WeaponDefinition = _progress.build_weapon(SPEAR)
 	_check(is_equal_approx(bind.slow_ratio, 0.40), "bind carries its slow ratio")
 	_check(is_equal_approx(bind.slow_seconds, 1.5), "bind carries its slow duration")
 
@@ -412,17 +418,17 @@ func _test_weapon_cards() -> void:
 	# 武器卡不能串味：已选卡里混入别的武器的改造时，只作用在自己的武器上
 	_progress.reset()
 	_take(&"yoyo_orbit")
-	_take(&"staff_reach")
+	_take(&"spear_reach")
 	_take(&"sword_gale")
 	var isolated_sword: SwingWeaponDefinition = _progress.build_weapon(LONGSWORD) as SwingWeaponDefinition
-	var isolated_staff: DepthStrikeWeaponDefinition = _progress.build_weapon(LONG_STAFF) as DepthStrikeWeaponDefinition
+	var isolated_spear: SpearWeaponDefinition = _progress.build_weapon(SPEAR) as SpearWeaponDefinition
 	var isolated_yoyo: YoyoWeaponDefinition = _progress.build_weapon(YOYO) as YoyoWeaponDefinition
 	_check(is_equal_approx(isolated_sword.arc_degrees, 210.0), "the longsword only takes its own arc card")
-	_check(is_equal_approx(isolated_staff.arc_degrees, LONG_STAFF.arc_degrees), "the staff ignores the sword arc card")
-	_check(is_equal_approx(isolated_staff.shaft_length, LONG_STAFF.shaft_length * 1.4), "the staff still gets its own reach card")
+	_check(is_equal_approx(isolated_spear.hit_width, SPEAR.hit_width), "the spear stays narrow with a sword arc card")
+	_check(is_equal_approx(isolated_spear.shaft_length, SPEAR.shaft_length * 1.35), "the spear still gets its own reach card")
 	_check(is_equal_approx(isolated_yoyo.max_range, YOYO.max_range), "the yoyo ignores every other weapon card")
 	_check(isolated_yoyo.orbit_balls == 1, "the yoyo still gets its own orbit ball")
-	_check(isolated_sword.orbit_balls == 0 and isolated_staff.orbit_balls == 0, "orbit balls stay on the yoyo")
+	_check(isolated_sword.orbit_balls == 0 and isolated_spear.orbit_balls == 0, "orbit balls stay on the yoyo")
 
 
 # --- 经验球 ---------------------------------------------------------------

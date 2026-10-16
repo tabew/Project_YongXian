@@ -27,18 +27,21 @@ def longsword() -> Image.Image:
     return image
 
 
-def long_staff() -> Image.Image:
-    image = Image.new("RGBA", (32, 5))
+def spear() -> Image.Image:
+    image = Image.new("RGBA", (64, 10))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 1, 31, 3), fill=OUTLINE)
-    draw.line([(1, 1), (30, 1)], fill="#d2ad75")
-    draw.line([(1, 2), (30, 2)], fill="#916540")
-    for x in (1, 29):
-        draw.rectangle((x, 1, x + 1, 3), fill="#819599")
-        draw.point((x, 1), fill="#d7e3df")
-    draw.rectangle((5, 1, 11, 3), fill="#496957")
-    for x in (5, 8, 11):
-        draw.line([(x, 1), (x, 2)], fill="#afc29f")
+    draw.rectangle((0, 3, 52, 6), fill=OUTLINE)
+    draw.line([(1, 4), (52, 4)], fill="#d2ad75")
+    draw.line([(1, 5), (52, 5)], fill="#916540")
+    draw.rectangle((24, 3, 32, 6), fill="#366a66")
+    for x in (24, 27, 30):
+        draw.line([(x, 3), (x + 1, 5)], fill="#93c4b5")
+    draw.polygon([(49, 1), (55, 1), (63, 4), (63, 5), (55, 8), (49, 8), (52, 5), (52, 4)], fill=OUTLINE)
+    draw.polygon([(51, 2), (55, 2), (61, 4), (53, 4)], fill="#e6f5f6")
+    draw.polygon([(53, 5), (61, 5), (55, 7), (51, 7)], fill="#6f9ba9")
+    draw.rectangle((46, 3, 48, 6), fill="#dab65e")
+    draw.line([(47, 6), (43, 9)], fill="#b34f62")
+    draw.line([(48, 6), (46, 9)], fill="#e27c83")
     return image
 
 
@@ -82,10 +85,10 @@ def main() -> None:
     (ASSETS / "weapons").mkdir(parents=True, exist_ok=True)
     (ASSETS / "combat").mkdir(parents=True, exist_ok=True)
     longsword().save(ASSETS / "weapons" / "longsword.png")
-    long_staff().save(ASSETS / "weapons" / "long_staff.png")
+    spear().save(ASSETS / "weapons" / "spear.png")
     yoyo().save(ASSETS / "weapons" / "yoyo.png")
     training_dummy().save(ASSETS / "combat" / "training_dummy.png")
-    print("Generated longsword.png, long_staff.png, yoyo.png and training_dummy.png")
+    print("Generated longsword.png, spear.png, yoyo.png and training_dummy.png")
 
 
 if __name__ == "__main__":

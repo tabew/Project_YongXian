@@ -1,7 +1,7 @@
 extends SceneTree
 
 const LONGSWORD: SwingWeaponDefinition = preload("res://resources/weapons/longsword.tres")
-const LONG_STAFF: DepthStrikeWeaponDefinition = preload("res://resources/weapons/long_staff.tres")
+const SPEAR: SpearWeaponDefinition = preload("res://resources/weapons/spear.tres")
 const YOYO: YoyoWeaponDefinition = preload("res://resources/weapons/yoyo.tres")
 const DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
 
@@ -93,7 +93,9 @@ func _run() -> void:
 	var friendly: HealthComponent = _target(Vector2(30, 0), 1)
 	var wrong_layer: HealthComponent = _target(Vector2(30, 0), 2, 2)
 	await _sync_physics()
+	var orphans_before: float = Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)
 	var attack: WeaponAttack = _start()
+	_check(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT) == orphans_before, "Starting an attack never leaks an unattached instance")
 	attack._physics_process(0.07)
 	_check(front.current_health == 1000.0, "Windup causes no damage")
 	_check(not _controller.try_attack(), "Cannot stack attacks during a swing")
@@ -259,7 +261,7 @@ func _run() -> void:
 	dummy._physics_process(0.02)
 	_check(dummy.sprite.visible and dummy.health.current_health == 100.0, "Training dummy respawns with full health")
 
-	await _test_long_staff()
+	await _test_spear()
 	await _test_yoyo()
 
 	_arena.free()
@@ -271,7 +273,7 @@ func _run() -> void:
 func _test_weapon_templates() -> void:
 	var templates: Array[WeaponDefinition] = [
 		load("res://resources/weapons/templates/swing_weapon_template.tres") as WeaponDefinition,
-		load("res://resources/weapons/templates/staff_weapon_template.tres") as WeaponDefinition,
+		load("res://resources/weapons/templates/spear_weapon_template.tres") as WeaponDefinition,
 	]
 	for template: WeaponDefinition in templates:
 		_check(template != null and template.validation_errors().is_empty(), "Template is ready to equip")
@@ -290,90 +292,104 @@ func _test_weapon_templates() -> void:
 		await _sync_physics()
 		var attack: WeaponAttack = _start()
 		var is_sword: bool = template is SwingWeaponDefinition
-		_check((attack is SwingAttack) if is_sword else (attack is DepthStrikeAttack), "Template instantiates its matching attack behavior")
+		_check((attack is SwingAttack) if is_sword else (attack is SpearAttack), "Template instantiates its matching attack behavior")
 		attack._physics_process(1.0)
 		_check(front.current_health == front.max_health - _data.damage, "Template copy deals its edited damage exactly once")
 		_check(received.size() == 1 and received[0].weapon_id == _data.id, "Copied weapon reports its new ID on hit")
-		_check((wide.current_health < wide.max_health) == is_sword, "Templates retain distinct sword fan and staff fan ranges")
+		_check((wide.current_health < wide.max_health) == is_sword, "Templates retain distinct sword fan and spear thrust ranges")
 		_check(not _controller.is_attacking(), "Template attack completes normally")
 		_check(template.id == original_id and template.damage == original_damage, "Editing and attacking with a copy leaves its template unchanged")
 		_check(sibling.id == original_id and sibling.damage == original_damage, "Other copies retain their independent values")
 
 
-func _test_long_staff() -> void:
-	_check(LONG_STAFF.validation_errors().is_empty(), "Long staff configuration is valid")
+func _test_spear() -> void:
+	_check(SPEAR.validation_errors().is_empty(), "Spear configuration is valid")
 	for direction_index: int in range(8):
-		_fixture(LONG_STAFF)
+		_fixture(SPEAR)
 		var aim: Vector2 = Vector2.from_angle(float(direction_index) * TAU / 8.0)
-		var front: HealthComponent = _target(aim * 35.0, 2, 4, 2)
+		var front: HealthComponent = _target(aim * 30.0, 2, 4, 2)
+		var tip: HealthComponent = _target(aim * 68.0)
 		var behind: HealthComponent = _target(-aim * 24.0)
-		var side: HealthComponent = _target(aim.rotated(deg_to_rad(45.0)) * 30.0)
-		var fan_left: HealthComponent = _target(aim.rotated(deg_to_rad(-15.0)) * 28.0)
-		var fan_right: HealthComponent = _target(aim.rotated(deg_to_rad(15.0)) * 28.0)
-		var far: HealthComponent = _target(aim * 60.0)
+		var side: HealthComponent = _target(aim * 30.0 + aim.orthogonal() * 12.0)
+		var far: HealthComponent = _target(aim * 80.0)
+		var friendly: HealthComponent = _target(aim * 50.0, 1)
+		var wrong_layer: HealthComponent = _target(aim * 50.0, 2, 2)
 		await _sync_physics()
-		var attack: WeaponAttack = _start(aim)
-		attack._physics_process(0.1)
-		_check(front.current_health == front.max_health, "Staff windup cannot hit")
+		var attack: SpearAttack = _start(aim) as SpearAttack
+		_check(attack != null, "Spear uses the thrust attack")
+		attack._physics_process(SPEAR.windup_seconds * 0.5)
+		_check(front.current_health == front.max_health, "Spear windup cannot hit")
 		_controller.set_aim(-aim)
 		attack._physics_process(1.0)
-		_check(front.current_health == front.max_health - LONG_STAFF.damage, "Depth stroke samples its mid-stroke reach and hits once in direction %d" % direction_index)
-		_check(behind.current_health == behind.max_health, "Staff keeps selected direction when cursor moves")
-		_check(side.current_health == side.max_health, "Staff misses targets outside the small fan")
-		_check(fan_left.current_health == 980.0 and fan_right.current_health == 980.0, "Staff swing hits both sides of its small fan")
-		_check(far.current_health == far.max_health, "Staff does not hit beyond its reach")
+		_check(front.current_health == front.max_health - SPEAR.damage, "Each thrust deduplicates multiple hurtboxes in direction %d" % direction_index)
+		_check(tip.current_health == tip.max_health - SPEAR.damage, "A skipped frame still reaches and pierces the distant target")
+		_check(behind.current_health == behind.max_health, "Thrust keeps the cursor direction locked")
+		_check(side.current_health == side.max_health, "Spear misses enemies alongside the narrow thrust")
+		_check(far.current_health == far.max_health, "Spear cannot hit beyond its tip")
+		_check(friendly.current_health == friendly.max_health and wrong_layer.current_health == wrong_layer.max_health, "Spear filters teams and collision layers")
 
-	_fixture(LONG_STAFF)
-	(_data as DepthStrikeWeaponDefinition).reverse_strike = true
-	var front: HealthComponent = _target(Vector2(35, 0))
+	_fixture(SPEAR)
+	var attack: SpearAttack = _start(Vector2.UP) as SpearAttack
+	attack._physics_process(SPEAR.windup_seconds)
+	var start_position: Vector2 = attack.shaft.position
+	var start_rotation: float = attack.shaft.rotation
+	var start_scale: Vector2 = attack.shaft.scale
+	attack._physics_process(SPEAR.active_seconds * SpearAttack.EXTEND_RATIO)
+	_check(is_equal_approx(attack._tip(attack.elapsed).length(), 72.0), "Visual tip and damage reach extend to 72 pixels")
+	_check(attack.shaft.position.distance_to(start_position) > 30.0, "Spear visibly slides forward")
+	_check(is_equal_approx(attack.shaft.rotation, start_rotation) and attack.shaft.scale == start_scale, "Thrust never rotates through a fan or changes scale")
+	var returning_target: HealthComponent = _target(Vector2.UP * 45.0)
 	await _sync_physics()
-	var attack: WeaponAttack = _start()
-	_check(attack is DepthStrikeAttack, "Staff uses its own depth behavior, not the sword fan")
-	attack._physics_process(1.0)
-	_check(front.current_health == 980.0, "Reversing depth direction preserves forward aim and reach")
+	attack._physics_process(SPEAR.attack_duration())
+	_check(returning_target.current_health == returning_target.max_health, "Retraction and recovery cannot damage new targets")
 
-	_fixture(LONG_STAFF)
-	front = _target(Vector2(30, 0))
+	_fixture(SPEAR)
+	var moving_target: HealthComponent = _target(Vector2(100, 0))
 	await _sync_physics()
-	attack = _start()
-	attack._physics_process(_data.windup_seconds + _data.active_seconds)
-	_check(front.current_health == 980.0, "Staff active window deals damage")
-	var recovery_target: HealthComponent = _target(Vector2(20, 0))
-	await _sync_physics()
-	attack._physics_process(_data.recovery_seconds)
-	_check(recovery_target.current_health == 1000.0, "Staff returning from depth during recovery cannot hit")
-
-	_fixture(LONG_STAFF)
-	front = _target(Vector2(50, 0))
-	await _sync_physics()
-	attack = _start()
-	attack._physics_process(_data.windup_seconds)
+	attack = _start() as SpearAttack
+	attack._physics_process(SPEAR.windup_seconds)
 	_actor.position.x = 60.0
-	attack._physics_process(_data.active_seconds)
-	_check(front.current_health == 980.0, "Depth hit sweep includes actor translation")
+	attack._physics_process(SPEAR.active_seconds * SpearAttack.EXTEND_RATIO)
+	_check(moving_target.current_health == moving_target.max_health - SPEAR.damage, "Thrust sweep includes wielder translation")
 
-	_fixture(LONG_STAFF)
-	var swing: DepthStrikeAttack = _start() as DepthStrikeAttack
-	swing._physics_process(_data.windup_seconds)
-	var start_points: PackedVector2Array = swing.shaft.polygon
-	var start_axis: Vector2 = (start_points[1] + start_points[2] - start_points[0] - start_points[3]) * 0.5
-	var start_brightness: float = swing.shaft.color.r
-	swing._physics_process(_data.active_seconds)
-	var end_points: PackedVector2Array = swing.shaft.polygon
-	var end_axis: Vector2 = (end_points[1] + end_points[2] - end_points[0] - end_points[3]) * 0.5
-	_check(end_axis.length() > start_axis.length() * 1.3, "Staff grows visibly from far to near during the swing")
-	_check(swing.shaft.color.r > start_brightness, "Staff brightens as it approaches the viewer")
-	_check(is_equal_approx(absf(rad_to_deg(start_axis.angle_to(end_axis))), LONG_STAFF.arc_degrees), "Visible staff rotates through the configured small fan")
+	for single_frame: bool in [false, true]:
+		_fixture(SPEAR)
+		UpgradePool.apply_weapon_cards(_data, {&"spear_flurry": 1})
+		var target: HealthComponent = _target(Vector2(60, 0), 2, 4, 3)
+		await _sync_physics()
+		attack = _start() as SpearAttack
+		if single_frame:
+			attack._physics_process(1.0)
+		else:
+			for frame: int in 70:
+				attack._physics_process(0.01)
+		_check(is_equal_approx(target.current_health, target.max_health - SPEAR.damage * 0.8 * 2.0), "Flurry hits exactly once per thrust at either frame rate")
 
-	var invalid: DepthStrikeWeaponDefinition = LONG_STAFF.duplicate(true) as DepthStrikeWeaponDefinition
+	_fixture(SPEAR)
+	UpgradePool.apply_weapon_cards(_data, {&"spear_reach": 1})
+	var distant: HealthComponent = _target(Vector2(90, 0))
+	await _sync_physics()
+	attack = _start() as SpearAttack
+	attack._physics_process(1.0)
+	_check(distant.current_health == distant.max_health - SPEAR.damage, "Reach upgrade extends actual collision reach")
+
+	_fixture(SPEAR)
+	var cancelled_target: HealthComponent = _target(Vector2(50, 0))
+	await _sync_physics()
+	attack = _start() as SpearAttack
+	_controller.cancel_attack()
+	attack._physics_process(1.0)
+	_check(cancelled_target.current_health == cancelled_target.max_health, "Cancelled thrust cannot hit")
+
+	var invalid: SpearWeaponDefinition = SPEAR.duplicate(true) as SpearWeaponDefinition
 	invalid.hit_width = 0.0
-	_check(not invalid.validation_errors().is_empty(), "Staff rejects zero-width hit geometry")
-	invalid.hit_width = 4.0
-	invalid.near_pitch_degrees = 90.0
-	_check(not invalid.validation_errors().is_empty(), "Staff rejects degenerate depth projection")
-	invalid.near_pitch_degrees = LONG_STAFF.near_pitch_degrees
-	invalid.arc_degrees = 361.0
-	_check(not invalid.validation_errors().is_empty(), "Staff rejects an oversized fan")
+	_check(not invalid.validation_errors().is_empty(), "Spear rejects zero-width hit geometry")
+	invalid.hit_width = SPEAR.hit_width
+	invalid.pullback_distance = invalid.hand_distance + 1.0
+	_check(not invalid.validation_errors().is_empty(), "Spear rejects a grip pulled behind the wielder")
+	invalid.pullback_distance = SPEAR.pullback_distance
+	invalid.thrust_count = 0
+	_check(not invalid.validation_errors().is_empty(), "Spear rejects an empty thrust sequence")
 
 func _test_yoyo() -> void:
 	_check(YOYO.validation_errors().is_empty(), "Yoyo configuration is valid")

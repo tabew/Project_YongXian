@@ -235,7 +235,7 @@ func is_ui_blocking() -> bool:
 	if hud == null:
 		return false
 
-	for panel_name:String in ["BagUi", "Alchemy", "UpgradePanel"]:
+	for panel_name:String in ["BagUi", "Alchemy", "UpgradePanel", "CheatPanel"]:
 		var panel:CanvasItem = hud.get_node_or_null(panel_name) as CanvasItem
 
 		if panel != null and panel.visible:

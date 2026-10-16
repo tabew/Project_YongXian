@@ -69,13 +69,10 @@ const KEY_WEAPON_WINDUP_ADD: StringName = &"weapon_windup_add"
 const KEY_WEAPON_ARC_ADD: StringName = &"weapon_arc_add"
 const KEY_WEAPON_COMBO_WINDOW: StringName = &"weapon_combo_window"
 const KEY_WEAPON_LUNGE: StringName = &"weapon_lunge_tiles"
-const KEY_SET_ARC: StringName = &"set_arc_degrees"
 const KEY_SET_ACTIVE: StringName = &"set_active_seconds"
-const KEY_SET_REUSE: StringName = &"set_reuse_delay"
-const KEY_SHAFT_LENGTH_MULT: StringName = &"shaft_length_mult"
-const KEY_HIT_WIDTH_ADD: StringName = &"hit_width_add"
+const KEY_SPEAR_REACH_MULT: StringName = &"spear_reach_mult"
+const KEY_THRUST_COUNT_ADD: StringName = &"thrust_count_add"
 const KEY_MAX_RANGE_MULT: StringName = &"max_range_mult"
-const KEY_REVERSE_STRIKE: StringName = &"reverse_strike"
 const KEY_SLOW_RATIO: StringName = &"slow_ratio"
 const KEY_SLOW_SECONDS: StringName = &"slow_seconds"
 const KEY_ORBIT_BALLS: StringName = &"orbit_balls"
@@ -190,10 +187,10 @@ static func sum_effects(stacks: Dictionary, key: StringName) -> float:
 ## 把已选的武器卡叠加到一份武器定义上。调用方必须传入副本。
 ##
 ## 只叠加“属于这把武器”的武器卡：卡是按武器 id 抽的，如果不过滤，
-## 换武器后别的武器的改造会残留（例如长棍拿到溜溜球的环绕球）。
+## 换武器后别的武器的改造会残留（例如长枪拿到溜溜球的环绕球）。
 ##
 ## attack_speed 是“迅捷”一类卡算出的攻速倍率。所有时间轴都在这里一次性结算，
-## 顺序是“先叠卡的绝对值，再统一除攻速”，这样旋风那类写死时间的卡也不会把攻速吃掉。
+## 顺序是“先叠卡的绝对值，再统一除攻速”，连刺的整段时间也受攻速影响。
 static func apply_weapon_cards(weapon: WeaponDefinition, stacks: Dictionary, attack_speed: float = 1.0) -> void:
 	if weapon == null:
 		return
@@ -213,11 +210,8 @@ static func apply_weapon_cards(weapon: WeaponDefinition, stacks: Dictionary, att
 	var reuse: float = weapon.reuse_delay
 	var recovery: float = weapon.recovery_seconds
 	var set_active: float = sum_effects(applicable, KEY_SET_ACTIVE)
-	var set_reuse: float = sum_effects(applicable, KEY_SET_REUSE)
 	if set_active > 0.0:
 		active = set_active
-	if set_reuse > 0.0:
-		reuse = set_reuse
 	weapon.windup_seconds = maxf(windup / speed, 0.0)
 	weapon.active_seconds = maxf(active / speed, 0.01)
 	weapon.recovery_seconds = maxf(recovery / speed, 0.0)
@@ -226,17 +220,12 @@ static func apply_weapon_cards(weapon: WeaponDefinition, stacks: Dictionary, att
 	if weapon is SwingWeaponDefinition:
 		var swing := weapon as SwingWeaponDefinition
 		swing.arc_degrees = clampf(swing.arc_degrees + sum_effects(applicable, KEY_WEAPON_ARC_ADD), 1.0, 360.0)
-	elif weapon is DepthStrikeWeaponDefinition:
-		var staff := weapon as DepthStrikeWeaponDefinition
-		var set_arc: float = sum_effects(applicable, KEY_SET_ARC)
-		if set_arc > 0.0:
-			staff.arc_degrees = clampf(set_arc, 1.0, 360.0)
-		else:
-			staff.arc_degrees = clampf(staff.arc_degrees + sum_effects(applicable, KEY_WEAPON_ARC_ADD), 1.0, 360.0)
-		staff.shaft_length = maxf(staff.shaft_length * (1.0 + sum_effects(applicable, KEY_SHAFT_LENGTH_MULT)), 4.0)
-		staff.hit_width = maxf(staff.hit_width + sum_effects(applicable, KEY_HIT_WIDTH_ADD), 1.0)
-		if sum_effects(applicable, KEY_REVERSE_STRIKE) > 0.0:
-			staff.reverse_strike = true
+	elif weapon is SpearWeaponDefinition:
+		var spear := weapon as SpearWeaponDefinition
+		var reach: float = maxf(1.0 + sum_effects(applicable, KEY_SPEAR_REACH_MULT), 0.1)
+		spear.shaft_length = maxf(spear.shaft_length * reach, 4.0)
+		spear.thrust_distance = maxf(spear.thrust_distance * reach, 1.0)
+		spear.thrust_count = clampi(spear.thrust_count + int(sum_effects(applicable, KEY_THRUST_COUNT_ADD)), 1, 4)
 	elif weapon is YoyoWeaponDefinition:
 		var yoyo := weapon as YoyoWeaponDefinition
 		yoyo.max_range = maxf(yoyo.max_range * (1.0 + sum_effects(applicable, KEY_MAX_RANGE_MULT)), yoyo.hand_distance + 1.0)
@@ -296,14 +285,14 @@ static func _build_catalog() -> void:
 	_add(&"sword_press", "剑压", "击退翻倍，命中时自身前冲 1 格", rare, weapon_scope, 1,
 		{KEY_WEAPON_KNOCKBACK_MULT: 1.0, KEY_WEAPON_LUNGE: 1.0}, &"longsword")
 
-	_add(&"staff_reach", "长驱", "杆长 +40%，判定宽度 +2", rare, weapon_scope, 1,
-		{KEY_SHAFT_LENGTH_MULT: 0.40, KEY_HIT_WIDTH_ADD: 2.0}, &"long_staff")
-	_add(&"staff_reverse", "反向突刺", "改由近到远，伤害 +25%", rare, weapon_scope, 1,
-		{KEY_REVERSE_STRIKE: 1.0, KEY_WEAPON_DAMAGE_MULT: 0.25}, &"long_staff")
-	_add(&"staff_whirl", "旋风", "改为 360 度横扫一圈，攻速降低", rare, weapon_scope, 1,
-		{KEY_SET_ARC: 360.0, KEY_SET_ACTIVE: 0.45, KEY_SET_REUSE: 0.20}, &"long_staff")
-	_add(&"staff_bind", "定身", "命中使敌人减速 40%，持续 1.5 秒", rare, weapon_scope, 1,
-		{KEY_SLOW_RATIO: 0.40, KEY_SLOW_SECONDS: 1.5}, &"long_staff")
+	_add(&"spear_reach", "长驱", "枪长与突刺距离 +35%，保持窄幅直刺", rare, weapon_scope, 1,
+		{KEY_SPEAR_REACH_MULT: 0.35}, &"spear")
+	_add(&"spear_heavy", "重刺", "突刺伤害 +40%，前摇 +0.10 秒", rare, weapon_scope, 1,
+		{KEY_WEAPON_DAMAGE_MULT: 0.40, KEY_WEAPON_WINDUP_ADD: 0.10}, &"spear")
+	_add(&"spear_flurry", "连刺", "沿出手方向连刺两次，每刺伤害 -20%，刺击阶段变为 0.30 秒", rare, weapon_scope, 1,
+		{KEY_THRUST_COUNT_ADD: 1.0, KEY_WEAPON_DAMAGE_MULT: -0.20, KEY_SET_ACTIVE: 0.30}, &"spear")
+	_add(&"spear_pin", "钉足", "命中使敌人减速 40%，持续 1.5 秒", rare, weapon_scope, 1,
+		{KEY_SLOW_RATIO: 0.40, KEY_SLOW_SECONDS: 1.5}, &"spear")
 
 	_add(&"yoyo_long", "长绳", "绳长 +60%", rare, weapon_scope, 1, {KEY_MAX_RANGE_MULT: 0.60}, &"yoyo")
 	_add(&"yoyo_orbit", "环绕球", "攻击期间额外一颗球绕自身旋转", rare, weapon_scope, 1,

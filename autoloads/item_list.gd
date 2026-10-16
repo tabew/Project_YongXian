@@ -20,7 +20,7 @@ extends Node
 	preload("res://resources/items/ingredients/shabei_meat.tres"),
 	preload("res://resources/items/ingredients/carrot.tres"),
 	preload("res://resources/items/weapons/longsword.tres"),
-	preload("res://resources/items/weapons/long_staff.tres"),
+	preload("res://resources/items/weapons/spear.tres"),
 	preload("res://resources/items/weapons/yoyo.tres"),
 	preload("res://resources/items/weapons/thunder_yoyo.tres"),
 	preload("res://resources/items/weapons/hive_yoyo.tres"),

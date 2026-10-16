@@ -35,14 +35,14 @@ func _run() -> void:
 	_check(dummy != null and dummy.is_visible_in_tree(), "开局训练靶仍可见")
 	_check(bag != null and alchemy != null, "背包和炼金界面保留")
 	_check(player.inventory.get_handy_slot_id(0) == 200, "开局物品栏第1格是长剑")
-	_check(player.inventory.get_handy_slot_id(1) == 201, "开局物品栏第2格是长棍")
+	_check(player.inventory.get_handy_slot_id(1) == 201, "开局物品栏第2格是长枪")
 	# 当前实现是"选中即装备"，起始选中是第1格，所以开局手里就是长剑
 	_check(player.weapon_controller.equipped_weapon != null and player.weapon_controller.equipped_weapon.id == &"longsword", "开局按起始选中装备了长剑")
 
 	player.inventory.select_handy_slot(1)
 	# 新版快捷栏在选中时自动装备武器，不再提供 use_handy_slot。
 	var equipped: WeaponDefinition = player.weapon_controller.equipped_weapon
-	_check(equipped.id == &"long_staff", "原长棍配置仍可装备")
+	_check(equipped.id == &"spear", "原长枪配置仍可装备")
 
 	_check((world.hud.get_node("WeaponLabel") as Label).text.contains(equipped.display_name), "原武器HUD信号仍同步")
 	player.take_damage(3)

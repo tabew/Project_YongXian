@@ -204,8 +204,8 @@ def build_swing_longsword():
     return whoosh(0.34, 320.0, 2600.0, 0.13, 11, body=0.10)
 
 
-def build_swing_long_staff():
-    return whoosh(0.24, 700.0, 3200.0, 0.08, 12, body=0.06)
+def build_swing_spear():
+    return whoosh(0.14, 1000.0, 3800.0, 0.05, 12, body=0.04)
 
 
 def build_swing_yoyo():
@@ -213,10 +213,6 @@ def build_swing_yoyo():
     t = t_of(n, SFX_RATE)
     whip = sine(900.0 + 2200.0 * bell(t, 0.03, 0.02), SFX_RATE, n) * exp_decay(n, SFX_RATE, 0.001, 0.035)
     return mix(whoosh(0.26, 900.0, 2800.0, 0.09, 13, body=0.05), whip * 0.35)
-
-
-def build_swing_depth_strike():
-    return whoosh(0.42, 180.0, 1500.0, 0.16, 14, body=0.28)
 
 
 def build_swing_generic():
@@ -513,9 +509,8 @@ def build_stone_land():
 
 SFX_BUILDERS = {
     "swing_longsword": build_swing_longsword,
-    "swing_long_staff": build_swing_long_staff,
+    "swing_spear": build_swing_spear,
     "swing_yoyo": build_swing_yoyo,
-    "swing_depth_strike": build_swing_depth_strike,
     "swing_generic": build_swing_generic,
     "hit_flesh": build_hit_flesh,
     "hit_critical": build_hit_critical,

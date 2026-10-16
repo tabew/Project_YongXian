@@ -6,7 +6,7 @@ extends SceneTree
 
 var _checks: int = 0
 var _failures: int = 0
-const LONG_STAFF: DepthStrikeWeaponDefinition = preload("res://resources/weapons/long_staff.tres")
+const SPEAR: SpearWeaponDefinition = preload("res://resources/weapons/spear.tres")
 
 var _progress: Node = null
 
@@ -182,41 +182,38 @@ func _run() -> void:
 	var inventory: Inventory = world.player.inventory
 	_check(inventory != null, "the real player carries an inventory")
 	if inventory != null:
-		var staff_slot: int = _find_weapon_slot(inventory, &"long_staff")
-		# 默认背包只带长剑与长棍，溜溜球现场放进快捷栏，用来验证环绕球。
+		var spear_slot: int = _find_weapon_slot(inventory, &"spear")
+		# 默认背包只带长剑与长枪，溜溜球现场放进快捷栏，用来验证环绕球。
 		var yoyo_item_id: int = (load("res://resources/items/weapons/yoyo.tres") as ItemData).id
 		inventory.add_item(yoyo_item_id, 1)
 		var yoyo_slot: int = _find_weapon_slot(inventory, &"yoyo")
 		if yoyo_slot < 0:
 			yoyo_slot = inventory.quick_move_to_handy(yoyo_item_id, 1)
 			yoyo_slot = _find_weapon_slot(inventory, &"yoyo")
-		_check(staff_slot >= 0, "the inventory offers the long staff")
+		_check(spear_slot >= 0, "the inventory offers the long spear")
 		_check(yoyo_slot >= 0, "the yoyo can be placed in the hotbar")
 
-		# 长棍 + 旋风：360 度横扫必须真的装上，而不是被校验挡住。
-		if staff_slot >= 0:
-			inventory.select_handy_slot(staff_slot)
+		# Select the spear, rebuild with flurry, then restore the base sequence.
+		if spear_slot >= 0:
+			inventory.select_handy_slot(spear_slot)
 			await process_frame
-			var base_staff: DepthStrikeWeaponDefinition = world.player.weapon_controller.equipped_weapon as DepthStrikeWeaponDefinition
-			_check(base_staff != null and base_staff.id == &"long_staff", "selecting the staff slot equips the staff")
-			_progress.cards_taken[&"staff_whirl"] = 1
+			var base_spear: SpearWeaponDefinition = world.player.weapon_controller.equipped_weapon as SpearWeaponDefinition
+			_check(base_spear != null and base_spear.id == &"spear", "selecting the spear slot equips the spear")
+			_progress.cards_taken[&"spear_flurry"] = 1
 			world.player.rebuild_weapon()
 			await process_frame
-			var whirl: DepthStrikeWeaponDefinition = world.player.weapon_controller.equipped_weapon as DepthStrikeWeaponDefinition
-			_check(whirl != null, "the whirl staff stays equipped")
-			if whirl != null:
-				# 升级流程里可能已经拿过“迅捷”，所以时间轴按当前攻速折算——
-				# 旋风写死的绝对值同样要跟着攻速走，这正是“迅捷不生效”修好的地方。
+			var flurry: SpearWeaponDefinition = world.player.weapon_controller.equipped_weapon as SpearWeaponDefinition
+			_check(flurry != null, "the flurry spear stays equipped")
+			if flurry != null:
 				var speed: float = _progress.attack_speed_mult()
-				_check(is_equal_approx(whirl.arc_degrees, 360.0), "whirl really turns the equipped staff into a full circle")
-				_check(is_equal_approx(whirl.active_seconds, 0.45 / speed), "whirl really extends the equipped staff sweep")
-				_check(is_equal_approx(whirl.reuse_delay, 0.20 / speed), "whirl really slows the equipped staff reuse loop")
-			_progress.cards_taken.erase(&"staff_whirl")
+				_check(flurry.thrust_count == 2, "flurry reaches the actual equipped weapon")
+				_check(is_equal_approx(flurry.active_seconds, 0.30 / speed), "flurry respects current attack speed")
+			_progress.cards_taken.erase(&"spear_flurry")
 			world.player.rebuild_weapon()
 			await process_frame
-			var restored: DepthStrikeWeaponDefinition = world.player.weapon_controller.equipped_weapon as DepthStrikeWeaponDefinition
-			_check(restored != null and is_equal_approx(restored.arc_degrees, LONG_STAFF.arc_degrees),
-				"dropping the card restores the plain staff")
+			var restored: SpearWeaponDefinition = world.player.weapon_controller.equipped_weapon as SpearWeaponDefinition
+			_check(restored != null and restored.thrust_count == SPEAR.thrust_count,
+				"dropping the card restores the plain spear")
 
 		# 溜溜球 + 环绕球：按住左键才有球，松手就没。
 		if yoyo_slot >= 0:

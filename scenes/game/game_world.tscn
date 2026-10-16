@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" uid="uid://cei2bfjxogxkp" path="res://scenes/ui/inventory/bottom_bag_ui.tscn" id="12_nms8r"]
 [ext_resource type="PackedScene" path="res://scenes/ui/upgrade/upgrade_panel.tscn" id="13_upgrade_panel"]
 [ext_resource type="Script" path="res://scripts/ui/upgrade/upgrade_manager.gd" id="14_upgrade_manager"]
+[ext_resource type="Script" path="res://scripts/ui/debug/cheat_panel.gd" id="15_cheat_panel"]
 
 [node name="GameWorld" type="Node2D" unique_id=408146263]
 script = ExtResource("1_world")
@@ -53,3 +54,12 @@ visible = false
 
 [node name="UpgradeManager" type="Node" parent="GameHUD" unique_id=883451907]
 script = ExtResource("14_upgrade_manager")
+
+[node name="CheatPanel" type="Control" parent="GameHUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("15_cheat_panel")

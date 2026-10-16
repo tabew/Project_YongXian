@@ -38,6 +38,16 @@ func _on_level_up(_level: int) -> void:
 	_offer_next()
 
 
+## 调试改造后重新抽取正在展示的选项，避免残留已满层或互斥的卡。
+func refresh_pending_choices() -> void:
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if _panel == null or not _panel.visible or progress == null:
+		return
+	var previous_pity: int = progress.rolls_since_rare
+	_offer_next()
+	progress.rolls_since_rare = previous_pity
+
+
 func _offer_next() -> void:
 	if _panel == null:
 		return

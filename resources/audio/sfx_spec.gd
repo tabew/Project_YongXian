@@ -24,9 +24,8 @@ const DEFAULT: Dictionary = {
 const SPECS: Dictionary = {
 	# 挥砍：三把武器各有音色，缺素材时由 swing_generic 兜底。
 	&"swing_longsword": {"volume_db": -8.0, "pitch_variation": 0.10, "min_interval": 0.05, "max_voices": 3},
-	&"swing_long_staff": {"volume_db": -9.0, "pitch_variation": 0.10, "min_interval": 0.05, "max_voices": 3},
+	&"swing_spear": {"volume_db": -9.0, "pitch_variation": 0.10, "min_interval": 0.05, "max_voices": 3},
 	&"swing_yoyo": {"volume_db": -10.0, "pitch_variation": 0.10, "min_interval": 0.05, "max_voices": 3},
-	&"swing_depth_strike": {"volume_db": -7.0, "pitch_variation": 0.08, "min_interval": 0.05, "max_voices": 3},
 	&"swing_generic": {"volume_db": -9.0, "pitch_variation": 0.10, "min_interval": 0.05, "max_voices": 3},
 
 	# 命中：按受击目标材质区分，暴击单独一档。

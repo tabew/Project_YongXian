@@ -123,6 +123,29 @@ func take_card(card_id: StringName) -> bool:
 	return true
 
 
+## 调试面板直接设定层数，不消耗正常升级次数；同组终极改造直接替换。
+func debug_set_card_stacks(card_id: StringName, count: int) -> bool:
+	var card: UpgradeCard = UpgradePool.get_card(card_id)
+	if card == null or count < 0 or count > card.max_stacks:
+		return false
+	if count > 0 and not card.exclusive_group.is_empty():
+		for taken_id: StringName in cards_taken.keys():
+			var taken: UpgradeCard = UpgradePool.get_card(taken_id)
+			if taken != null and taken.id != card_id and taken.exclusive_group == card.exclusive_group:
+				cards_taken.erase(taken_id)
+	if count == 0:
+		cards_taken.erase(card_id)
+	else:
+		cards_taken[card_id] = count
+	cards_changed.emit()
+	return true
+
+
+func debug_clear_cards() -> void:
+	cards_taken.clear()
+	cards_changed.emit()
+
+
 # --- 数值聚合 -------------------------------------------------------------
 
 func max_health_add() -> float:
