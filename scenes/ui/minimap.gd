@@ -13,15 +13,23 @@ const ROAD_ATLAS: String = "res://assets/road_tiles.png"
 const TILES_PER_PIXEL: int = 4
 const WINDOW_TILES: int = 512
 const TEXTURE_SIZE: int = WINDOW_TILES / TILES_PER_PIXEL
-const PIXEL_CACHE_LIMIT: int = TEXTURE_SIZE * TEXTURE_SIZE * 4
 const COMPACT_TILES_PER_PIXEL: int = TILES_PER_PIXEL
 const FULL_MAP_TILES_PER_PIXEL: int = 1
 ## 全屏地图至少显示以玩家为中心的 15x7 个区块。
 const FULL_MAP_HALF_CHUNKS: Vector2i = Vector2i(7, 3)
 const REFRESH_INTERVAL: float = 0.25
+## 每帧最多快照几个区块的探索像素，避免进图时一次性拷贝整张地图；
+## 转场期间没有画面要画，可以多做，淡入时小地图已经补齐。
+const CAPTURE_BUDGET: int = 8
+const CAPTURE_BUDGET_TRANSITION: int = 24
 ## 图集里取色的位置（每块贴图的正中心）。
 const ATLAS_PROBE: int = 8
 const FULL_MAP_MARGIN: float = 48.0
+## 全屏地图的缩放范围与滚轮步进；1.0 表示整局适配。
+const FULL_MAP_MIN_ZOOM: float = 0.6
+const FULL_MAP_MAX_ZOOM: float = 8.0
+const FULL_MAP_ZOOM_STEP: float = 1.18
+const HINT_FONT_SIZE: int = 12
 
 const UNKNOWN_COLOR: Color = Color(0.08, 0.09, 0.12)
 const FULL_MAP_BACKGROUND: Color = Color(0.025, 0.03, 0.045, 0.96)
@@ -36,6 +44,7 @@ const LABEL_COLOR: Color = Color(0.90, 0.93, 1.0)
 const ACTIVE_LABEL_COLOR: Color = Color(1.0, 0.90, 0.35)
 const CAMERA_COLOR: Color = Color(0.90, 0.94, 1.0, 0.65)
 const LABEL_FONT_SIZE: int = 13
+const HINT_COLOR: Color = Color(0.78, 0.84, 0.92, 0.85)
 
 @export var show_camera_view: bool = true
 
@@ -64,11 +73,14 @@ var _expanded: bool = false
 var _map_size: int = 0
 var _map_node: int = -1
 var _source_generator: WorldGenerator = null
-var _sampler: WorldGenerator = null
 var _seed: int = 0
 var _specs: Array[MapSpec] = []
-## 世界 tile -> RGB 整数；仅 compact 使用，不能作为探索记录。
-var _pixel_cache: Dictionary = {}
+## 全屏地图的缩放与平移；1.0 / 零偏移表示整局适配。
+var _zoom: float = 1.0
+var _pan: Vector2 = Vector2.ZERO
+var _dragging: bool = false
+## 待快照的区块队列（近的先做），避免进图时一次性拷贝整张地图。
+var _capture_queue: Array[Vector2i] = []
 ## 同一个世界区块可能分属两个箱庭，分别记录已捕获的矩形区域。
 var _captured_regions: Dictionary = {}
 
@@ -76,6 +88,9 @@ var _captured_regions: Dictionary = {}
 var _explored_chunks: Dictionary = {}
 var _exploration_version: int = 0
 var _seen_exploration_version: int = -1
+## 去过（有已探索区块）的箱庭；小地图只标出这些。
+var _visited_regions: Dictionary = {}
+var _visited_version: int = -1
 
 
 func _ready() -> void:
@@ -114,13 +129,17 @@ func _clear_world_cache() -> void:
 	_seen_version = -1
 	_seed = 0
 	_source_generator = null
-	_sampler = null
 	_specs.clear()
-	_pixel_cache.clear()
+	_capture_queue.clear()
 	_captured_regions.clear()
 	_explored_chunks.clear()
 	_exploration_version = 0
 	_seen_exploration_version = -1
+	_visited_regions.clear()
+	_visited_version = -1
+	_zoom = 1.0
+	_pan = Vector2.ZERO
+	_dragging = false
 
 
 func _sync_generator() -> bool:
@@ -136,8 +155,6 @@ func _sync_generator() -> bool:
 		_clear_world_cache()
 		_source_generator = generator
 		_seed = generator.world_seed
-		# 不共享管理器的可变分类缓冲，也不把采样结果记为已探索。
-		_sampler = WorldGenerator.new(_seed, generator.config, generator.variant)
 		_specs = generator.map_specs().duplicate()
 	return true
 
@@ -167,23 +184,35 @@ func refresh_position() -> void:
 	if _sync_generator():
 		_update_focus()
 		_capture_loaded_chunks()
-		if _texture == null or (_expanded and _exploration_version != _seen_exploration_version):
-			_rebuild()
-		elif not _expanded and _window_origin() != _map_origin:
+		if _is_stale():
 			_rebuild()
 		_seen_version = _manager.version
 	_refresh_timer = REFRESH_INTERVAL
 	queue_redraw()
 
 
+## compact 与全屏都建立在探索记录上，所以新探索到的区块也要触发重建。
+func _is_stale() -> bool:
+	if _texture == null or _exploration_version != _seen_exploration_version:
+		return true
+	if _expanded:
+		return false
+	return _window_origin() != _map_origin
+
+
 func set_expanded(value: bool) -> void:
 	if _expanded == value:
 		return
 	_expanded = value
+	# 每次开关都回到整局适配；滚轮缩放和中键拖动在这个基础上叠加。
+	_zoom = 1.0
+	_pan = Vector2.ZERO
+	_dragging = false
 
 	if _expanded:
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		z_index = 100
+		mouse_filter = Control.MOUSE_FILTER_STOP
 	else:
 		anchor_left = 1.0
 		anchor_top = 0.0
@@ -194,6 +223,7 @@ func set_expanded(value: bool) -> void:
 		offset_right = -14.0
 		offset_bottom = 178.0
 		z_index = 0
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_seen_version = -1
 	_seen_exploration_version = -1
@@ -213,9 +243,7 @@ func _process(delta: float) -> void:
 	_update_focus()
 	_capture_loaded_chunks()
 	_refresh_timer -= delta
-	var compact_changed: bool = not _expanded and _window_origin() != _map_origin
-	var full_map_changed: bool = _expanded and _exploration_version != _seen_exploration_version
-	if _refresh_timer <= 0.0 and (_texture == null or compact_changed or full_map_changed):
+	if _refresh_timer <= 0.0 and _is_stale():
 		_refresh_timer = REFRESH_INTERVAL
 		_rebuild()
 	_seen_version = _manager.version
@@ -224,6 +252,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## 每帧最多快照 CAPTURE_BUDGET 个区块，近的先做：进图时不再一次性拷贝整张地图。
 ## 只保存当前可见地图的 loaded_chunks，不能把隐藏预加载邻图当作探索。
 func _capture_loaded_chunks() -> void:
 	if not is_instance_valid(_manager):
@@ -231,44 +260,80 @@ func _capture_loaded_chunks() -> void:
 	if _terrain_rgb.is_empty():
 		_build_palette()
 	var spec: MapSpec = _manager.get_map_spec()
-	var changed: bool = false
-	for coords: Vector2i in _manager.loaded_chunks():
-		var capture_key := Vector3i(coords.x, coords.y, spec.node_id if spec != null else -1)
-		if _captured_regions.has(capture_key):
-			continue
-		var data: ChunkData = _manager.get_cached_chunk(coords)
-		if data == null:
-			continue
-		if spec == null:
-			_explored_chunks[coords] = _build_chunk_pixels(data, FULL_MAP_TILES_PER_PIXEL)
-		else:
-			# 缓存包含整个边界区块；只拷贝当前箱庭，邻图以后访问时再补入。
-			var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
-			var bounds := Rect2i(spec.origin, spec.extent).intersection(
-				Rect2i(origin, Vector2i.ONE * WorldGenerator.CHUNK_SIZE)
-			)
-			if not bounds.has_area():
-				continue
-			var pixels: PackedByteArray
-			if _explored_chunks.has(coords):
-				pixels = _explored_chunks[coords]
-			else:
-				pixels = PackedByteArray()
-				pixels.resize(WorldGenerator.CHUNK_SIZE * WorldGenerator.CHUNK_SIZE * 3)
-				_fill_unknown(pixels)
-			for y: int in range(bounds.position.y, bounds.end.y):
-				for x: int in range(bounds.position.x, bounds.end.x):
-					var local: Vector2i = Vector2i(x, y) - origin
-					var index: int = local.y * WorldGenerator.CHUNK_SIZE + local.x
-					var rgb: int = _color_rgb(data.terrain[index], data.route[index])
-					pixels[index * 3] = (rgb >> 16) & 255
-					pixels[index * 3 + 1] = (rgb >> 8) & 255
-					pixels[index * 3 + 2] = rgb & 255
-			_explored_chunks[coords] = pixels
-		_captured_regions[capture_key] = true
-		changed = true
-	if changed:
+	if _capture_queue.is_empty():
+		_capture_queue = _pending_capture_chunks(spec)
+		if _capture_queue.is_empty():
+			return
+	var taken: int = 0
+	var budget: int = CAPTURE_BUDGET_TRANSITION if _in_transition() else CAPTURE_BUDGET
+	while taken < budget and not _capture_queue.is_empty():
+		var coords: Vector2i = _capture_queue.pop_front()
+		if _capture_chunk(coords, spec):
+			taken += 1
+	if taken > 0:
 		_exploration_version += 1
+
+
+## 转场中：黑屏期间没有画面要画，快照可以多做一点。
+## 自动加载单例用运行期查找而不是全局标识符，这样本脚本仍能作为全局类被其他
+## 脚本引用并在 --script 单元测试里编译。
+func _in_transition() -> bool:
+	var manager: Node = get_node_or_null("/root/SceneManager")
+	return manager != null and bool(manager.call("is_transitioning"))
+
+
+## 还没快照过的已铺区块；近的排前面，小地图先补齐玩家身边。
+func _pending_capture_chunks(spec: MapSpec) -> Array[Vector2i]:
+	var node_id: int = spec.node_id if spec != null else -1
+	var pending: Array[Vector2i] = []
+	for coords: Vector2i in _manager.loaded_chunks():
+		if _captured_regions.has(Vector3i(coords.x, coords.y, node_id)):
+			continue
+		if _manager.get_cached_chunk(coords) == null:
+			continue
+		pending.append(coords)
+	if pending.size() <= 1:
+		return pending
+	var focus := Vector2(_focus_chunk)
+	pending.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return Vector2(a).distance_squared_to(focus) < Vector2(b).distance_squared_to(focus)
+	)
+	return pending
+
+
+func _capture_chunk(coords: Vector2i, spec: MapSpec) -> bool:
+	var data: ChunkData = _manager.get_cached_chunk(coords)
+	if data == null:
+		return false
+	var node_id: int = spec.node_id if spec != null else -1
+	if spec == null:
+		_explored_chunks[coords] = _build_chunk_pixels(data, FULL_MAP_TILES_PER_PIXEL)
+	else:
+		# 缓存包含整个边界区块；只拷贝当前箱庭，邻图以后访问时再补入。
+		var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
+		var bounds := Rect2i(spec.origin, spec.extent).intersection(
+			Rect2i(origin, Vector2i.ONE * WorldGenerator.CHUNK_SIZE)
+		)
+		if not bounds.has_area():
+			return false
+		var pixels: PackedByteArray
+		if _explored_chunks.has(coords):
+			pixels = _explored_chunks[coords]
+		else:
+			pixels = PackedByteArray()
+			pixels.resize(WorldGenerator.CHUNK_SIZE * WorldGenerator.CHUNK_SIZE * 3)
+			_fill_unknown(pixels)
+		for y: int in range(bounds.position.y, bounds.end.y):
+			for x: int in range(bounds.position.x, bounds.end.x):
+				var local: Vector2i = Vector2i(x, y) - origin
+				var index: int = local.y * WorldGenerator.CHUNK_SIZE + local.x
+				var rgb: int = _color_rgb(data.terrain[index], data.route[index])
+				pixels[index * 3] = (rgb >> 16) & 255
+				pixels[index * 3 + 1] = (rgb >> 8) & 255
+				pixels[index * 3 + 2] = rgb & 255
+		_explored_chunks[coords] = pixels
+	_captured_regions[Vector3i(coords.x, coords.y, node_id)] = true
+	return true
 
 
 # ------------------------------------------------------------ 调色板
@@ -325,6 +390,8 @@ func build_pixels() -> PackedByteArray:
 	return bytes
 
 
+## 小地图只画已探索过的区块：没去过的箱庭保持迷雾，不提前泄露地形。
+## 数据来自与全屏地图同一份探索快照（1 格 / 像素），按 4 格 / 像素降采样。
 func _build_compact_pixels() -> PackedByteArray:
 	var bytes := PackedByteArray()
 	if not is_instance_valid(_manager) or not is_instance_valid(_player):
@@ -340,44 +407,31 @@ func _build_compact_pixels() -> PackedByteArray:
 	_compact_pixels_per_chunk = WorldGenerator.CHUNK_SIZE / TILES_PER_PIXEL
 	_active_pixels_per_chunk = _compact_pixels_per_chunk
 	_active_tiles_per_pixel = TILES_PER_PIXEL
-	# 预留整个新窗口的容量，确保插入过程中也不会超过缓存上限。
-	if _pixel_cache.size() + TEXTURE_SIZE * TEXTURE_SIZE > PIXEL_CACHE_LIMIT:
-		_trim_pixel_cache()
 
 	bytes.resize(TEXTURE_SIZE * TEXTURE_SIZE * 3)
+	_fill_unknown(bytes)
 	var per_chunk: int = WorldGenerator.CHUNK_SIZE / TILES_PER_PIXEL
 	var min_chunk: Vector2i = WorldGenerator.tile_to_chunk(_map_origin)
 	var chunk_count: int = WINDOW_TILES / WorldGenerator.CHUNK_SIZE
+	var snapshot_side: int = WorldGenerator.CHUNK_SIZE
 	for chunk_y: int in chunk_count:
 		for chunk_x: int in chunk_count:
 			var coords: Vector2i = min_chunk + Vector2i(chunk_x, chunk_y)
-			var data: ChunkData = _manager.get_cached_chunk(coords)
-			var origin: Vector2i = coords * WorldGenerator.CHUNK_SIZE
+			if not _explored_chunks.has(coords):
+				continue
+			var snapshot: PackedByteArray = _explored_chunks[coords]
+			if snapshot.size() < snapshot_side * snapshot_side * 3:
+				continue
 			for cell_y: int in per_chunk:
+				var source_row: int = cell_y * TILES_PER_PIXEL * snapshot_side
 				for cell_x: int in per_chunk:
-					var local := Vector2i(cell_x, cell_y) * TILES_PER_PIXEL
-					var tile: Vector2i = origin + local
-					var rgb: int
-					if data != null:
-						# 缓存数据始终优先于先前的像素采样。
-						var index: int = local.y * WorldGenerator.CHUNK_SIZE + local.x
-						rgb = _color_rgb(data.terrain[index], data.route[index])
-						_pixel_cache[tile] = rgb
-					elif _pixel_cache.has(tile):
-						rgb = _pixel_cache[tile]
-					elif _sampler != null:
-						rgb = _color_rgb(_sampler.sample_terrain(tile), _sampler.sample_route(tile))
-						_pixel_cache[tile] = rgb
-					else:
-						# 没有生成器的旧 fixture 保留未知色，不凭空生成另一个世界。
-						rgb = (int(_unknown_rgb[0]) << 16) | (int(_unknown_rgb[1]) << 8) | int(_unknown_rgb[2])
-
-					var pixel_x: int = chunk_x * per_chunk + cell_x
-					var pixel_y: int = chunk_y * per_chunk + cell_y
-					var offset: int = (pixel_y * TEXTURE_SIZE + pixel_x) * 3
-					bytes[offset] = (rgb >> 16) & 255
-					bytes[offset + 1] = (rgb >> 8) & 255
-					bytes[offset + 2] = rgb & 255
+					var source: int = (source_row + cell_x * TILES_PER_PIXEL) * 3
+					var target_x: int = chunk_x * per_chunk + cell_x
+					var target_y: int = chunk_y * per_chunk + cell_y
+					var target: int = (target_y * TEXTURE_SIZE + target_x) * 3
+					bytes[target] = snapshot[source]
+					bytes[target + 1] = snapshot[source + 1]
+					bytes[target + 2] = snapshot[source + 2]
 	return bytes
 
 
@@ -388,20 +442,6 @@ func _color_rgb(terrain: int, road: int) -> int:
 		palette = _route_rgb
 		entry = Route.atlas_row(road) * 3
 	return (int(palette[entry]) << 16) | (int(palette[entry + 1]) << 8) | int(palette[entry + 2])
-
-
-func _trim_pixel_cache() -> void:
-	# 留当前窗口与半个窗口的周边，转身时仍可复用。
-	var margin := Vector2i(WINDOW_TILES / 2, WINDOW_TILES / 2)
-	var keep := Rect2i(_map_origin - margin, Vector2i(WINDOW_TILES, WINDOW_TILES) + margin * 2)
-	for tile: Vector2i in _pixel_cache.keys():
-		if not keep.has_point(tile):
-			_pixel_cache.erase(tile)
-	if _pixel_cache.size() + TEXTURE_SIZE * TEXTURE_SIZE > PIXEL_CACHE_LIMIT:
-		var window := Rect2i(_map_origin, Vector2i(WINDOW_TILES, WINDOW_TILES))
-		for tile: Vector2i in _pixel_cache.keys():
-			if not window.has_point(tile):
-				_pixel_cache.erase(tile)
 
 
 ## 全屏地图至少覆盖 15x7 区块，并在此基础上包含全部已探索区块。
@@ -568,6 +608,18 @@ func _draw() -> void:
 			draw_arc(player_position, marker_radius, 0.0, TAU, 20, PLAYER_OUTLINE, 1.5)
 
 	draw_rect(map_rect, BORDER_COLOR, false, 1.0)
+	if _expanded:
+		_draw_hint()
+
+
+## 全屏地图的操作提示。
+func _draw_hint() -> void:
+	var font: Font = get_theme_default_font()
+	var text: String = "滚轮缩放 · 中键拖动 · M 关闭"
+	var text_size: Vector2 = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, HINT_FONT_SIZE)
+	var position := Vector2((size.x - text_size.x) * 0.5, size.y - 18.0)
+	draw_string_outline(font, position, text, HORIZONTAL_ALIGNMENT_LEFT, -1, HINT_FONT_SIZE, 3, PLAYER_OUTLINE)
+	draw_string(font, position, text, HORIZONTAL_ALIGNMENT_LEFT, -1, HINT_FONT_SIZE, HINT_COLOR)
 
 
 func _tile_to_minimap(tile: Vector2, map_rect: Rect2, scale_factor: Vector2) -> Vector2:
@@ -583,7 +635,11 @@ func _draw_regions(map_rect: Rect2, scale_factor: Vector2) -> void:
 			break
 
 	var font: Font = get_theme_default_font()
+	var visited: Dictionary = _visited_region_set()
 	for spec: MapSpec in _specs:
+		# 右上角小地图只标出已经探索过的箱庭，没去过的不泄露。
+		if not _expanded and not visited.has(spec.node_id):
+			continue
 		if _expanded:
 			var start: Vector2 = _tile_to_minimap(Vector2(spec.origin), map_rect, scale_factor)
 			var end: Vector2 = _tile_to_minimap(Vector2(spec.origin + spec.extent), map_rect, scale_factor)
@@ -633,7 +689,16 @@ func _calculate_map_rect() -> Rect2:
 	if not _expanded:
 		var side: float = minf(size.x, size.y)
 		return Rect2(Vector2.ZERO, Vector2(side, side))
+	var fitted: Rect2 = _fitted_map_rect()
+	if is_equal_approx(_zoom, 1.0) and _pan.is_zero_approx():
+		return fitted
+	var scaled: Vector2 = fitted.size * _zoom
+	var center: Vector2 = fitted.get_center() + _pan
+	return Rect2(center - scaled * 0.5, scaled)
 
+
+## 整局适配：把整张探索图放进可用区域，居中。
+func _fitted_map_rect() -> Rect2:
 	var available := Vector2(
 		maxf(size.x - FULL_MAP_MARGIN * 2.0, 1.0),
 		maxf(size.y - FULL_MAP_MARGIN * 2.0, 1.0)
@@ -642,8 +707,96 @@ func _calculate_map_rect() -> Rect2:
 		available.x / float(_image.get_width()),
 		available.y / float(_image.get_height())
 	)
-	var map_size := Vector2(
+	var fitted_size := Vector2(
 		float(_image.get_width()) * scale_factor,
 		float(_image.get_height()) * scale_factor
 	)
-	return Rect2((size - map_size) * 0.5, map_size)
+	return Rect2((size - fitted_size) * 0.5, fitted_size)
+
+
+# ------------------------------------------------------------ 全屏地图的缩放与拖动
+
+## 展开时在 _input 阶段直接接管滚轮与中键：不依赖鼠标 hover，也不受其他
+## _input 处理器的树序影响（物品栏也会在 _input 里读滚轮）。
+func _input(event: InputEvent) -> void:
+	if not _expanded:
+		return
+	if _handle_pointer(event):
+		get_viewport().set_input_as_handled()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not _expanded:
+		return
+	if _handle_pointer(event):
+		accept_event()
+
+
+## 处理滚轮缩放与中键拖动；吃掉事件时返回 true。
+func _handle_pointer(event: InputEvent) -> bool:
+	var button := event as InputEventMouseButton
+	if button != null:
+		if not button.pressed:
+			if button.button_index == MOUSE_BUTTON_MIDDLE:
+				_dragging = false
+				return true
+			return false
+		if button.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom_at(FULL_MAP_ZOOM_STEP, button.position)
+			return true
+		if button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom_at(1.0 / FULL_MAP_ZOOM_STEP, button.position)
+			return true
+		if button.button_index == MOUSE_BUTTON_MIDDLE:
+			_dragging = true
+			return true
+		return false
+	var motion := event as InputEventMouseMotion
+	if motion != null and _dragging:
+		_pan += motion.relative
+		_clamp_pan()
+		queue_redraw()
+		return true
+	return false
+
+
+## 以光标为锚点缩放：光标下的那一点保持不动。
+func _zoom_at(factor: float, focus: Vector2) -> void:
+	var before: Rect2 = _calculate_map_rect()
+	var next_zoom: float = clampf(_zoom * factor, FULL_MAP_MIN_ZOOM, FULL_MAP_MAX_ZOOM)
+	if is_equal_approx(next_zoom, _zoom):
+		return
+	var anchor: Vector2 = (focus - before.position) / before.size
+	_zoom = next_zoom
+	var after: Rect2 = _calculate_map_rect()
+	_pan += focus - (after.position + after.size * anchor)
+	_clamp_pan()
+	queue_redraw()
+
+
+## 放大后可以拖到地图边缘，但不会把地图拖出画面；适配状态下面板归零。
+func _clamp_pan() -> void:
+	var fitted: Rect2 = _fitted_map_rect()
+	var limit := Vector2(
+		maxf(fitted.size.x * (_zoom - 1.0) * 0.5, 0.0),
+		maxf(fitted.size.y * (_zoom - 1.0) * 0.5, 0.0)
+	)
+	_pan = _pan.clamp(-limit, limit)
+
+
+## 去过的箱庭集合：小地图只标出这些，没探索过的不显示。
+func _visited_region_set() -> Dictionary:
+	if _visited_version == _exploration_version:
+		return _visited_regions
+	_visited_version = _exploration_version
+	_visited_regions.clear()
+	for coords: Vector2i in _explored_chunks.keys():
+		var bounds := Rect2i(
+			coords * WorldGenerator.CHUNK_SIZE, Vector2i.ONE * WorldGenerator.CHUNK_SIZE
+		)
+		for spec: MapSpec in _specs:
+			if _visited_regions.has(spec.node_id):
+				continue
+			if Rect2i(spec.origin, spec.extent).intersects(bounds):
+				_visited_regions[spec.node_id] = true
+	return _visited_regions

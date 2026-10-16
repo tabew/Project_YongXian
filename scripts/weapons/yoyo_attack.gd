@@ -134,9 +134,10 @@ func _sweep_ball(from_position: Vector2, to_position: Vector2) -> void:
 	for index: int in range(steps + 1):
 		var center: Vector2 = from_position.lerp(to_position, float(index) / float(steps)) - global_position
 		points.append_array(_circle_points(center))
-	_shape.points = Geometry2D.convex_hull(points)
-	_query.transform = Transform2D(0.0, global_position)
-	_query_hurtboxes(_query)
+		_shape.points = Geometry2D.convex_hull(points)
+		_query.transform = Transform2D(0.0, global_position)
+		_query_hurtboxes(_query)
+		_clear_grass(points)
 
 
 func _circle_points(center: Vector2) -> PackedVector2Array:
