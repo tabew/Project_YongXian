@@ -122,3 +122,30 @@ static func apply_lifesteal(source: Node, damage: float) -> void:
 static func is_absorbing(target: Node) -> bool:
 	var holder: BuffHolder = holder_of(target)
 	return holder != null and holder.has_flag(FLAG_ABSORB)
+
+
+##给任意实体造成一次伤害。返回实际扣掉的生命。
+##玩家走自己的 take_damage，其它实体走生命组件。
+static func hurt_entity(target: Node, amount: float) -> float:
+	if target == null or not is_instance_valid(target) or amount <= 0.0:
+		return 0.0
+
+	if target is PlayerCharacter:
+		var player: PlayerCharacter = target as PlayerCharacter
+		var before: float = player.health
+
+		player.take_damage(amount)
+		return maxf(before - player.health, 0.0)
+
+	var health: Node = target.get_node_or_null("Health")
+
+	if health == null or not health.has_method("receive_hit"):
+		return 0.0
+	var previous: float = float(health.get("current_health"))
+	var hit: CombatHit = CombatHit.new()
+
+	hit.damage = amount
+	if target is Node2D:
+		hit.position = (target as Node2D).global_position
+	health.call("receive_hit", hit)
+	return maxf(previous - float(health.get("current_health")), 0.0)

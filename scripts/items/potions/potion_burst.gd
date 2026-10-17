@@ -25,13 +25,6 @@ const MIN_PULSE_INTERVAL: float = 0.05
 ##护己效果作用对象，只吃正面效果
 var exempt_target: Node = null
 
-##作用圈每次结算对圈内目标造成的伤害（0 = 圈不伤人）
-var zone_damage: float = 0.0
-##圈伤害的结算间隔(秒)
-const ZONE_DAMAGE_INTERVAL: float = 0.5
-##下一次圈伤害的时间点
-var _next_damage_at: float = 0.0
-
 ##下一个脉冲的时间点(相对 _elapsed)
 var _next_pulse_at: float = 0.0
 ##最近一次脉冲的时间点，用来画脉冲闪光
@@ -60,13 +53,6 @@ func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attrib
 	duration = burst_duration
 	attributes = burst_attributes
 	exempt_target = exempt
-	# ===== AI 修改开始 (圈伤害由属性决定，没有就是 0) =====
-	zone_damage = 0.0
-	for attribute: AlchemicalData in attributes:
-		if attribute != null and attribute.has_method("zone_damage_total"):
-			zone_damage += maxf(float(attribute.call("zone_damage_total")), 0.0)
-	_next_damage_at = 0.0
-	# ===== AI 修改结束 =====
 	global_position = at
 	if _shape != null:
 		_shape.radius = maxf(radius, 1.0)
@@ -117,12 +103,7 @@ func _pulse() -> void:
 	if not _started:
 		return
 	_last_pulse_at = _elapsed
-	var bodies: Array = _query_bodies()
-
-	_apply_to(bodies)
-	# ===== AI 修改开始 (作用圈本身造成伤害) =====
-	_apply_zone_damage(bodies)
-	# ===== AI 修改结束 =====
+	_apply_to(_query_bodies())
 
 
 
@@ -182,39 +163,6 @@ func _is_exempt(target: Node) -> bool:
 	if exempt_target == null or not is_instance_valid(exempt_target):
 		return false
 	return target == exempt_target or exempt_target.is_ancestor_of(target)
-
-
-# ===== AI 修改开始 (作用圈伤害结算) =====
-##作用圈本身造成的伤害：按 ZONE_DAMAGE_INTERVAL 定时对圈内目标各结算一次。
-##伤害没有攻击者（不参与吸血/反伤）；护己的使用者不会被自己的圈伤到。
-func _apply_zone_damage(bodies: Array) -> void:
-	if zone_damage <= 0.0 or _elapsed < _next_damage_at:
-		return
-	_next_damage_at += ZONE_DAMAGE_INTERVAL
-	for body: Variant in bodies:
-		var target: Node = body as Node
-		if target == null or _is_exempt(target):
-			continue
-		_deal_zone_damage(target)
-
-
-func _deal_zone_damage(target: Node) -> void:
-	#玩家走 take_damage：要过升级卡/防御/吸收那条管线
-	if target is PlayerCharacter:
-		(target as PlayerCharacter).take_damage(zone_damage)
-		return
-
-	var health: Node = target.get_node_or_null("Health")
-
-	if health == null or not health.has_method("receive_hit"):
-		return
-	var hit: CombatHit = CombatHit.new()
-
-	hit.damage = zone_damage
-	if target is Node2D:
-		hit.position = (target as Node2D).global_position
-	health.call("receive_hit", hit)
-# ===== AI 修改结束 =====
 
 
 
