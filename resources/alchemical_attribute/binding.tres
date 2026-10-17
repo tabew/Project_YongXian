@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="BindingAttribute" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="BindingAttribute" format=3 uid="uid://bnjkauj6quf5t"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/binding.gd" id="1_attribute"]
+[ext_resource type="Script" uid="uid://v5a86h3e711h" path="res://scripts/alchemical_attribute/binding.gd" id="1_attribute"]
+[ext_resource type="Resource" uid="uid://bgl53husyuo2q" path="res://resources/buffs/solid.tres" id="1_xfdm3"]
 
 [resource]
 script = ExtResource("1_attribute")
 attribute_id = 5
 name = "固结"
-max_level = 0
 can_be_interacted_attribute = Array[int]([10, 7])

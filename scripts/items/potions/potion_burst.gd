@@ -25,6 +25,11 @@ const MIN_PULSE_INTERVAL: float = 0.05
 ##护己效果作用对象，只吃正面效果
 var exempt_target: Node = null
 
+##周期性作用于圈自身的属性（例如雷的落雷）：按属性自报的间隔在圈心触发
+var _zone_effects: Array[AlchemicalData] = []
+##每个这类属性下一次触发的时间点(相对 _elapsed)，每个圈各自持有
+var _zone_next: Dictionary = {}
+
 ##下一个脉冲的时间点(相对 _elapsed)
 var _next_pulse_at: float = 0.0
 ##最近一次脉冲的时间点，用来画脉冲闪光
@@ -53,6 +58,17 @@ func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attrib
 	duration = burst_duration
 	attributes = burst_attributes
 	exempt_target = exempt
+	#护己的使用者记在圈上
+	if exempt_target != null:
+		set_meta(SelfExempt.EXEMPT_META, exempt_target)
+	#周期性作用于圈自身的属性，圈里有没有生物都会触发，触发点在圈心
+	_zone_effects.clear()
+	_zone_next.clear()
+
+	for attribute: AlchemicalData in attributes:
+		if attribute != null and attribute.has_method("zone_interval"):
+			_zone_effects.append(attribute)
+			_zone_next[attribute.get_instance_id()] = 0.0
 	global_position = at
 	if _shape != null:
 		_shape.radius = maxf(radius, 1.0)
@@ -104,6 +120,24 @@ func _pulse() -> void:
 		return
 	_last_pulse_at = _elapsed
 	_apply_to(_query_bodies())
+	_tick_zone_effects()
+
+
+##圈自身的周期性效果，按每个圈自己的计时触发
+func _tick_zone_effects() -> void:
+	for attribute: AlchemicalData in _zone_effects:
+		if attribute == null:
+			continue
+
+		var id: int = attribute.get_instance_id()
+
+		if _elapsed < float(_zone_next.get(id, 0.0)):
+			continue
+
+		var interval: float = maxf(float(attribute.call("zone_interval")), MIN_PULSE_INTERVAL)
+
+		_zone_next[id] = _elapsed + interval
+		attribute.use_effect(self)
 
 
 
@@ -142,6 +176,8 @@ func _apply_attributes(target: Node, for_self: bool) -> void:
 
 	for attribute: AlchemicalData in attributes:
 		if attribute == null or not attribute.has_method("use_effect"):
+			continue
+		if attribute.has_method("zone_interval"):
 			continue
 		if split:
 			if for_self and not attribute.is_positive_effect():

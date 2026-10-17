@@ -33,6 +33,15 @@ func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[Alchemi
 					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.VULNERABLE, level))
 
 
+			AlchemicalAttributeList.ATTRIBUTE.SWIFT:
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.THUNDER, level))
+
+
+
 		break
 	return result
 

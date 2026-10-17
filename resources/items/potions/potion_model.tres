@@ -3,18 +3,12 @@
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="1_n78tq"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_5tjeu"]
 [ext_resource type="Script" uid="uid://bo7jexboonb66" path="res://scripts/items/potions/potion_data.gd" id="3_2y2yk"]
-[ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="3_k670q"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/binding.tres" id="4_8etbr"]
 [ext_resource type="Texture2D" uid="uid://dvka76ih52ueg" path="res://assets/items/potions/potion_default.png" id="4_potion"]
-[ext_resource type="Resource" uid="uid://8ugmywcuoule" path="res://resources/alchemical_attribute/continuous_heal.tres" id="5_aqqec"]
-[ext_resource type="Resource" uid="uid://tvv30e84ixy7" path="res://resources/alchemical_attribute/fortify.tres" id="6_vgdl5"]
-[ext_resource type="Resource" uid="uid://i57ovpqcwurd" path="res://resources/alchemical_attribute/guard.tres" id="7_qdjuu"]
-[ext_resource type="Resource" uid="uid://dpnt6e0sku66d" path="res://resources/alchemical_attribute/lifesteal.tres" id="8_avo6g"]
-[ext_resource type="Resource" uid="uid://h1c8y2alrnnn" path="res://resources/alchemical_attribute/powerful.tres" id="9_aqqec"]
-[ext_resource type="Resource" uid="uid://dnmf43q3qyiwl" path="res://resources/alchemical_attribute/swift.tres" id="10_ni3ce"]
-[ext_resource type="Resource" uid="uid://dfrxptdcjp3ae" path="res://resources/alchemical_attribute/self_exempt.tres" id="10_vgdl5"]
-[ext_resource type="Resource" uid="uid://dwhsxyrom4sho" path="res://resources/alchemical_attribute/thorns.tres" id="11_hi73l"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/weakness.tres" id="7_5er28"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/thunder.tres" id="12_aqqec"]
 [ext_resource type="Resource" uid="uid://bhhq45ferenin" path="res://resources/alchemical_attribute/vulnerable.tres" id="13_qdjuu"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/fire.tres" id="13_vgdl5"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/linger.tres" id="14_qdjuu"]
 [ext_resource type="Resource" uid="uid://culll21xgf8xm" path="res://resources/alchemical_attribute/explosive.tres" id="14_vgdl5"]
 
 [resource]
@@ -23,6 +17,6 @@ id = 300
 name = "药水"
 texture = ExtResource("4_potion")
 max_stack = 1
-alchemical_attribute = Array[ExtResource("1_n78tq")]([ExtResource("4_8etbr"), ExtResource("5_aqqec"), ExtResource("6_vgdl5"), ExtResource("7_qdjuu"), ExtResource("3_k670q"), ExtResource("8_avo6g"), ExtResource("9_aqqec"), ExtResource("10_vgdl5"), ExtResource("10_ni3ce"), ExtResource("11_hi73l"), ExtResource("13_qdjuu"), ExtResource("14_vgdl5")])
+alchemical_attribute = Array[ExtResource("1_n78tq")]([ExtResource("14_vgdl5"), ExtResource("12_aqqec"), ExtResource("13_vgdl5"), ExtResource("14_qdjuu"), ExtResource("13_qdjuu"), ExtResource("7_5er28")])
 item_scene_path = "uid://b3pw5ub0dbcpo"
 metadata/_custom_type_script = "uid://bo7jexboonb66"
