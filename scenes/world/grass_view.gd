@@ -133,15 +133,11 @@ func set_split(world_y: float) -> void:
 		z_index = BACK_Z if next == Layer.BACK else FRONT_Z
 		if next == Layer.SPLIT:
 			_ensure_back()
-		queue_redraw()
-		if _back != null and is_instance_valid(_back):
-			_back.queue_redraw()
+		_mark_dirty()
 		return
 	# 同一层里只有真的跨过了某簇草根才需要重绘，走直线时不会每帧重画。
 	if next == Layer.SPLIT and _crosses_split(low, high):
-		queue_redraw()
-		if _back != null and is_instance_valid(_back):
-			_back.queue_redraw()
+		_mark_dirty()
 
 
 ## 本块相对分割线落在哪一层。
@@ -174,9 +170,7 @@ func update_focus(feet_y: float, focus_rect: Rect2) -> void:
 		_layer = Layer.FRONT
 		z_index = FRONT_Z
 		split_y = -INF
-		queue_redraw()
-		if _back != null and is_instance_valid(_back):
-			_back.queue_redraw()
+		_mark_dirty()
 	split_y = feet_y
 	var next: int = Layer.FRONT
 	if not _positions.is_empty() and _y_max < feet_y:
@@ -279,7 +273,7 @@ func populate(chunk_data: ChunkData, chunk_coords: Vector2i) -> void:
 				_y_min = minf(_y_min, clump["position"].y)
 				_y_max = maxf(_y_max, clump["position"].y)
 	_populated = true
-	queue_redraw()
+	_mark_dirty()
 
 
 ## 武器形状（世界坐标多边形）掠过时清除范围内的草丛，返回新清除的簇数。
@@ -312,8 +306,52 @@ func cut_area(points: PackedVector2Array) -> int:
 			GrassCutEffect.spawn(self, at, float(_tints[index]) / 255.0)
 			effects += 1
 	if cut > 0:
-		queue_redraw()
+		# 后层节点也在画这批草，只重绘自己会留下残影。
+		_mark_dirty()
 	return cut
+
+
+## 内容变了：前后两层都要重绘（后层只在跨线时存在）。
+func _mark_dirty() -> void:
+	queue_redraw()
+	if _back != null and is_instance_valid(_back):
+		_back.queue_redraw()
+
+
+## 用一块圆形范围清除草丛（闪电、爆炸、药水等范围效果用）。
+## 与武器共用同一份清除记录，切过的草不会补刷。
+static func clear_circle(center: Vector2, radius: float) -> int:
+	if radius <= 0.0:
+		return 0
+	var safe_radius: float = maxf(radius, 1.0)
+	var steps: int = 12
+	var points := PackedVector2Array()
+	points.resize(steps)
+	for index: int in steps:
+		var angle: float = TAU * float(index) / float(steps)
+		points[index] = center + Vector2(cos(angle), sin(angle)) * safe_radius
+	var cut: int = 0
+	for node: Node in views_in_rect(
+		Rect2(center - Vector2.ONE * safe_radius, Vector2.ONE * safe_radius * 2.0)
+	):
+		var view := node as GrassView
+		if view == null or not view.is_visible_in_tree():
+			continue
+		cut += view.cut_area(points)
+	if cut > 0:
+		_play_cut_sfx(center)
+	return cut
+
+
+## 音频管理器是自动加载单例：用运行期查找而不是全局标识符，
+## 这样本脚本仍能作为 --script 单元测试的编译依赖被加载。
+static func _play_cut_sfx(at: Vector2) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var manager: Node = tree.root.get_node_or_null("AudioManager")
+	if manager != null:
+		manager.call("play_sfx", &"cut_grass", at)
 
 
 ## 落在矩形内的所有草丛块；武器按形状包围盒取，通常只有 1-4 块。

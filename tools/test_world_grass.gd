@@ -45,6 +45,7 @@ func _run() -> void:
 	_test_determinism()
 	_test_cut_queries_stay_local()
 	_test_player_sorting()
+	_test_area_clear()
 	await _test_weapon_cut()
 	await _test_live_world()
 	print("WORLD_GRASS: checks=%d failures=%d" % [_checks, _failures])
@@ -163,9 +164,48 @@ func _test_player_sorting() -> void:
 	_check(view._layer == GrassView.Layer.FRONT, "cell_below_the_feet_draws_in_front_of_the_player")
 	_check(view.z_index == GrassView.FRONT_Z, "front_cell_uses_the_front_layer")
 	_check(view.above_split_count() == 0, "front_cell_leaves_nothing_behind")
+	# 后层（脚底以上）的草被武器清掉时也要立刻从画面消失，不能等人动一下。
+	view.set_split((low + high) * 0.5)
+	var above_before: int = view.above_split_count()
+	var above_pos: Vector2 = Vector2.INF
+	for index: int in view._positions.size():
+		if view._cleared.has(Vector2i(view._key_x[index], view._key_y[index])):
+			continue
+		if view._positions[index].y < view.split_y:
+			above_pos = view._positions[index]
+			break
+	if above_pos != Vector2.INF:
+		_check(
+			view.cut_area(_square(above_pos)) >= 1,
+			"weapon_can_cut_grass_drawn_by_the_back_layer"
+		)
+		_check(
+			view.above_split_count() < above_before,
+			"back_layer_clump_is_gone_right_after_the_cut"
+		)
 	# 回到默认：-INF 表示没有角色。
 	view.set_split(-INF)
 	_check(view._layer == GrassView.Layer.FRONT, "reset_puts_grass_back_in_front")
+	_free_view(view)
+
+
+## 范围效果（闪电、爆炸、药水圈）也能清草，且切过的不补刷。
+func _test_area_clear() -> void:
+	var generator := WorldGenerator.new(TEST_SEED)
+	var spec: MapSpec = generator.map_specs()[0]
+	var context: GrassContext = GrassContext.create(generator, spec, {})
+	var found: Dictionary = _grassy_cell(generator, spec, context, {}, 3)
+	_check(not found.is_empty(), "area_clear_needs_a_grassy_cell")
+	if found.is_empty():
+		return
+	var view: GrassView = found["view"]
+	var before: int = view.live_clumps()
+	var center: Vector2 = view._positions[0]
+	var cut: int = GrassView.clear_circle(center, 20.0)
+	_check(cut >= 1, "area_effect_clears_grass_in_a_circle")
+	_check(view.live_clumps() < before, "area_effect_reduces_live_clumps")
+	_check(GrassView.clear_circle(center, 20.0) == 0, "area_effect_does_not_recut_the_same_grass")
+	_check(GrassView.clear_circle(center, 0.0) == 0, "area_effect_ignores_empty_radius")
 	_free_view(view)
 
 

@@ -27,6 +27,8 @@ func strike(at: Vector2, amount: float, strike_radius: float, exempt: Node = nul
 	_left = flash_seconds
 	_roll_bolt()
 	_deal_damage(exempt)
+	# 雷落在草地上会烧掉一片草。
+	GrassView.clear_circle(global_position, radius)
 	queue_redraw()
 
 

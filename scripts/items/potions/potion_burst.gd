@@ -73,6 +73,8 @@ func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attrib
 	if _shape != null:
 		_shape.radius = maxf(radius, 1.0)
 	_started = true
+	# 药水圈落在草地上时先把圈内的草清掉（圈是静止的，清一次就够）。
+	GrassView.clear_circle(at, radius)
 	_elapsed = 0.0
 	
 	#生成时就在圈里的目标先结算：Area2D 的重叠要等物理帧同步，这里直接查一次更稳

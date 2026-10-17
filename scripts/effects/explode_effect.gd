@@ -40,6 +40,8 @@ func detonate(radius: float, enemy_damage: float, player_damage: float, knockbac
 	_hit_hurtboxes(enemy_damage, knockback, hit_mask, _resolve_source(source), edge_scale, falloff_power)
 	_hit_player(player_damage, knockback, edge_scale, falloff_power)
 	_play_visual(radius)
+	# 爆炸范围内的草一并清掉。
+	GrassView.clear_circle(global_position, radius)
 
 
 ##获取排除目标函数，目前只有护己属性会有排除目标返回
