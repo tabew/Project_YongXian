@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_i3nbe"]
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/rage.png" id="1_i4he3"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_i4he3"]
+
+[sub_resource type="Resource" id="Resource_c1yos"]
+script = ExtResource("1_i3nbe")
+stat = &"crit_chance"
+value = 0.1
+value_per_level = 0.04
+
+[resource]
+script = ExtResource("2_i4he3")
+id = &"rage"
+display_name = "暴怒"
+description = "出手的暴击率提高，持续 8 秒。"
+icon = ExtResource("1_i4he3")
+duration = 8.0
+modifiers = Array[ExtResource("1_i3nbe")]([SubResource("Resource_c1yos")])

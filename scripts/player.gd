@@ -63,6 +63,10 @@ var damage_taken: float = 1.0
 var damage_dealt: float = 1.0
 ##吸血比例：造成伤害时按这个比例回血（0 = 不吸血）
 var lifesteal: float = 0.0
+##暴击率加成：0 表示不加成，暴怒 buff 会提高它（武器结算时叠加）
+var crit_chance: float = 0.0
+##攻击速度加成：0 表示正常，敏捷 buff 会提高它（出手阶段按 1+它 加快）
+var attack_speed: float = 0.0
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -359,6 +363,10 @@ func read_stat(stat: StringName) -> float:
 			return damage_dealt
 		&"lifesteal":
 			return lifesteal
+		&"crit_chance":
+			return crit_chance
+		&"attack_speed":
+			return attack_speed
 		&"max_health":
 			return base_max_health
 	return 0.0
@@ -380,6 +388,10 @@ func apply_stat(stat: StringName, value: float) -> void:
 			damage_dealt = value
 		&"lifesteal":
 			lifesteal = value
+		&"crit_chance":
+			crit_chance = value
+		&"attack_speed":
+			attack_speed = value
 		&"max_health":
 			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
 			base_max_health = maxf(value, 1.0)

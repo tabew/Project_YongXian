@@ -104,7 +104,13 @@ func try_attack() -> bool:
 
 
 func _on_attack_finished() -> void:
-	_cooldown = _attack.definition.reuse_delay
+	# 敏捷这类加成也会缩短收招后的硬直
+	var speed: float = 1.0
+	var actor: Node = get_parent()
+
+	if actor != null and actor.has_method("read_stat"):
+		speed = 1.0 + maxf(float(actor.call("read_stat", &"attack_speed")), 0.0)
+	_cooldown = _attack.definition.reuse_delay / maxf(speed, 0.1)
 	_attack = null
 	attack_finished.emit()
 

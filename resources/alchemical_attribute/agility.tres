@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Agility" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/agility.gd" id="1_agility"]
+[ext_resource type="Resource" path="res://resources/buffs/agility.tres" id="2_agility_buff"]
+
+[resource]
+script = ExtResource("1_agility")
+attribute_id = 25
+name = "敏捷"
+max_level = 3
+can_be_interacted_attribute = Array[int]([])
+buff = ExtResource("2_agility_buff")

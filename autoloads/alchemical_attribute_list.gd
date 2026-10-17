@@ -29,6 +29,8 @@ enum ATTRIBUTE
 	ABSORB = 21,
 	LINGER = 22,
 	THUNDER = 23,
+	RAGE = 24,
+	AGILITY = 25,
 }
 
 
@@ -61,7 +63,9 @@ enum ATTRIBUTE
 	# ===== AI 修改开始 (滞留) =====
 	preload("res://resources/alchemical_attribute/linger.tres"),
 	# ===== AI 修改结束 =====
-	preload("res://resources/alchemical_attribute/thunder.tres")
+	preload("res://resources/alchemical_attribute/thunder.tres"),
+	preload("res://resources/alchemical_attribute/rage.tres"),
+	preload("res://resources/alchemical_attribute/agility.tres")
 ]
 
 ##id -> 模板
