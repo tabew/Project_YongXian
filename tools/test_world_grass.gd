@@ -44,6 +44,7 @@ func _run() -> void:
 	_test_region_population(generator, generator.map_specs()[0])
 	_test_determinism()
 	_test_cut_queries_stay_local()
+	_test_player_sorting()
 	await _test_weapon_cut()
 	await _test_live_world()
 	print("WORLD_GRASS: checks=%d failures=%d" % [_checks, _failures])
@@ -127,6 +128,45 @@ func _count_clumps(generator: WorldGenerator, spec: MapSpec) -> int:
 				generator.world_seed, generator.variant, generator.sample_terrain(tile), tile
 			).size()
 	return clumps
+
+
+## 逐簇前后关系：脚底以上的草在人物背后、以下的在人物前面，跨线的那块拆成两层。
+func _test_player_sorting() -> void:
+	var generator := WorldGenerator.new(TEST_SEED)
+	var spec: MapSpec = generator.map_specs()[0]
+	var context: GrassContext = GrassContext.create(generator, spec, {})
+	var found: Dictionary = _grassy_cell(generator, spec, context, {}, 2)
+	_check(not found.is_empty(), "sorting_needs_a_grassy_cell")
+	if found.is_empty():
+		return
+	var view: GrassView = found["view"]
+	var low: float = view._y_min
+	var high: float = view._y_max
+	# 没有角色时全部画在前面，保持旧的"草盖住人"表现。
+	_check(view._layer == GrassView.Layer.FRONT, "without_a_player_all_grass_is_in_front")
+	# 脚底落在这块中间：上半部分交给后层，下半部分留在这里。
+	view.set_split((low + high) * 0.5)
+	_check(view._layer == GrassView.Layer.SPLIT, "cell_straddling_the_feet_uses_two_layers")
+	_check(view._back != null, "straddling_cell_spawns_a_back_layer")
+	_check(view.z_index == GrassView.FRONT_Z, "front_half_stays_in_front_of_the_player")
+	_check(
+		view.above_split_count() > 0 and view.below_split_count() > 0,
+		"split_puts_clumps_on_both_sides"
+	)
+	# 脚底在这块下面：整块都在人物后面，人踩在草上。
+	view.set_split(high + 1.0)
+	_check(view._layer == GrassView.Layer.BACK, "cell_above_the_feet_draws_behind_the_player")
+	_check(view.z_index == GrassView.BACK_Z, "behind_cell_uses_the_back_layer")
+	_check(view.below_split_count() == 0, "behind_cell_leaves_nothing_in_front")
+	# 脚底在这块上面：整块都在人物前面，草盖住人。
+	view.set_split(low - 1.0)
+	_check(view._layer == GrassView.Layer.FRONT, "cell_below_the_feet_draws_in_front_of_the_player")
+	_check(view.z_index == GrassView.FRONT_Z, "front_cell_uses_the_front_layer")
+	_check(view.above_split_count() == 0, "front_cell_leaves_nothing_behind")
+	# 回到默认：-INF 表示没有角色。
+	view.set_split(-INF)
+	_check(view._layer == GrassView.Layer.FRONT, "reset_puts_grass_back_in_front")
+	_free_view(view)
 
 
 ## 两个同种子生成器对同一小块必须给出完全一致的草丛。
@@ -352,16 +392,10 @@ func _test_live_world() -> void:
 	_check(cells > 0, "live_world_grows_grass_views_around_the_player")
 	# 关键性能回归：进图只排队，不再同步把整图的草算完。
 	_check(cells < _map_cell_count(spec), "grass_is_not_generated_for_the_whole_map_on_entry")
-	# 草层必须高于角色，才能在画面上盖住人和怪。
+	# 玩家出生在小屋内（不长草），先挪到最近的一簇草上。
 	var views: Array = GrassView.views_in_rect(
 		Rect2(Vector2(spec.origin) * 16.0, Vector2(spec.extent) * 16.0)
 	)
-	var covered: bool = not views.is_empty()
-	for node: Node in views:
-		if ((node as GrassView).get_parent() as Node2D).z_index <= world.player.z_index:
-			covered = false
-	_check(covered, "grass_layer_renders_above_the_player")
-	# 玩家出生在小屋内（不长草），挪到最近的一簇草上再测挥砍。
 	var spot: Vector2 = Vector2.INF
 	var best: float = INF
 	for node: Node in views:
@@ -375,6 +409,21 @@ func _test_live_world() -> void:
 				best = distance
 				spot = at
 	_check(spot != Vector2.INF, "live_world_has_a_clump_inside_the_arena")
+	# 逐簇前后关系：脚底以下的草盖住人物，脚底以上的草被人物踩住。
+	world.player.global_position = spot
+	world._update_grass_split()
+	var in_front: int = 0
+	var behind: int = 0
+	for node: Node in GrassView.views_in_rect(
+		Rect2(world.player.global_position - Vector2.ONE * 300.0, Vector2.ONE * 600.0)
+	):
+		var view := node as GrassView
+		if view.z_index >= GrassView.FRONT_Z:
+			in_front += 1
+		else:
+			behind += 1
+	_check(in_front > 0, "grass_below_the_feet_draws_in_front_of_the_player")
+	_check(behind > 0, "grass_above_the_feet_draws_behind_the_player")
 	# 用挥砍形状连扫 400 次：只查邻近小块，总耗时必须很小。
 	var attack: Node2D = load(WEAPON_SCENES[0]).instantiate() as Node2D
 	root.add_child(attack)

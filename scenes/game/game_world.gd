@@ -48,8 +48,11 @@ var _nearby_pickup: GroundPickup = null
 var _nearby_chest: WorldChest = null
 var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
-## 草丛层高于角色与怪物（0），低于武器与怪物血条（2）。
-const GRASS_Z_INDEX: int = 1
+## 草层容器本身压在地形之上：每个草块再按人物脚底决定画在前还是后（0 / 1），
+## 武器与怪物血条在 2，永远在草之上。
+const GRASS_LAYER_Z: int = 0
+## 分割线只更新屏幕附近的草块，视野外多留一圈。
+const GRASS_SPLIT_MARGIN: float = 480.0
 ## 草丛只生成玩家周围这个区块半径内的小块，走一步补一片。
 ## 视野在缩放 2 倍时约 1.3x0.7 个区块，1 圈足够盖住屏幕还留出余量。
 const GRASS_RADIUS_CHUNKS: int = 1
@@ -71,6 +74,8 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	# 草丛按预算长出来；转场黑屏期间也在推进，这样淡入时身边已经长好。
 	_process_grass_queue()
+	# 与角色的前后关系依赖角色位置，同样在转场期间保持更新。
+	_update_grass_split()
 	if _generator == null or player.active_map == null or _transitioning:
 		return
 	_sync_training_dummy()
@@ -405,6 +410,10 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 			pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 			entity_root.add_child(pickup)
 		_material_maps[spec.node_id] = true
+	# 结构画在草后面：草层要排在实体层之后、角色之前。
+	var grass_root: Node2D = _grass_roots.get(spec.node_id)
+	if grass_root != null:
+		move_child(grass_root, player.get_index())
 	_sync_layer_visibility()
 
 
@@ -529,17 +538,44 @@ func _grow_grass_cell(spec: MapSpec, cell: Vector2i, chunk_coords: Vector2i) -> 
 	return true
 
 
-## 每张地图一层草丛，z 高于角色与怪物，高草因此能盖住人和怪。
+## 每张地图一层草丛容器：草块自己的 z 由 GrassView 按人物脚底逐块决定。
 func _grass_root(map_node_id: int) -> Node2D:
 	if _grass_roots.has(map_node_id):
 		return _grass_roots[map_node_id]
 	var root := Node2D.new()
 	root.name = "GrassLayer_%d" % map_node_id
-	root.z_index = GRASS_Z_INDEX
+	root.z_index = GRASS_LAYER_Z
 	root.visible = map_node_id == _current_node
 	add_child(root)
+	# 放在角色之前：z=0 的草块因此画在角色背后，z=1 的画在角色前面。
+	move_child(root, player.get_index())
 	_grass_roots[map_node_id] = root
 	return root
+
+
+## 每帧把视野内草块的分割线更新成人物脚底：
+## 脚底以上的草盖住人物，脚底以下的草被人物踩住。
+func _update_grass_split() -> void:
+	if _generator == null or player.active_map == null:
+		return
+	var feet: float = player.global_position.y + _player_feet_offset()
+	var area := Rect2(
+		player.global_position - Vector2.ONE * GRASS_SPLIT_MARGIN,
+		Vector2.ONE * GRASS_SPLIT_MARGIN * 2.0
+	)
+	for node: Node in GrassView.views_in_rect(area):
+		var view := node as GrassView
+		if view == null or not view.is_visible_in_tree():
+			continue
+		view.set_split(feet)
+
+
+## 角色最低处（精灵底边）相对原点的偏移；换角色贴图时会自动跟着变。
+func _player_feet_offset() -> float:
+	var sprite: Sprite2D = player.sprite
+	if sprite == null:
+		return float(WorldGenerator.TILE_SIZE) * 0.5
+	return sprite.get_rect().end.y * absf(sprite.scale.y)
 
 
 ## 过场动画期间提前准备下一张箱庭：材料点位、草丛排除区与到达点周围的草丛。

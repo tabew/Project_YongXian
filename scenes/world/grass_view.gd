@@ -34,6 +34,12 @@ const PALETTES: Array = [
 ## 格坐标 -> [GrassView]。武器用包围盒直接定位邻近的块，不遍历整棵树的节点。
 static var _cells: Dictionary = {}
 
+## 相对角色的绘制层级：整块在脚底以上就在角色背后，以下就在角色前面。
+const BACK_Z: int = 0
+const FRONT_Z: int = 1
+## 本块草与人物脚底分割线的关系。
+enum Layer { BACK = 0, FRONT = 1, SPLIT = 2 }
+
 var _cell: Vector2i = Vector2i.ZERO
 ## 本块可长草的实际范围（与地图矩形求交）。
 var _rect: Rect2i = Rect2i()
@@ -52,6 +58,15 @@ var _tints: PackedByteArray = PackedByteArray()
 var _palettes: PackedByteArray = PackedByteArray()
 var _blade_seeds: PackedInt32Array = PackedInt32Array()
 var _populated: bool = false
+## 本块所有草根的 Y 范围，用来快速判断分割线有没有穿过本块。
+var _y_min: float = INF
+var _y_max: float = -INF
+## 人物脚底的世界 Y：比它靠上的草画在人物后面，靠下的画在前面。
+## 负无穷表示"还没有角色"，全部画在前面（也就是旧的"草一直盖住人"）。
+var split_y: float = -INF
+var _layer: int = Layer.FRONT
+## 被分割线穿过时，上半部分交给这个兄弟节点绘制（画在角色背后）。
+var _back: Node2D = null
 
 
 func bind(
@@ -67,6 +82,7 @@ func bind(
 	_context = context
 	_cleared = cleared
 	position = Vector2(cell * CELL_TILES) * float(WorldGenerator.TILE_SIZE)
+	z_index = FRONT_Z
 	_register_cell()
 
 
@@ -80,6 +96,9 @@ func _exit_tree() -> void:
 	bucket.erase(self)
 	if bucket.is_empty():
 		_cells.erase(_cell)
+	if _back != null and is_instance_valid(_back):
+		_back.queue_free()
+		_back = null
 
 
 func is_populated() -> bool:
@@ -93,6 +112,98 @@ func live_clumps() -> int:
 		if not _cleared.has(Vector2i(_key_x[index], _key_y[index])):
 			live += 1
 	return live
+
+
+# ------------------------------------------------------------ 与角色的前后关系
+
+## 按人物脚底的世界 Y 决定本块的绘制层级：
+## 整块在脚底以上 -> 整块画在角色背后（人踩在草上）；整块在脚底以下 -> 画在角色前面。
+## 只有被脚底分割线穿过的那一块，才把上半部分交给后层节点，保证逐簇排序。
+func set_split(world_y: float) -> void:
+	if world_y == split_y:
+		return
+	var low: float = minf(world_y, split_y)
+	var high: float = maxf(world_y, split_y)
+	split_y = world_y
+	var next: int = layer_for(world_y)
+	if next != _layer:
+		_layer = next
+		z_index = BACK_Z if next == Layer.BACK else FRONT_Z
+		if next == Layer.SPLIT:
+			_ensure_back()
+		queue_redraw()
+		if _back != null and is_instance_valid(_back):
+			_back.queue_redraw()
+		return
+	# 同一层里只有真的跨过了某簇草根才需要重绘，走直线时不会每帧重画。
+	if next == Layer.SPLIT and _crosses_split(low, high):
+		queue_redraw()
+		if _back != null and is_instance_valid(_back):
+			_back.queue_redraw()
+
+
+## 本块相对分割线落在哪一层。
+func layer_for(world_y: float) -> int:
+	if _positions.is_empty():
+		return Layer.FRONT
+	if _y_max < world_y:
+		return Layer.BACK
+	if _y_min >= world_y:
+		return Layer.FRONT
+	return Layer.SPLIT
+
+
+func _crosses_split(low: float, high: float) -> bool:
+	if high < _y_min or low > _y_max:
+		return false
+	for index: int in _positions.size():
+		var at: float = _positions[index].y
+		if at >= low and at < high:
+			return true
+	return false
+
+
+## 跨线时才建后层兄弟节点；它没有脚本，只在 draw 信号里发绘制命令。
+func _ensure_back() -> void:
+	if _back != null and is_instance_valid(_back):
+		return
+	var parent: Node = get_parent()
+	if parent == null:
+		return
+	_back = Node2D.new()
+	_back.name = "%s_back" % name
+	_back.position = position
+	_back.z_index = BACK_Z
+	_back.draw.connect(_draw_back_items)
+	parent.add_child(_back)
+
+
+## 后层节点：只画分割线以上的草（这些草盖住站着的人物）。
+func _draw_back_items() -> void:
+	if _layer != Layer.SPLIT or _back == null:
+		return
+	for index: int in _positions.size():
+		if _cleared.has(Vector2i(_key_x[index], _key_y[index])):
+			continue
+		if _positions[index].y >= split_y:
+			continue
+		draw_clump_into(_back, index)
+
+
+## 分割线以下还没被清除的簇数（测试与调试用）。
+func below_split_count() -> int:
+	var count: int = 0
+	for index: int in _positions.size():
+		if _cleared.has(Vector2i(_key_x[index], _key_y[index])):
+			continue
+		if _positions[index].y >= split_y:
+			count += 1
+	return count
+
+
+## 分割线以上还没被清除的簇数（测试与调试用）。
+func above_split_count() -> int:
+	return maxi(live_clumps() - below_split_count(), 0)
 
 
 ## 用区块数据生成这一块的草丛：只长地图范围内的自然地面、避开排除区。
@@ -127,6 +238,8 @@ func populate(chunk_data: ChunkData, chunk_coords: Vector2i) -> void:
 				_tints.append(int(round(float(clump["tint"]) * 255.0)))
 				_palettes.append(clump["palette"])
 				_blade_seeds.append(clump["blade_seed"])
+				_y_min = minf(_y_min, clump["position"].y)
+				_y_max = maxf(_y_max, clump["position"].y)
 	_populated = true
 	queue_redraw()
 
@@ -194,16 +307,21 @@ func _register_cell() -> void:
 
 
 func _draw() -> void:
+	# 被人物脚底分割线穿过时，脚底以上的部分交给后层节点，这里只画前面的。
+	var splitting: bool = _layer == Layer.SPLIT
 	for index: int in _positions.size():
 		if _cleared.has(Vector2i(_key_x[index], _key_y[index])):
 			continue
-		_draw_clump(index)
+		if splitting and _positions[index].y < split_y:
+			continue
+		draw_clump_into(self, index)
 
 
 ## 一丛草：根部阴影加 5-8 片叶子。叶子从同一个根心长出、叶尖向外散开，
 ## 组合起来才像"一簇草"；叶片用顶点色做根深尖浅的渐变。
-func _draw_clump(index: int) -> void:
-	var base: Vector2 = to_local(_positions[index])
+## 绘制命令必须发在正在绘制的那个节点上，所以这里显式传入 item。
+func draw_clump_into(item: CanvasItem, index: int) -> void:
+	var base: Vector2 = _positions[index] - position
 	var scale: float = _scales[index]
 	var tint: float = float(_tints[index]) / 255.0
 	var palette: Array = PALETTES[_palettes[index]]
@@ -217,7 +335,7 @@ func _draw_clump(index: int) -> void:
 	var tip_reach: float = lerpf(5.0, 8.5, tint) * scale
 	var count: int = WorldGrass.blade_count(_shapes[index])
 	var state: int = _blade_seeds[index]
-	draw_rect(
+	item.draw_rect(
 		Rect2(base.x - root_radius - 1.5, base.y - 1.0, (root_radius + 1.5) * 2.0, 2.5),
 		SHADOW
 	)
@@ -248,4 +366,4 @@ func _draw_clump(index: int) -> void:
 		blade_points[1] = tip
 		blade_points[2] = Vector2(root_x + half, base.y)
 		blade_colors[1] = body_color.lerp(tip_color, clampf(light * 0.35 + ratio * 0.65, 0.0, 1.0))
-		draw_polygon(blade_points, blade_colors)
+		item.draw_polygon(blade_points, blade_colors)
