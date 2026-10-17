@@ -202,13 +202,8 @@ func _build_water(rng: RandomNumberGenerator) -> void:
 				continue
 			ponds.append_array(PackedFloat32Array([point.x, point.y, rx, ry]))
 			break
-	if rng.randf() < 0.35:
-		river_width = rng.randf_range(1.2, 2.2)
-		river_phase = rng.randf_range(0.0, TAU)
-		river_amplitude = rng.randf_range(2.0, 4.0)
-		# 完整河带离出生点至少约 20 格，出生点不会恰好落在桥面。
-		var direction: float = 1.0 if center.y < extent.y * 0.5 else -1.0
-		river_y = center.y + direction * rng.randf_range(26.0, 32.0)
+	# 河流改为世界级水系（WorldGenerator._build_rivers），
+	# 箱庭内不再保留独立河带，避免两套河流互相打架；池塘仍然保留。
 
 
 ## 沼泽主题至少有一处可游荡池塘，避免合法战斗箱庭完全没有鳄鱼栖地。
@@ -293,14 +288,36 @@ func build_roads() -> PackedFloat32Array:
 			_append(data, side_centers[side_index - 1], side_centers[side_index], -1.0)
 		return data
 	var index: int = 0
-	for gate_y: int in west_gates:
-		_append(data, Vector2(0.5, float(gate_y) + 0.5), center, _road_phase(index))
+	# 主干：西门 → 穿过主庭 → 东门，中间两处折点让主路蜿蜒而不是一条直线。
+	var west_y: float = float(west_gates[0]) + 0.5 if not west_gates.is_empty() else center.y
+	var east_y: float = float(east_gates[0]) + 0.5 if not east_gates.is_empty() else center.y
+	var bend: float = (float(shape) - 2.5) * 3.6
+	var trunk: Array[Vector2] = [
+		Vector2(0.5, west_y),
+		Vector2(
+			float(extent.x) * 0.28,
+			clampf(lerpf(west_y, center.y, 0.72) + bend, 6.0, float(extent.y) - 6.0)
+		),
+		center,
+		Vector2(
+			float(extent.x) * 0.72,
+			clampf(lerpf(center.y, east_y, 0.72) - bend * 0.8, 6.0, float(extent.y) - 6.0)
+		),
+		Vector2(float(extent.x) - 0.5, east_y),
+	]
+	for point_index: int in range(1, trunk.size()):
+		_append(data, trunk[point_index - 1], trunk[point_index], _road_phase(index))
 		index += 1
-	for gate_y: int in east_gates:
-		_append(data, center, Vector2(float(extent.x) - 0.5, float(gate_y) + 0.5), _road_phase(index))
+	# 额外的门接在主干两端，形成岔口而不是从主庭放射。
+	for gate_index: int in range(1, west_gates.size()):
+		_append(data, Vector2(0.5, float(west_gates[gate_index]) + 0.5), trunk[1], _road_phase(index))
 		index += 1
+	for gate_index: int in range(1, east_gates.size()):
+		_append(data, trunk[3], Vector2(float(extent.x) - 0.5, float(east_gates[gate_index]) + 0.5), _road_phase(index))
+		index += 1
+	# 侧庭从主干最近点引支路，侧庭之间再互相连通，形成可返回的环路。
 	for side_center: Vector2 in side_centers:
-		_append(data, center, side_center, _road_phase(index))
+		_append(data, _nearest_trunk_point(trunk, side_center), side_center, _road_phase(index))
 		index += 1
 	for side_index: int in range(1, side_centers.size()):
 		_append(data, side_centers[side_index - 1], side_centers[side_index], _road_phase(index))
@@ -308,11 +325,31 @@ func build_roads() -> PackedFloat32Array:
 	return data
 
 
+## 主干折线上离目标最近的点。
+func _nearest_trunk_point(trunk: Array[Vector2], target: Vector2) -> Vector2:
+	var best: Vector2 = trunk[0]
+	var best_distance: float = INF
+	for index: int in range(1, trunk.size()):
+		var a: Vector2 = trunk[index - 1]
+		var b: Vector2 = trunk[index]
+		for step: int in 9:
+			var point: Vector2 = a.lerp(b, float(step) / 8.0)
+			var distance: float = point.distance_squared_to(target)
+			if distance < best_distance:
+				best_distance = distance
+				best = point
+	return best
+
+
 func _road_phase(index: int) -> float:
 	return road_phases[posmod(index, road_phases.size())] if not road_phases.is_empty() else 0.0
 
 
+## 路段写入。短路段不套正弦摆动：8 格振幅压在十来格的短段上会让曲线过陡，
+## 逐格判定与实际曲线偏离，路面出现断口。
 func _append(data: PackedFloat32Array, a: Vector2, b: Vector2, phase: float) -> void:
+	if a.distance_to(b) < 26.0:
+		phase = -1.0
 	data.append_array(PackedFloat32Array([a.x, a.y, b.x, b.y, phase]))
 
 

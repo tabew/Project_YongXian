@@ -22,6 +22,18 @@ const CLIMATE_CONTRAST: float = 1.90
 const WALL_FOOT_WIDTH: float = 3.0
 const WATER_BANK_WIDTH: float = 1.4
 
+## 世界级河流：跨箱庭连续的水系，穿过屏障处形成水峡（仍是阻挡）。
+const RIVER_HALF_WIDTH: float = 1.5
+const RIVER_BANK_WIDTH: float = 2.4
+## 折线采样步长（格）与空间索引网格（格）。
+const RIVER_STEP: float = 5.0
+const RIVER_CELL: int = 32
+## 区内每隔多少格留一段可涉水浅滩，保证河不会把箱庭切成两半。
+const RIVER_FORD_SPAN: float = 28.0
+const RIVER_FORD_HALF: float = 2.0
+## 河流横向摆幅上限：只许蜿蜒，不许绕回自身围出封闭水域。
+const RIVER_MEANDER: float = 7.0
+
 var world_seed: int = 0
 ## 同一主种子下的布局变体；不改变世界身份，只改变房间图与模板的抽样。
 var variant: int = 0
@@ -37,6 +49,7 @@ var _variation := FastNoiseLite.new()
 var _groves := FastNoiseLite.new()
 var _ridges := FastNoiseLite.new()
 var _edges := FastNoiseLite.new()
+var _flow := FastNoiseLite.new()
 
 # 每线程一个实例，所以这些缓存天然是线程局部的
 var _map_cache: Dictionary = {}
@@ -47,6 +60,10 @@ var _map_bins: Dictionary = {}
 var _gate_cache: Dictionary = {}
 var _populations: Dictionary = {}
 var _population_blockers: Dictionary = {}
+## 世界级河流：折线段 x1,y1,x2,y2,half 与空间索引。
+var _river_segments: PackedFloat32Array = PackedFloat32Array()
+var _river_cells: Dictionary = {}
+var _river_length: PackedFloat32Array = PackedFloat32Array()
 ## 各列贴合，世界地图上不再留空白断层。
 const REGION_GAP: int = 0
 
@@ -56,6 +73,9 @@ var _last_biome: int = Biome.Kind.DEEP_OCEAN
 var _last_route: int = Route.Kind.NONE
 var _last_map: MapSpec = null
 var _last_gate: int = -1
+## 河流查询的两个输出：水深（>0 在水里）与沿河里程。
+var _last_river_depth: float = -INF
+var _last_river_along: float = -1.0
 ## 同一物理帧的只读采样共用结果；各线程持有自己的生成器实例。
 var _query_frame: int = -1
 var _query_tiles: Dictionary = {}
@@ -69,6 +89,7 @@ func _init(seed_value: int = 0, map_config: MapConfig = null, variant_index: int
 	run = RoomGraph.plan(world_seed, config, variant)
 	_build_layout()
 	_configure_noise()
+	_build_rivers()
 	# 先在基础地形上规划所有兴趣点，再统一启用碰撞覆盖，避免规划顺序影响布局。
 	if population_data.is_empty():
 		for spec: MapSpec in _specs:
@@ -110,6 +131,11 @@ func _configure_noise() -> void:
 	_edges.seed = rng.noise_seed(5)
 	_edges.frequency = 0.010
 	_edges.fractal_octaves = 1
+	# 河流蜿蜒用独立随机源，避免改动它与既有地形/生物群系抽样互相影响。
+	_flow.noise_type = FastNoiseLite.TYPE_PERLIN
+	_flow.seed = rng.noise_seed(6)
+	_flow.frequency = 0.012
+	_flow.fractal_octaves = 2
 
 
 static func random_seed() -> int:
@@ -375,15 +401,189 @@ func entry_position(map_node_id: int, side: int = 0, gate_y: int = -1) -> Vector
 		if absf(dx) < 0.001:
 			continue
 		var target_x: float = 8.5 if side < 0 else float(spec.extent.x) - 8.5
-		var t: float = clampf((target_x - a.x) / dx, 0.0, 1.0)
 		var delta: Vector2 = b - a
 		var normal: Vector2 = Vector2(delta.y, -delta.x).normalized()
+		var t: float = clampf((target_x - a.x) / dx, 0.0, 1.0)
+		# 道路摆动会让落点横向偏移，迭代几次把 x 拉回“向里八格”附近。
+		for _pass_index: int in 4:
+			var sample: Vector2 = a.lerp(b, t) + normal * MapSpec.road_offset(t, roads[base + 4])
+			t = clampf(t + (target_x - sample.x) / dx, 0.0, 1.0)
 		var point: Vector2 = a.lerp(b, t) + normal * MapSpec.road_offset(t, roads[base + 4])
 		return tile_to_world(spec.origin + Vector2i(point.floor()))
 	return tile_to_world(spec.origin + Vector2i(spec.center))
 
 
-## 这张地图的路段（带缓存）。
+# ------------------------------------------------------------ 世界级河流
+
+## 规划跨箱庭的河流：同一世界里河流互相平行（不交叉，避免围出封闭水域），
+## 从世界一侧流入、贯穿若干区域后从另一侧流出。避开门口、落点与起始小屋；
+## 穿屏障处是水峡（仍阻挡），区内每隔一段留浅滩保证连通。
+func _build_rivers() -> void:
+	_river_segments.clear()
+	_river_cells.clear()
+	_river_length.clear()
+	if _specs.is_empty():
+		return
+	var bounds := Rect2(Vector2(_specs[0].origin), Vector2(_specs[0].extent))
+	for spec: MapSpec in _specs:
+		bounds = bounds.merge(Rect2(Vector2(spec.origin), Vector2(spec.extent)))
+	var protected: Array[Vector2] = _protected_water_points()
+	var flow_rng: RandomNumberGenerator = rng.rng(MapRng.Stream.DECOR, MapRng.mix(0x52495652, variant))
+	var horizontal: bool = flow_rng.randf() < 0.5
+	var count: int = flow_rng.randi_range(1, 3)
+	var span: float = bounds.size.y if horizontal else bounds.size.x
+	var used: Array[float] = []
+	for river_index: int in count:
+		for attempt: int in 12:
+			var lateral: float = span * (0.16 + 0.26 * float(river_index))
+			lateral += flow_rng.randf_range(-span * 0.06, span * 0.06)
+			if not _lateral_is_free(lateral, used, span * 0.16):
+				continue
+			var path: PackedVector2Array = _trace_river(bounds, horizontal, lateral)
+			if path.size() < 3:
+				continue
+			if not _river_clear_of(path, protected):
+				continue
+			_register_river(path, flow_rng.randf_range(RIVER_HALF_WIDTH * 0.85, RIVER_HALF_WIDTH * 1.35))
+			used.append(lateral)
+			break
+
+
+## 两条河之间至少隔开一段距离，否则会在并行处夹出细长水域。
+func _lateral_is_free(lateral: float, used: Array[float], minimum: float) -> bool:
+	for other: float in used:
+		if absf(other - lateral) < minimum:
+			return false
+	return true
+
+
+## 不能落水的关键点：所有出入口、落点与起始小屋附近。
+func _protected_water_points() -> Array[Vector2]:
+	var points: Array[Vector2] = []
+	for spec: MapSpec in _specs:
+		if spec.cottage != null:
+			points.append(Vector2(spec.origin) + spec.center)
+		for connection: Dictionary in _connections:
+			if connection["from"] == spec.node_id or connection["to"] == spec.node_id:
+				points.append(connection["a"] as Vector2)
+				points.append(connection["b"] as Vector2)
+	return points
+
+
+## 沿固定轴向贯穿世界，用噪声横向蜿蜒；摆幅被夹住，只弯不绕。
+func _trace_river(bounds: Rect2, horizontal: bool, lateral: float) -> PackedVector2Array:
+	var path := PackedVector2Array()
+	var direction := Vector2.RIGHT
+	var start := Vector2.ZERO
+	if horizontal:
+		direction = Vector2.RIGHT if _hash_side(bounds, lateral) else Vector2.LEFT
+		start = Vector2(
+			bounds.position.x - RIVER_STEP * 2.0 if direction.x > 0.0 else bounds.end.x + RIVER_STEP * 2.0,
+			bounds.position.y + lateral
+		)
+	else:
+		direction = Vector2.DOWN if _hash_side(bounds, lateral) else Vector2.UP
+		start = Vector2(
+			bounds.position.x + lateral,
+			bounds.position.y - RIVER_STEP * 2.0 if direction.y > 0.0 else bounds.end.y + RIVER_STEP * 2.0
+		)
+	var point: Vector2 = start
+	var lateral_axis := Vector2(-direction.y, direction.x)
+	var steps: int = int((bounds.size.x + bounds.size.y) / RIVER_STEP) + 12
+	for step: int in steps:
+		path.append(point)
+		var sway: float = _flow.get_noise_2d(point.x, point.y)
+		var bend: float = _flow.get_noise_2d(point.y * 0.7 + 137.0, point.x * 0.7 - 61.0)
+		point += direction * RIVER_STEP + lateral_axis * (sway * 2.4 + bend * 0.9)
+		var offset: float = (point - start).dot(lateral_axis)
+		var clamped: float = clampf(offset, -RIVER_MEANDER, RIVER_MEANDER)
+		if not is_equal_approx(clamped, offset):
+			point -= lateral_axis * (offset - clamped)
+		if point.x < bounds.position.x - RIVER_STEP * 5.0 or point.x > bounds.end.x + RIVER_STEP * 5.0:
+			break
+		if point.y < bounds.position.y - RIVER_STEP * 5.0 or point.y > bounds.end.y + RIVER_STEP * 5.0:
+			break
+	path.append(point)
+	return path
+
+
+## 河流从哪一侧起流：由位置与变体决定，保证同种子一致。
+func _hash_side(bounds: Rect2, lateral: float) -> bool:
+	return posmod(int(bounds.size.x + bounds.size.y) * 31 + int(lateral) * 17 + variant * 7, 2) == 0
+
+
+## 河流离关键点至少 12 格，避免淹掉门口和落点；起始小屋所在的箱庭整体不落河。
+func _river_clear_of(path: PackedVector2Array, protected: Array[Vector2]) -> bool:
+	for point: Vector2 in path:
+		var tile := Vector2i(floori(point.x), floori(point.y))
+		var spec: MapSpec = _spec_at(tile)
+		if spec != null and spec.cottage != null:
+			return false
+		for other: Vector2 in protected:
+			if point.distance_to(other) < 12.0:
+				return false
+	return true
+
+
+## 把折线登记成带半宽的线段，并按 32 格一格的网格建索引，逐格查询只看得见邻近几段。
+func _register_river(path: PackedVector2Array, half_width: float) -> void:
+	var along: float = 0.0
+	for index: int in range(1, path.size()):
+		var a: Vector2 = path[index - 1]
+		var b: Vector2 = path[index]
+		var length: float = a.distance_to(b)
+		if length < 0.001:
+			continue
+		var segment_index: int = _river_segments.size() / 5
+		_river_segments.append_array(PackedFloat32Array([a.x, a.y, b.x, b.y, half_width]))
+		_river_length.append(along)
+		along += length
+		var reach: float = half_width + RIVER_BANK_WIDTH + 1.0
+		var first := Vector2i(floori((minf(a.x, b.x) - reach) / float(RIVER_CELL)), floori((minf(a.y, b.y) - reach) / float(RIVER_CELL)))
+		var last := Vector2i(floori((maxf(a.x, b.x) + reach) / float(RIVER_CELL)), floori((maxf(a.y, b.y) + reach) / float(RIVER_CELL)))
+		for cell_y: int in range(first.y, last.y + 1):
+			for cell_x: int in range(first.x, last.x + 1):
+				var cell := Vector2i(cell_x, cell_y)
+				if not _river_cells.has(cell):
+					_river_cells[cell] = PackedInt32Array()
+				var bucket: PackedInt32Array = _river_cells[cell]
+				bucket.append(segment_index)
+				_river_cells[cell] = bucket
+
+
+## 查询这一格的水深（>0 在水里）与沿河里程（-1 表示不在河里）。
+func _river_sample(tile_x: int, tile_y: int) -> void:
+	_last_river_depth = -INF
+	_last_river_along = -1.0
+	if _river_segments.is_empty():
+		return
+	var cell := Vector2i(floori(float(tile_x) / float(RIVER_CELL)), floori(float(tile_y) / float(RIVER_CELL)))
+	if not _river_cells.has(cell):
+		return
+	var point := Vector2(float(tile_x) + 0.5, float(tile_y) + 0.5)
+	for segment_index: int in _river_cells[cell]:
+		var base: int = segment_index * 5
+		var half: float = _river_segments[base + 4]
+		var distance: float = MapSpec.segment_distance(
+			point,
+			Vector2(_river_segments[base], _river_segments[base + 1]),
+			Vector2(_river_segments[base + 2], _river_segments[base + 3])
+		)
+		var depth: float = half - distance
+		if depth > _last_river_depth:
+			_last_river_depth = depth
+			_last_river_along = _river_length[segment_index]
+
+
+## 区内每 RIVER_FORD_SPAN 格留一小段浅滩，河不会把箱庭切成两半。
+func _is_river_ford(along: float) -> bool:
+	if along < 0.0:
+		return false
+	var phase: float = fmod(along, RIVER_FORD_SPAN)
+	return phase <= RIVER_FORD_HALF or phase >= RIVER_FORD_SPAN - RIVER_FORD_HALF
+
+
+## 一张地图的路段（带缓存）。
 func _map_roads(map_node_id: int) -> PackedFloat32Array:
 	if _road_cache.has(map_node_id):
 		return _road_cache[map_node_id]
@@ -577,7 +777,7 @@ func _classify(tile_x: int, tile_y: int) -> void:
 	if open_depth < WALL_FOOT_WIDTH and not Terrain.is_water(_last_terrain):
 		_last_terrain = _ground_cover(_last_biome)
 
-	# 水域是局部河流 / 池塘，控制在箱庭内部；道路遇水生成桥。
+	# 池塘是箱庭内的局部水面；道路遇水生成桥。
 	if spec != null and room_depth > 5.0 and point.distance_to(spec.center) > 10.0:
 		var water: float = spec.water_depth(point)
 		if water > 0.0:
@@ -586,7 +786,35 @@ func _classify(tile_x: int, tile_y: int) -> void:
 				_last_route = Route.Kind.BRIDGE
 		elif water > -WATER_BANK_WIDTH and nearest_road >= 7.0:
 			_last_terrain = Terrain.Kind.SAND if spec.biome_id == Biome.Kind.DESERT else _ground_cover(spec.biome_id)
+	# 世界级河流：跨箱庭连续，穿屏障处是水峡（仍是阻挡）；区内每隔一段留浅滩保证连通。
+	_apply_river(tile_x, tile_y, spec, room_depth)
 	_check_gate(local.x, local.y, spec)
+
+
+## 把世界级河流盖到这一格上：水域、河岸与浅滩三种情况。
+func _apply_river(tile_x: int, tile_y: int, spec: MapSpec, room_depth: float) -> void:
+	_river_sample(tile_x, tile_y)
+	if _last_river_depth <= -RIVER_BANK_WIDTH:
+		return
+	if _last_river_depth > 0.0:
+		# 只有深入区内、且不在山脚过渡带里的河段才留浅滩；
+		# 屏障里的水峡必须保持阻断，否则箱庭之间会被打通。
+		# 浅滩允许贴近山脚过渡带，否则贴边的窄条会没有可涉水处而断路。
+		# 但路面不能变成浅滩：有路的地方保持桥面，否则道路上会出现断口。
+		if room_depth > 2.5 and _last_route == Route.Kind.NONE and _is_river_ford(_last_river_along):
+			_last_terrain = Terrain.Kind.SAND
+			return
+		_last_terrain = Terrain.Kind.WATER
+		if _last_route != Route.Kind.NONE:
+			_last_route = Route.Kind.BRIDGE
+		return
+	# 岸带：只在没被道路占用、也不是池塘水面的地方铺沙或地表。
+	if _last_route != Route.Kind.NONE or Terrain.is_water(_last_terrain):
+		return
+	if spec != null and spec.biome_id == Biome.Kind.DESERT:
+		_last_terrain = Terrain.Kind.SAND
+	elif spec != null:
+		_last_terrain = _ground_cover(spec.biome_id)
 
 
 func _ground_cover(biome: int) -> int:

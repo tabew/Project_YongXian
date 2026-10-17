@@ -45,6 +45,10 @@ const ACTIVE_LABEL_COLOR: Color = Color(1.0, 0.90, 0.35)
 const CAMERA_COLOR: Color = Color(0.90, 0.94, 1.0, 0.65)
 const LABEL_FONT_SIZE: int = 13
 const HINT_COLOR: Color = Color(0.78, 0.84, 0.92, 0.85)
+## 区域染色的羽化层数与每层内缩像素。
+const REGION_TINT_STEPS: int = 7
+const REGION_TINT_INSET: float = 2.5
+const REGION_TINT_ALPHA: float = 0.26
 
 @export var show_camera_view: bool = true
 
@@ -645,10 +649,22 @@ func _draw_regions(map_rect: Rect2, scale_factor: Vector2) -> void:
 			var end: Vector2 = _tile_to_minimap(Vector2(spec.origin + spec.extent), map_rect, scale_factor)
 			var bounds: Rect2 = Rect2(start, end - start).intersection(map_rect)
 			if bounds.has_area():
+				# 区域染色：多层内缩矩形叠出羽化边缘，区域之间不再有硬边和边框线。
 				var rgb: int = _color_rgb(RegionBiomes.ground_for(spec.biome_id), Route.Kind.NONE)
-				var shade := Color(float((rgb >> 16) & 255) / 255.0, float((rgb >> 8) & 255) / 255.0, float(rgb & 255) / 255.0, 0.24)
-				draw_rect(bounds, shade, true)
-				draw_rect(bounds, Color(0.67, 0.78, 0.71, 0.18), false, 1.0)
+				var shade := Color(
+					float((rgb >> 16) & 255) / 255.0,
+					float((rgb >> 8) & 255) / 255.0,
+					float(rgb & 255) / 255.0
+				)
+				for step: int in REGION_TINT_STEPS:
+					var area: Rect2 = bounds.grow(-float(step) * REGION_TINT_INSET)
+					if not area.has_area():
+						break
+					draw_rect(
+						area,
+						Color(shade.r, shade.g, shade.b, REGION_TINT_ALPHA / float(REGION_TINT_STEPS)),
+						true
+					)
 		var center: Vector2 = _tile_to_minimap(Vector2(spec.origin) + Vector2(spec.center), map_rect, scale_factor)
 		if not map_rect.has_point(center):
 			continue
