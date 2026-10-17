@@ -53,6 +53,11 @@ const PICKUP_RADIUS: float = 36.0
 const GRASS_LAYER_Z: int = 0
 ## 分割线只更新屏幕附近的草块，视野外多留一圈。
 const GRASS_SPLIT_MARGIN: float = 480.0
+## 需要逐簇分层的那一小块：角色精灵加草叶可能蒙到身上的范围。
+## 这块之外的草即使跨过脚底也画在角色前面，因为根本不会和角色重叠。
+const GRASS_FOCUS_HALF_WIDTH: float = 20.0
+const GRASS_FOCUS_ABOVE: float = 44.0
+const GRASS_FOCUS_BELOW: float = 12.0
 ## 草丛只生成玩家周围这个区块半径内的小块，走一步补一片。
 ## 视野在缩放 2 倍时约 1.3x0.7 个区块，1 圈足够盖住屏幕还留出余量。
 const GRASS_RADIUS_CHUNKS: int = 1
@@ -326,7 +331,7 @@ func _map_entity_root(map_node_id: int) -> Node2D:
 		var root := Node2D.new()
 		root.name = "MapEntities_%d" % map_node_id
 		add_child(root)
-		move_child(root, player.get_index())
+		_move_before_player(root)
 		_map_entity_roots[map_node_id] = root
 	return _map_entity_roots[map_node_id]
 
@@ -413,7 +418,7 @@ func _setup_ground_materials(spec: MapSpec) -> void:
 	# 结构画在草后面：草层要排在实体层之后、角色之前。
 	var grass_root: Node2D = _grass_roots.get(spec.node_id)
 	if grass_root != null:
-		move_child(grass_root, player.get_index())
+		_move_before_player(grass_root)
 	_sync_layer_visibility()
 
 
@@ -538,6 +543,16 @@ func _grow_grass_cell(spec: MapSpec, cell: Vector2i, chunk_coords: Vector2i) -> 
 	return true
 
 
+## 把节点插到角色之前（角色之前的层按树序先画）。
+## move_child 内部先摘下节点再插入，节点本来就在角色之前的索引需要补偿一位，
+## 否则会插到角色之后。
+func _move_before_player(node: Node2D) -> void:
+	var target: int = player.get_index()
+	if node.get_index() < target:
+		target -= 1
+	move_child(node, maxi(target, 0))
+
+
 ## 每张地图一层草丛容器：草块自己的 z 由 GrassView 按人物脚底逐块决定。
 func _grass_root(map_node_id: int) -> Node2D:
 	if _grass_roots.has(map_node_id):
@@ -548,17 +563,25 @@ func _grass_root(map_node_id: int) -> Node2D:
 	root.visible = map_node_id == _current_node
 	add_child(root)
 	# 放在角色之前：z=0 的草块因此画在角色背后，z=1 的画在角色前面。
-	move_child(root, player.get_index())
+	_move_before_player(root)
 	_grass_roots[map_node_id] = root
 	return root
 
 
 ## 每帧把视野内草块的分割线更新成人物脚底：
 ## 脚底以上的草盖住人物，脚底以下的草被人物踩住。
+## 只有可能和角色重叠的一两块才逐簇分层，其余整块归层，避免走路时不停重绘。
 func _update_grass_split() -> void:
 	if _generator == null or player.active_map == null:
 		return
 	var feet: float = player.global_position.y + _player_feet_offset()
+	var focus := Rect2(
+		Vector2(
+			player.global_position.x - GRASS_FOCUS_HALF_WIDTH,
+			feet - GRASS_FOCUS_ABOVE
+		),
+		Vector2(GRASS_FOCUS_HALF_WIDTH * 2.0, GRASS_FOCUS_ABOVE + GRASS_FOCUS_BELOW)
+	)
 	var area := Rect2(
 		player.global_position - Vector2.ONE * GRASS_SPLIT_MARGIN,
 		Vector2.ONE * GRASS_SPLIT_MARGIN * 2.0
@@ -567,7 +590,7 @@ func _update_grass_split() -> void:
 		var view := node as GrassView
 		if view == null or not view.is_visible_in_tree():
 			continue
-		view.set_split(feet)
+		view.update_focus(feet, focus)
 
 
 ## 角色最低处（精灵底边）相对原点的偏移；换角色贴图时会自动跟着变。

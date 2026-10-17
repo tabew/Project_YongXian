@@ -65,6 +65,8 @@ var _y_max: float = -INF
 ## 负无穷表示"还没有角色"，全部画在前面（也就是旧的"草一直盖住人"）。
 var split_y: float = -INF
 var _layer: int = Layer.FRONT
+## 本块当前是否在与角色重叠的焦点范围内（决定走逐簇还是整块归层）。
+var _splitting: bool = false
 ## 被分割线穿过时，上半部分交给这个兄弟节点绘制（画在角色背后）。
 var _back: Node2D = null
 
@@ -151,6 +153,42 @@ func layer_for(world_y: float) -> int:
 	if _y_min >= world_y:
 		return Layer.FRONT
 	return Layer.SPLIT
+
+
+## 每帧由 GameWorld 调用：
+## 只有可能和角色重叠的那一两块才逐簇分层（跨线才重绘），
+## 其余整块按脚底归到前 / 后层 —— 只改 z_index，走直线时完全不重绘。
+func update_focus(feet_y: float, focus_rect: Rect2) -> void:
+	if _bounds().intersects(focus_rect):
+		if not _splitting:
+			# 从整块归层切到逐簇：复位后走一次完整更新。
+			_splitting = true
+			_layer = Layer.FRONT
+			z_index = FRONT_Z
+			split_y = -INF
+		set_split(feet_y)
+		return
+	if _splitting:
+		# 离开焦点：整块归层，并重绘一次把交给后层的草收回来。
+		_splitting = false
+		_layer = Layer.FRONT
+		z_index = FRONT_Z
+		split_y = -INF
+		queue_redraw()
+		if _back != null and is_instance_valid(_back):
+			_back.queue_redraw()
+	split_y = feet_y
+	var next: int = Layer.FRONT
+	if not _positions.is_empty() and _y_max < feet_y:
+		next = Layer.BACK
+	if next != _layer:
+		_layer = next
+		z_index = BACK_Z if next == Layer.BACK else FRONT_Z
+
+
+## 本块在世界上覆盖的矩形，用来判断它会不会和角色重叠。
+func _bounds() -> Rect2:
+	return Rect2(position, Vector2.ONE * CELL_PIXELS)
 
 
 func _crosses_split(low: float, high: float) -> bool:

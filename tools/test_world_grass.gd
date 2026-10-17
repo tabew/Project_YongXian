@@ -387,6 +387,8 @@ func _test_live_world() -> void:
 		await process_frame
 	_check(manager.map_ready(), "live_world_finishes_painting_chunks")
 	var spec: MapSpec = world.player.active_map
+	# 草层必须排在角色之前：z=0 的草块靠这个树序才能画在角色背后。
+	_check(_grass_root_before_player(world, spec), "grass_layer_sits_before_the_player")
 	await _wait_for_live_grass(world, spec)
 	var cells: int = _live_grass_cells(world, spec)
 	_check(cells > 0, "live_world_grows_grass_views_around_the_player")
@@ -469,6 +471,11 @@ func _test_live_world() -> void:
 		_check(entry_usec < ENTRY_BUDGET_USEC, "entering_a_prewarmed_map_stays_cheap")
 		await _wait_for_live_grass(world, other)
 		_check(_live_grass_cells(world, other) > 0, "the_new_map_streams_grass_around_the_player")
+		# 进出箱庭后草层仍要贴在角色之前，否则 z=0 的草会画到人身上。
+		_check(
+			_grass_root_before_player(world, other),
+			"grass_layer_stays_before_the_player_after_reentry"
+		)
 	world.queue_free()
 	for _frame: int in 30:
 		await process_frame
@@ -495,6 +502,14 @@ func _map_cell_count(spec: MapSpec) -> int:
 		ceili(float(spec.extent.x) / float(GrassView.CELL_TILES))
 		* ceili(float(spec.extent.y) / float(GrassView.CELL_TILES))
 	)
+
+
+## 草层节点是否排在角色之前（z=0 的草块靠这个树序画在角色背后）。
+func _grass_root_before_player(world: Node, spec: MapSpec) -> bool:
+	var root_node: Node = world._grass_roots.get(spec.node_id)
+	if root_node == null:
+		return false
+	return root_node.get_index() < world.player.get_index()
 
 
 ## 这个位置所在小块里已经长好的草簇数量。
