@@ -91,6 +91,10 @@ func read_stat(stat: StringName) -> float:
 			return outgoing_damage_multiplier
 		&"lifesteal":
 			return lifesteal
+		&"crit_chance":
+			return crit_chance
+		&"attack_speed":
+			return attack_speed
 		&"max_health":
 			return health_component.max_health if health_component != null else 0.0
 	return 0.0
@@ -113,6 +117,10 @@ func apply_stat(stat: StringName, value: float) -> void:
 			outgoing_damage_multiplier = value
 		&"lifesteal":
 			lifesteal = value
+		&"crit_chance":
+			crit_chance = value
+		&"attack_speed":
+			attack_speed = value
 		&"max_health":
 			if health_component != null:
 				health_component.max_health = maxf(value, 1.0)
@@ -126,6 +134,10 @@ var invisible: bool = false
 var outgoing_damage_multiplier: float = 1.0
 ##buff 的吸血比例（0 = 不吸血），由 BuffHolder 写回
 var lifesteal: float = 0.0
+##暴击率加成（暴怒 buff 写回）
+var crit_chance: float = 0.0
+##攻击速度加成（敏捷 buff 写回）：出手阶段按 1+它 加快
+var attack_speed: float = 0.0
 
 
 ##BuffHolder 通知标记类效果（隐身）

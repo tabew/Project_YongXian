@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Thunder" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/thunder.gd" id="1_thunder"]
+[ext_resource type="PackedScene" path="res://scenes/effects/lightning_strike.tscn" id="2_strike"]
+
+[resource]
+script = ExtResource("1_thunder")
+attribute_id = 23
+name = "雷"
+max_level = 3
+can_be_interacted_attribute = Array[int]([23])
+strike_scene = ExtResource("2_strike")

@@ -6,8 +6,8 @@
 
 [sub_resource type="Resource" id="Resource_1wun4"]
 script = ExtResource("2_2p4an")
-value = 10.0
-value_per_level = 5.0
+value = 1.0
+value_per_level = 2.0
 
 [resource]
 script = ExtResource("3_qp1io")

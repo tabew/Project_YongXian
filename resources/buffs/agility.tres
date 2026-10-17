@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_lotwu"]
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/agility.png" id="1_u6rnx"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_u6rnx"]
+
+[sub_resource type="Resource" id="Resource_srcfh"]
+script = ExtResource("1_lotwu")
+stat = &"attack_speed"
+value = 0.2
+value_per_level = 0.08
+
+[resource]
+script = ExtResource("2_u6rnx")
+id = &"agility"
+display_name = "敏捷"
+description = "出手速度提高（前摇/持续/后摇一起加快），持续 8 秒。"
+icon = ExtResource("1_u6rnx")
+duration = 8.0
+modifiers = Array[ExtResource("1_lotwu")]([SubResource("Resource_srcfh")])

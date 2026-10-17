@@ -46,7 +46,7 @@ func _physics_process(delta: float) -> void:
 		_complete()
 		return
 	var previous: float = elapsed
-	elapsed += delta
+	elapsed += delta * speed_multiplier()
 	_advance(previous, elapsed)
 	if _running and elapsed >= definition.attack_duration():
 		_complete()
@@ -67,6 +67,22 @@ func _advance(_previous: float, _current: float) -> void:
 	pass
 
 
+## 暴击率：武器基础值 + 持有者的暴击加成
+func critical_chance_total() -> float:
+	var chance: float = definition.critical_chance if definition != null else 0.0
+
+	if wielder != null and is_instance_valid(wielder) and wielder.has_method("read_stat"):
+		chance += maxf(float(wielder.call("read_stat", &"crit_chance")), 0.0)
+	return clampf(chance, 0.0, 1.0)
+
+
+## 出手速度倍率
+func speed_multiplier() -> float:
+	if wielder != null and is_instance_valid(wielder) and wielder.has_method("read_stat"):
+		return 1.0 + maxf(float(wielder.call("read_stat", &"attack_speed")), 0.0)
+	return 1.0
+
+
 func _try_hit(hurtbox: CombatHurtbox) -> void:
 	if not _running or not hurtbox.can_receive_hit(wielder, wielder_team):
 		return
@@ -83,7 +99,7 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 	var hit: CombatHit = CombatHit.new()
 	hit.source = wielder
 	hit.weapon_id = definition.id
-	hit.critical = MapRng.shared(MapRng.Stream.COMBAT).randf() < definition.critical_chance
+	hit.critical = MapRng.shared(MapRng.Stream.COMBAT).randf() < critical_chance_total()
 	var multiplier: float = 1.0
 	if wielder != null and wielder.has_method("outgoing_damage_multiplier"):
 		multiplier = float(wielder.call("outgoing_damage_multiplier", hurtbox))
