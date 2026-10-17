@@ -156,10 +156,22 @@ func _input(event: InputEvent) -> void:
 	var mouse_event:InputEventMouseButton = event as InputEventMouseButton
 
 	if mouse_event != null and mouse_event.pressed:
+		# 全屏地图展开时滚轮用来缩放地图，物品栏让出滚轮。
+		if _fullscreen_map_open():
+			return
+
 		if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			inventory.select_handy_slot(_next_slot(inventory.get_selected_handy(),-1))
 			get_viewport().set_input_as_handled()
 		elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			inventory.select_handy_slot(_next_slot(inventory.get_selected_handy(),1))
 			get_viewport().set_input_as_handled()
+
+
+##全屏地图（M）展开时，滚轮与中键归地图，物品栏不再抢输入。
+func _fullscreen_map_open() ->bool:
+
+	var minimap:Node = get_parent().get_node_or_null("HUD/Minimap")
+
+	return minimap != null and minimap.has_method("is_expanded") and minimap.call("is_expanded")
 

@@ -97,6 +97,7 @@ func _sweep(from_time: float, to_time: float, from_origin: Vector2, to_origin: V
 		_shape.points = Geometry2D.convex_hull(points)
 		_query.transform = Transform2D(0.0, global_position)
 		_query_hurtboxes(_query)
+		_clear_grass(points)
 
 
 func _draw() -> void:

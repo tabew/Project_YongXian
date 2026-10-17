@@ -243,6 +243,14 @@ def build_hit_stone():
                   ring_freqs=(1150.0,), ring_tau=0.05, ring_gain=0.35, duration=0.20) + clack * 0.5
 
 
+def build_cut_grass():
+    """草丛被挥断：两层噪声错开衰减——低频厚一点的"唰"加上高频的沙沙声。"""
+    n = int(0.20 * SFX_RATE)
+    rustle = lowpass(noise(n, 0x677261), 2600.0, SFX_RATE) * exp_decay(n, SFX_RATE, 0.0, 0.045)
+    swish = highpass(noise(n, 0x737769), 1100.0, SFX_RATE) * exp_decay(n, SFX_RATE, 0.0, 0.028) * 0.55
+    return (rustle + swish) * 0.75
+
+
 def build_monster_hurt():
     n = int(0.22 * SFX_RATE)
     t = t_of(n, SFX_RATE)
@@ -516,6 +524,7 @@ SFX_BUILDERS = {
     "hit_critical": build_hit_critical,
     "hit_wood": build_hit_wood,
     "hit_stone": build_hit_stone,
+    "cut_grass": build_cut_grass,
     "monster_hurt": build_monster_hurt,
     "monster_die": build_monster_die,
     "player_hurt": build_player_hurt,

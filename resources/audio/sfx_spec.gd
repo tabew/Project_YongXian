@@ -34,6 +34,9 @@ const SPECS: Dictionary = {
 	&"hit_wood": {"volume_db": -6.0, "pitch_variation": 0.12, "min_interval": 0.03, "max_voices": 4},
 	&"hit_stone": {"volume_db": -6.0, "pitch_variation": 0.12, "min_interval": 0.03, "max_voices": 3},
 
+	# 草丛被武器切断：连扫时每 0.07 秒最多响一次。
+	&"cut_grass": {"volume_db": -15.0, "pitch_variation": 0.20, "min_interval": 0.07, "max_voices": 3},
+
 	# 怪物与主角。
 	&"monster_hurt": {"volume_db": -7.0, "pitch_variation": 0.14, "min_interval": 0.06, "max_voices": 4},
 	&"monster_die": {"volume_db": -4.0, "pitch_variation": 0.10, "min_interval": 0.08, "max_voices": 3},

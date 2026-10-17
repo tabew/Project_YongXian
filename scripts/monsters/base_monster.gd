@@ -581,7 +581,8 @@ func _setup_health_bar() -> void:
 	health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	health_bar.size = Vector2(28.0, 4.0)
 	health_bar.position = Vector2(-14.0, -22.0)
-	health_bar.z_index = 1
+	# 高于草丛层（1）：高草盖住身子也不该盖住血条。
+	health_bar.z_index = 2
 	var name_label := get_node_or_null("NameLabel") as Label
 	if name_label != null:
 		health_bar.position.y = name_label.position.y + name_label.size.y + 1.0
