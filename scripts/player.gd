@@ -17,6 +17,10 @@ const REGEN_COMBAT_LOCKOUT: float = 4.0
 const COMBO_WINDOW: float = 2.0
 const COMBO_MAX_STACKS: int = 5
 
+@export var animation_tree:AnimationTree;
+
+var input_direction: Vector2
+
 @export_group("移动手感")
 ## 最大速度（像素/秒）。
 @export var max_speed: float = 220.0
@@ -89,7 +93,6 @@ func _ready() -> void:
 		handy_item_changed()
 
 	apply_progress(true)
-
 
 ## 升级卡聚合后的生命上限。
 var max_health: float:
@@ -173,10 +176,10 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
 		return
-	var input_direction: Vector2 = Input.get_vector(
+	input_direction = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
-	_apply_input(input_direction, delta)
+	_apply_input(delta)
 	_integrate_movement(delta)
 	_update_facing()
 
@@ -263,15 +266,27 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(weapon_controller):
 		weapon_controller.cancel_attack()
 
+#动画树更新
+func _update_blend_position(directionVector:Vector2):
+	animation_tree.set("parameters/StateMachine/Stand/blend_position",directionVector);
+	animation_tree.set("parameters/StateMachine/Walk/blend_position",directionVector);
+
 
 ## 有输入时朝目标速度加速，松手后按摩擦力减速到 0。
-func _apply_input(input_direction: Vector2, delta: float) -> void:
+func _apply_input(delta: float) -> void:
 	if input_direction != Vector2.ZERO:
 		var target_velocity: Vector2 = input_direction * _move_speed()
 		velocity = velocity.move_toward(target_velocity, acceleration * delta)
+
+		_update_blend_position(input_direction)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
 
+#武器动画修改
+func _update_facing() -> void:
+	if weapon_controller.is_attacking():
+		var direction_vector = get_global_mouse_position() - global_position
+		_update_blend_position(direction_vector)
 
 func _move_speed() -> float:
 	var progress: Node = _run_progress()
@@ -559,10 +574,3 @@ func _progress_value(key: String) -> float:
 		UpgradePool.KEY_PICKUP_ADD:
 			return progress.pickup_radius_add()
 	return 0.0
-
-
-func _update_facing() -> void:
-	if weapon_controller.is_attacking():
-		sprite.flip_h = weapon_controller.locked_aim().x < 0.0
-	elif absf(velocity.x) > 1.0:
-		sprite.flip_h = velocity.x < 0.0
