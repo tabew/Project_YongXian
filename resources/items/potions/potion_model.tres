@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="2_5tjeu"]
 [ext_resource type="Script" uid="uid://bo7jexboonb66" path="res://scripts/items/potions/potion_data.gd" id="3_2y2yk"]
 [ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="3_k670q"]
-[ext_resource type="Resource" uid="uid://d0cfayl2cqimi" path="res://resources/alchemical_attribute/absorb.tres" id="3_m2i1u"]
 [ext_resource type="Resource" path="res://resources/alchemical_attribute/binding.tres" id="4_8etbr"]
 [ext_resource type="Texture2D" uid="uid://dvka76ih52ueg" path="res://assets/items/potions/potion_default.png" id="4_potion"]
 [ext_resource type="Resource" uid="uid://8ugmywcuoule" path="res://resources/alchemical_attribute/continuous_heal.tres" id="5_aqqec"]
@@ -24,6 +23,6 @@ id = 300
 name = "药水"
 texture = ExtResource("4_potion")
 max_stack = 1
-alchemical_attribute = Array[ExtResource("1_n78tq")]([ExtResource("3_m2i1u"), ExtResource("4_8etbr"), ExtResource("5_aqqec"), ExtResource("6_vgdl5"), ExtResource("7_qdjuu"), ExtResource("3_k670q"), ExtResource("8_avo6g"), ExtResource("9_aqqec"), ExtResource("10_vgdl5"), ExtResource("10_ni3ce"), ExtResource("11_hi73l"), ExtResource("13_qdjuu"), ExtResource("14_vgdl5")])
+alchemical_attribute = Array[ExtResource("1_n78tq")]([ExtResource("4_8etbr"), ExtResource("5_aqqec"), ExtResource("6_vgdl5"), ExtResource("7_qdjuu"), ExtResource("3_k670q"), ExtResource("8_avo6g"), ExtResource("9_aqqec"), ExtResource("10_vgdl5"), ExtResource("10_ni3ce"), ExtResource("11_hi73l"), ExtResource("13_qdjuu"), ExtResource("14_vgdl5")])
 item_scene_path = "uid://b3pw5ub0dbcpo"
 metadata/_custom_type_script = "uid://bo7jexboonb66"

@@ -7,12 +7,13 @@
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_jwgjw"]
 [ext_resource type="Resource" path="res://resources/alchemical_attribute/weakness.tres" id="6_weakness"]
 [ext_resource type="Script" uid="uid://5w7fr1ns5q7c" path="res://scripts/items/ingredients/sticky_ball.gd" id="7_sticky"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/linger.tres" id="8_linger"]
 
 [resource]
 script = ExtResource("7_sticky")
-for_use_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow")])
+for_use_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("8_linger")])
 id = 10
 name = "粘性球"
 texture = ExtResource("2_icon")
-alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("5_binding"), ExtResource("6_weakness")])
+alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("5_binding"), ExtResource("6_weakness"), ExtResource("8_linger")])
 item_scene_path = "res://scenes/items/ingredients/sticky_ball.tscn"

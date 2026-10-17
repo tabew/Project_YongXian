@@ -23,6 +23,13 @@ func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[Alchemi
 				else:
 					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.SLOW, level))
 
+			AlchemicalAttributeList.ATTRIBUTE.FIRE:
+				if which == 2:
+					result.append(self)
+					result.append(attribute[i])
+				else:
+					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.LINGER, level))
+
 		#一轮只看第一个反应物，判定完直接结束
 		break
 	return result

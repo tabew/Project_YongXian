@@ -27,6 +27,7 @@ enum ATTRIBUTE
 	LIFESTEAL = 19,
 	FORTIFY = 20,
 	ABSORB = 21,
+	LINGER = 22,
 }
 
 
@@ -55,7 +56,10 @@ enum ATTRIBUTE
 	preload("res://resources/alchemical_attribute/vulnerable.tres"),
 	preload("res://resources/alchemical_attribute/lifesteal.tres"),
 	preload("res://resources/alchemical_attribute/fortify.tres"),
-	preload("res://resources/alchemical_attribute/absorb.tres")
+	preload("res://resources/alchemical_attribute/absorb.tres"),
+	# ===== AI 修改开始 (滞留) =====
+	preload("res://resources/alchemical_attribute/linger.tres")
+	# ===== AI 修改结束 =====
 ]
 
 ##id -> 模板

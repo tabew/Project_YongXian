@@ -26,7 +26,7 @@ const THORNS_RATIO_PER_LEVEL: float = 0.35
 ##反伤命中的来源标识
 const THORNS_WEAPON_ID: StringName = &"thorns"
 ##反伤链的最大深度
-const THORNS_MAX_DEPTH: int = 0
+const THORNS_MAX_DEPTH: int = 1
 ##第几次反伤，记在 CombatHit 的 metadata 上（原始命中没有这个键，视作 0）
 const THORNS_DEPTH_META: StringName = &"thorns_depth"
 
