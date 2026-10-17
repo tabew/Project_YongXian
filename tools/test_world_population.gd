@@ -46,10 +46,23 @@ func _check_plans() -> void:
 			_check(population["chests"].size() >= 2, "region_has_random_chests")
 			_check(population["drops"].size() >= 10, "region_has_scattered_loot")
 			var reachable: Dictionary = _reachable(generator, spec)
+			var alchemy_count: int = 0
+			var centers: Array[Vector2i] = []
 			for structure: Dictionary in population["structures"]:
 				kinds[structure["kind"]] = true
 				structure_total += 1
 				_check(reachable.has(structure["tile"]), "structure_center_is_reachable")
+				if structure["kind"] == WorldPopulation.ALCHEMY_KIND:
+					alchemy_count += 1
+				centers.append(structure["tile"] as Vector2i)
+			# 每张箱庭保证有一台炼金台；结构之间留出间距，不挤成一堆。
+			_check(alchemy_count >= 1, "region_has_an_alchemy_station")
+			var too_close: bool = false
+			for left: int in centers.size():
+				for right: int in range(left + 1, centers.size()):
+					if centers[left].distance_to(centers[right]) < 14.0:
+						too_close = true
+			_check(not too_close, "structures_keep_their_distance")
 			for tile: Vector2i in population["blocked"]:
 				_check(not generator.is_walkable(tile), "structure_collision_is_real")
 				_check(generator.sample_route(tile) == Route.Kind.NONE, "structure_does_not_block_road")

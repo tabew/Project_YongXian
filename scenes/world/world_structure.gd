@@ -24,8 +24,8 @@ func _draw() -> void:
 			_draw_camp()
 		&"ruins":
 			_draw_ruins()
-		&"stone_circle":
-			_draw_circle()
+		&"alchemy":
+			_draw_alchemy()
 		&"supplies":
 			_draw_supplies()
 		&"garden":
@@ -71,16 +71,53 @@ func _draw_ruins() -> void:
 	_stone(Vector2(18, -9), Vector2(9, 4))
 
 
-func _draw_circle() -> void:
-	for point: Vector2 in [Vector2(-32, -32), Vector2(32, -32), Vector2(-32, 32), Vector2(32, 32)]:
-		_stone(point, Vector2(16, 16))
-		draw_rect(Rect2(point - Vector2(6, 11), Vector2(12, 14)), STONE)
-		draw_line(point - Vector2(3, 8), point + Vector2(2, -3), Color("b8cfb0"), 2)
-	for point: Vector2 in [Vector2(0, -36), Vector2(0, 36), Vector2(-38, 0), Vector2(38, 0)]:
-		_stone(point, Vector2(8, 5))
-	draw_rect(Rect2(-12, -12, 24, 24), Color("686f62"), false, 2)
-	draw_line(Vector2(-8, 0), Vector2(8, 0), Color("b9c49c"), 2)
-	draw_line(Vector2(0, -8), Vector2(0, 8), Color("b9c49c"), 2)
+## 野外炼金台：先铺一块砖石地块，台面上架坩埚与药瓶，底下留一团炉火。
+## 台面占中间三格（-1 行），玩家站在近侧按 E 交互。
+func _draw_alchemy() -> void:
+	const BREW := Color("6fc25a")
+	const GLOW := Color("ffd27a")
+	const FIRE := Color("e79840")
+	# 砖石地块：外圈压暗的石沿 + 内圈浅色砖 + 四角磨损。
+	draw_rect(Rect2(-70, -52, 140, 104), Color("4a4a44"))
+	draw_rect(Rect2(-66, -48, 132, 96), Color("767a6b"))
+	for row: int in 6:
+		for column: int in 8:
+			var brick := Rect2(-63 + column * 16, -45 + row * 15, 14, 12)
+			var shade: float = 0.06 * float(posmod(column * 3 + row * 5 + variant, 3))
+			draw_rect(brick, Color("8d9383").darkened(shade))
+	draw_rect(Rect2(-66, -48, 132, 96), Color("5c5f54"), false, 2)
+	# 炉火与光晕：在台面下方。
+	draw_circle(Vector2(0, 4), 26.0, Color(GLOW, 0.16))
+	draw_colored_polygon(PackedVector2Array([Vector2(-13, 12), Vector2(-7, -8), Vector2(-1, 10)]), FIRE)
+	draw_colored_polygon(PackedVector2Array([Vector2(-3, 12), Vector2(3, -12), Vector2(9, 10)]), FIRE.lightened(0.18))
+	draw_colored_polygon(PackedVector2Array([Vector2(6, 12), Vector2(12, -2), Vector2(17, 11)]), FIRE.darkened(0.12))
+	# 台面与桌腿。
+	draw_rect(Rect2(-30, -22, 60, 13), WOOD.darkened(0.28))
+	draw_rect(Rect2(-32, -24, 64, 6), Color("b08053"))
+	draw_rect(Rect2(-27, -10, 6, 14), WOOD.darkened(0.45))
+	draw_rect(Rect2(21, -10, 6, 14), WOOD.darkened(0.45))
+	# 坩埚：锅身 + 锅沿 + 绿色药液 + 气泡。
+	draw_rect(Rect2(-19, -43, 38, 4), DARK)
+	draw_colored_polygon(
+		PackedVector2Array([
+			Vector2(-18, -40), Vector2(18, -40), Vector2(14, -23), Vector2(-14, -23)
+		]),
+		Color("3f3a38")
+	)
+	draw_rect(Rect2(-15, -39, 30, 5), BREW.darkened(0.25))
+	draw_circle(Vector2(-6, -33), 2.5, BREW)
+	draw_circle(Vector2(4, -30), 1.8, BREW.lightened(0.2))
+	draw_line(Vector2(-18, -40), Vector2(18, -40), LIGHT.darkened(0.2), 2)
+	# 两侧药瓶。
+	for side: int in [-1, 1]:
+		var base := Vector2(24.0 * float(side), -24)
+		draw_rect(Rect2(base.x - 3, base.y - 9, 6, 9), Color("9fd3c7"))
+		draw_rect(Rect2(base.x - 1, base.y - 13, 2, 4), LIGHT.darkened(0.3))
+		draw_rect(Rect2(base.x - 3, base.y - 4, 6, 3), BREW.darkened(0.1))
+	# 坩埚上方的蒸汽。
+	for index: int in 3:
+		var rise: float = 12.0 + float(index) * 9.0
+		draw_circle(Vector2(float(index) * 7.0 - 7.0, -46.0 - rise), 4.0 + float(index), Color(0.9, 0.95, 0.9, 0.12))
 
 
 func _draw_supplies() -> void:

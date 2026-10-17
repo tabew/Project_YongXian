@@ -10,6 +10,7 @@ size = Vector2(111, 383)
 script = ExtResource("1_2iyb1")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1046026505]
+visible = false
 texture = ExtResource("1_8uf1t")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=493770000]

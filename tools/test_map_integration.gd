@@ -25,6 +25,14 @@ func _wheel_event(at: Vector2) -> InputEventMouseButton:
 	return event
 
 
+func _key_event(code: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = true
+	return event
+
+
 func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	root.get_node("GameState").set("world_seed", 24681357)
@@ -95,6 +103,36 @@ func _run() -> void:
 	_check(minimap._zoom > zoom_before, "全屏地图滚轮缩放没生效")
 	_check(player.inventory.get_selected_handy() == slot_before, "全屏地图打开时滚轮仍被物品栏抢走")
 	minimap.set_expanded(false)
+	# 炼金台：B 键入口已移除，改成站在台前按 E 开关界面。
+	var station_panel: CanvasItem = alchemy as CanvasItem
+	var station: WorldStructure = null
+	var station_root: Node2D = world._map_entity_roots.get(world._current_node)
+	if station_root != null:
+		for child: Node in station_root.get_children():
+			if child is WorldStructure and (child as WorldStructure).kind == WorldPopulation.ALCHEMY_KIND:
+				station = child as WorldStructure
+				break
+	_check(station != null, "每张箱庭至少有一台炼金台")
+	if station != null:
+		player.global_position = station.global_position + Vector2(0, 26)
+		await process_frame
+		world._refresh_pickup()
+		_check(world._nearby_station == station, "站在炼金台旁会被识别为可交互")
+		_check(world.hud._pickup_label.text.contains("炼金台"), "炼金台提示文案正确")
+		_check(not station_panel.visible, "炼金界面默认关闭")
+		root.push_input(_key_event(KEY_E))
+		await process_frame
+		_check(station_panel.visible, "按 E 打开炼金界面")
+		root.push_input(_key_event(KEY_E))
+		await process_frame
+		_check(not station_panel.visible, "再按 E 关闭炼金界面")
+		# 走远之后按 E 不应该再打开。
+		player.global_position = station.global_position + Vector2(320, 0)
+		for _frame: int in 4:
+			await process_frame
+		root.push_input(_key_event(KEY_E))
+		await process_frame
+		_check(not station_panel.visible, "离开炼金台后按 E 不会打开界面")
 	player.collide_with_terrain = false
 	var outside: Vector2 = WorldGenerator.tile_to_world(player.active_map.origin - Vector2i.ONE)
 	_check(not player.can_stand_at(outside), "关闭地形碰撞仍不能进入箱庭间隙")

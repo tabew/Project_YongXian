@@ -28,7 +28,7 @@ func _ready() -> void:
 	# ==========================================================================
 	# ↓↓↓↓ 改动：操作提示跟着新的物品栏选中/使用方式走 ↓↓↓↓
 	#操作提示分两行放在物品栏上方：物品栏常驻显示，提示压在它下面就会被挡住
-	hint_label.text = "WASD 移动　·　E 拾取/开箱　·　左键 使用选中物品　·　右键 使用/投掷选中物品\n1-9 / 滚轮 / 点格子 换选中　·　Tab 背包　·　B 炼金　·　M 地图　·　R 重开世界"
+	hint_label.text = "WASD 移动　·　E 拾取/开箱/用炼金台　·　左键 使用选中物品　·　右键 使用/投掷选中物品\n1-9 / 滚轮 / 点格子 换选中　·　Tab 背包　·　M 地图　·　R 重开世界"
 	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
 	# ==========================================================================
 	_pickup_label = Label.new()
@@ -148,6 +148,15 @@ func show_chest(chest: WorldChest) -> void:
 	_pickup_label.visible = chest != null and not chest.opened
 	if _pickup_label.visible:
 		_pickup_label.text = "E · 打开%s" % chest.display_name()
+
+
+## 站在野外炼金台旁边的提示。
+func show_alchemy_station(station: WorldStructure) -> void:
+	if _pickup_label == null:
+		return
+	_pickup_label.visible = station != null
+	if _pickup_label.visible:
+		_pickup_label.text = "E · 使用炼金台"
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -2,7 +2,11 @@ class_name WorldPopulation
 extends RefCounted
 
 ## 地表兴趣点的纯数据规划。独立随机流保证不影响地形、刷怪和战斗。
-const KINDS: Array[StringName] = [&"camp", &"ruins", &"stone_circle", &"supplies", &"garden"]
+const KINDS: Array[StringName] = [&"camp", &"ruins", &"alchemy", &"supplies", &"garden"]
+## 炼金台：野外唯一的炼金交互点，每张箱庭保证至少一台。
+const ALCHEMY_KIND: StringName = &"alchemy"
+## 结构之间留出的最小间隔（格）。之前是 3，结构容易挤在一起。
+const STRUCTURE_GAP: int = 6
 const LOOT_POOL: Array[int] = [0, 1, 2, 5]
 const SALT: int = 0x504F5055
 
@@ -26,16 +30,25 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 	for attempt: int in 900:
 		if structures.size() >= count:
 			break
-		var tile: Vector2i = _candidate(spec, decor_rng, 8)
+		# 第一台炼金台优先贴着主路放（沿路走一段就能碰到），其余结构轮转种类。
+		var want_alchemy: bool = structures.is_empty()
+		var kind: StringName = (
+			ALCHEMY_KIND if want_alchemy
+			else KINDS[(structures.size() + rotation) % KINDS.size()]
+		)
+		var tile: Vector2i = Vector2i.ZERO
+		if want_alchemy and attempt < 40:
+			tile = _roadside_candidate(generator, spec, decor_rng, 8)
+		if tile == Vector2i.ZERO:
+			tile = _candidate(spec, decor_rng, 8)
 		var footprint := Rect2i(tile - Vector2i(4, 3), Vector2i(9, 7))
 		if not _site_is_clear(generator, spec, footprint.grow(1), reserved, safe_points):
 			continue
-		var kind: StringName = KINDS[(structures.size() + rotation) % KINDS.size()]
 		var solid: Array[Vector2i] = _solid_offsets(kind)
 		for offset: Vector2i in solid:
 			blocked[tile + offset] = true
 		structures.append({"kind": kind, "tile": tile, "rect": footprint, "variant": decor_rng.randi_range(0, 2)})
-		reserved.append(footprint.grow(3))
+		reserved.append(footprint.grow(STRUCTURE_GAP))
 	var chest_count: int = loot_rng.randi_range(2, 4)
 	if generator.run.type_of(spec.node_id) == RoomType.Kind.REWARD:
 		chest_count += 2
@@ -95,8 +108,29 @@ static func _solid_offsets(kind: StringName) -> Array[Vector2i]:
 			return [Vector2i(-3, -2), Vector2i(-2, -2), Vector2i(-1, -2), Vector2i(-3, -1), Vector2i(-2, -1), Vector2i(-1, -1)]
 		&"ruins":
 			return [Vector2i(-3, -2), Vector2i(3, -2), Vector2i(-3, 2), Vector2i(3, 2)]
-		&"stone_circle":
-			return [Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2)]
+		&"alchemy":
+			# 台面占中间三格，四周留出站位给玩家按 E。
+			return [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1)]
 		&"supplies":
 			return [Vector2i(-2, -1), Vector2i(-1, -1), Vector2i(2, 1)]
 	return []
+
+
+## 贴着主路找一个站点位置：沿路取点后向侧面挪几格，让结构落在路边。
+## 找不到返回 Vector2i.ZERO，调用方退回普通选址。
+static func _roadside_candidate(
+	generator: WorldGenerator, spec: MapSpec, source: RandomNumberGenerator, margin: int
+) -> Vector2i:
+	var bounds := Rect2i(spec.origin, spec.extent).grow(-margin)
+	for probe: int in 40:
+		var road_tile: Vector2i = _candidate(spec, source, margin)
+		if generator.sample_route(road_tile) == Route.Kind.NONE:
+			continue
+		for offset: Vector2i in [
+			Vector2i(5, 0), Vector2i(-5, 0), Vector2i(0, 5), Vector2i(0, -5),
+			Vector2i(6, 1), Vector2i(-6, -1), Vector2i(-1, 6), Vector2i(1, -6)
+		]:
+			var site: Vector2i = road_tile + offset
+			if bounds.has_point(site):
+				return site
+	return Vector2i.ZERO

@@ -131,10 +131,6 @@ func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
 func _input(event: InputEvent) -> void:
 
 	if event is InputEventKey:
-		if Input.is_action_just_pressed("alchemy_menu"):
-			visible = !visible
-			return
-
 		if Input.is_action_just_pressed("open_inventory")&&visible == false:
 			visible = true
 

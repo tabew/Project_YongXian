@@ -116,9 +116,6 @@ func _input(event: InputEvent) -> void:
 			_input_update()
 			return
 
-		if Input.is_action_just_pressed("alchemy_menu"):
-			visible = false
-
 func _input_update():
 	if visible:
 		for item_id in item_for_button:

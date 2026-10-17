@@ -29,6 +29,63 @@ func _ready() -> void:
 
 	if player != null:
 		inventory = player.inventory
+	queue_redraw()
+
+
+## 坩埚外观：像素风石锅（宽口圆肚）+ 绿色药液 + 炉火 + 蒸汽，替掉原来那张纯黑占位图。
+func _draw() -> void:
+	const IRON := Color("3c3a3f")
+	const IRON_LIGHT := Color("5b5860")
+	const IRON_DARK := Color("26242a")
+	const BREW := Color("58b04a")
+	const BREW_LIGHT := Color("8ede6c")
+	const FIRE := Color("e79840")
+	const GLOW := Color("ffd27a")
+	# 炉火与光晕：在锅底下方。
+	draw_circle(Vector2(0, 74), 96.0, Color(GLOW, 0.10))
+	for index: int in 5:
+		var x: float = float(index - 2) * 26.0
+		var height: float = 30.0 + 16.0 * float(2 - absi(index - 2))
+		draw_colored_polygon(
+			PackedVector2Array([
+				Vector2(x - 13, 96), Vector2(x, 96 - height), Vector2(x + 13, 96)
+			]),
+			FIRE.darkened(0.12 * float(posmod(index, 2)))
+		)
+	# 锅身：自锅沿向下逐层收窄，做出宽口圆肚。
+	var widths: Array[float] = [150, 150, 146, 138, 126, 110, 90, 66]
+	var top: float = -44.0
+	for index: int in widths.size():
+		var half: float = widths[index] * 0.5
+		draw_rect(
+			Rect2(-half, top + float(index) * 18.0, widths[index], 18.0),
+			IRON if index % 2 == 0 else IRON_DARK
+		)
+	# 左侧受光、右侧阴影。
+	draw_rect(Rect2(-64, -36, 10, 118), IRON_LIGHT.darkened(0.1))
+	draw_rect(Rect2(52, -30, 9, 100), IRON_DARK)
+	# 锅沿。
+	draw_rect(Rect2(-82, -62, 164, 12), IRON_LIGHT)
+	draw_rect(Rect2(-82, -62, 164, 4), IRON_LIGHT.lightened(0.28))
+	draw_rect(Rect2(-88, -50, 176, 6), IRON)
+	# 药液与气泡。
+	draw_rect(Rect2(-70, -52, 140, 20), BREW.darkened(0.3))
+	draw_rect(Rect2(-64, -52, 128, 7), BREW)
+	for index: int in 5:
+		var bubble_x: float = -44.0 + float(index) * 22.0
+		draw_circle(
+			Vector2(bubble_x, -56.0 - float(posmod(index * 7, 6))),
+			3.0 + float(posmod(index, 2)),
+			BREW_LIGHT
+		)
+	# 蒸汽。
+	for index: int in 3:
+		draw_circle(
+			Vector2(float(index) * 36.0 - 36.0, -88.0 - float(index) * 13.0),
+			9.0 + float(index) * 3.0,
+			Color(0.88, 0.95, 0.88, 0.13)
+		)
+
 
 ##得到材料的所以炼金属性
 func _get_attributes(body: Node2D) -> void:
