@@ -47,17 +47,38 @@ func heal_ratio() -> float:
 	return BASE_RATIO + RATIO_PER_LEVEL * float(maxi(level - 1, 0))
 
 
+## 回血成功后给目标挂上"治疗抵抗"，期间带 heal 的物品不会恢复生命。
+const HEAL_RESIST_ID: StringName = &"heal_resist"
+const HEAL_RESIST_BUFF: BuffData = preload("res://resources/buffs/heal_resist.tres")
+
+
+##目标是否被治疗抵抗挡着（等价于"现在不能通过 heal 回血"）
+func is_heal_resisted(object: Node) -> bool:
+	if object == null or not is_instance_valid(object):
+		return false
+	return Buffs.has(object, HEAL_RESIST_ID)
+
+
 func use_effect(object:Node = null) -> void:
 	if object == null:
 		return
+
+	if is_heal_resisted(object):
+		return
+
 	var maximum: float = _max_health_of(object)
 	if maximum <= 0.0:
 		return
 	var amount: float = maximum * heal_ratio()
+	var healed: float = 0.0
+
 	if object.has_method("heal"):
-		object.call("heal", amount)
-		return
-	_heal_component(object, amount)
+		healed = float(object.call("heal", amount))
+	else:
+		healed = _heal_component(object, amount)
+
+	if healed > 0.0 and HEAL_RESIST_BUFF != null:
+		Buffs.apply(object, HEAL_RESIST_BUFF, 0)
 
 
 func _max_health_of(object: Node) -> float:
@@ -67,9 +88,9 @@ func _max_health_of(object: Node) -> float:
 	return float(health.get("max_health")) if health != null else 0.0
 
 
-##怪物恢复：生命组件已经死了就不再回复
-func _heal_component(object: Node, amount: float) -> void:
+##怪物恢复：生命组件已经死了就不再回复。返回实际回复量
+func _heal_component(object: Node, amount: float) -> float:
 	var health: Node = object.get_node_or_null("Health")
 	if health == null or not health.has_method("heal"):
-		return
-	health.call("heal", amount)
+		return 0.0
+	return float(health.call("heal", amount))

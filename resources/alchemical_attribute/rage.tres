@@ -1,12 +1,13 @@
-[gd_resource type="Resource" script_class="Rage" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="Rage" format=3 uid="uid://cpw52j27flh7l"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/rage.gd" id="1_rage"]
-[ext_resource type="Resource" path="res://resources/buffs/rage.tres" id="2_rage_buff"]
+[ext_resource type="Script" uid="uid://cfjjq81y3ek4j" path="res://scripts/alchemical_attribute/rage.gd" id="1_rage"]
+
+[sub_resource type="Resource" id="Resource_6aj6j"]
+metadata/__load_path__ = "res://resources/buffs/rage.tres"
 
 [resource]
 script = ExtResource("1_rage")
+buff = SubResource("Resource_6aj6j")
 attribute_id = 24
 name = "暴怒"
-max_level = 3
-can_be_interacted_attribute = Array[int]([])
-buff = ExtResource("2_rage_buff")
+level = 3

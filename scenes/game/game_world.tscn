@@ -16,8 +16,8 @@
 [ext_resource type="Resource" path="res://resources/monsters/shabei_spawn_data.tres" id="11_shabei_spawn"]
 [ext_resource type="PackedScene" uid="uid://cei2bfjxogxkp" path="res://scenes/ui/inventory/bottom_bag_ui.tscn" id="12_nms8r"]
 [ext_resource type="PackedScene" path="res://scenes/ui/upgrade/upgrade_panel.tscn" id="13_upgrade_panel"]
-[ext_resource type="Script" path="res://scripts/ui/upgrade/upgrade_manager.gd" id="14_upgrade_manager"]
-[ext_resource type="Script" path="res://scripts/ui/debug/cheat_panel.gd" id="15_cheat_panel"]
+[ext_resource type="Script" uid="uid://3372q551x67j" path="res://scripts/ui/upgrade/upgrade_manager.gd" id="14_upgrade_manager"]
+[ext_resource type="Script" uid="uid://60lfpn57wwmk" path="res://scripts/ui/debug/cheat_panel.gd" id="15_cheat_panel"]
 
 [node name="GameWorld" type="Node2D" unique_id=408146263]
 script = ExtResource("1_world")
@@ -55,7 +55,7 @@ visible = false
 [node name="UpgradeManager" type="Node" parent="GameHUD" unique_id=883451907]
 script = ExtResource("14_upgrade_manager")
 
-[node name="CheatPanel" type="Control" parent="GameHUD"]
+[node name="CheatPanel" type="Control" parent="GameHUD" unique_id=1103585012]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="Linger" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="Linger" format=3 uid="uid://ctcep8dtvvm4b"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/linger.gd" id="1_linger"]
+[ext_resource type="Script" uid="uid://dqovcsulnje1d" path="res://scripts/alchemical_attribute/linger.gd" id="1_linger"]
 
 [resource]
 script = ExtResource("1_linger")
