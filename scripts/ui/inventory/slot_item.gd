@@ -6,6 +6,7 @@ class_name SlotItem
 
 @onready var item_texture: TextureRect = $ItemTexture
 @onready var amount_label:Label = $AmountLabel
+@onready var enchant_label:Label = get_node_or_null("EnchantLabel") as Label
 
 @export var count:int = 0 #数量
 
@@ -72,7 +73,10 @@ func slot_item_update()->void:
 	if _item == null and item_id >= 0:
 		item = item_id
 
-	if !_item: return
+	if _item == null:
+		if enchant_label != null:
+			enchant_label.visible = false
+		return
 
 	if count <= 0:
 		item_texture.self_modulate.a = 0.4
@@ -86,3 +90,9 @@ func slot_item_update()->void:
 		amount_label.text = str(count)
 	else :
 		amount_label.visible = false
+
+	if enchant_label != null:
+		var enchanted: bool = false
+		if _item is WeaponData and (_item as WeaponData).weapon != null:
+			enchanted = not (_item as WeaponData).weapon.enchant_attributes.is_empty()
+		enchant_label.visible = count > 0 and enchanted

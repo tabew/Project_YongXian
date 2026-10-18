@@ -4,6 +4,7 @@ extends Button
 
 class_name SlotButton
 
+const ITEM_TOOLTIP_SCRIPT = preload("res://scripts/ui/inventory/item_tooltip.gd")
 signal take_item_signal(item_id:int, num:int)
 signal put_item_signal(item_id:int, num:int)
 
@@ -57,9 +58,11 @@ func  slot_insert(SI:SlotItem)->void:
 	slot_item = SI
 	center_container.add_child(slot_item)
 	slot_item.slot_item_update()
+	tooltip_text = ITEM_TOOLTIP_SCRIPT.build(slot_item.item as ItemData)
 
 ##清掉本格显示
 func clear_slot() -> void:
+	tooltip_text = ""
 	if slot_item == null:
 		return
 
@@ -292,6 +295,7 @@ func set_count(num:int) -> void:
 		return
 	slot_item.count = num
 	slot_item.slot_item_update()
+	tooltip_text = ITEM_TOOLTIP_SCRIPT.build(slot_item.item as ItemData)
 
 
 #//////////////////////附魔

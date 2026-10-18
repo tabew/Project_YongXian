@@ -38,3 +38,17 @@ theme_override_constants/outline_size = 3
 theme_override_font_sizes/font_size = 20
 text = "95"
 horizontal_alignment = 2
+
+[node name="EnchantLabel" type="Label" parent="." unique_id=1204456789]
+layout_mode = 0
+offset_left = 2.0
+offset_top = -2.0
+offset_right = 42.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 10
+text = "附魔"
+visible = false
