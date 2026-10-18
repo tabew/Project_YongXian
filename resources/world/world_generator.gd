@@ -23,8 +23,14 @@ const WALL_FOOT_WIDTH: float = 3.0
 const WATER_BANK_WIDTH: float = 1.4
 
 ## 世界级河流：跨箱庭连续的水系，穿过屏障处形成水峡（仍是阻挡）。
-const RIVER_HALF_WIDTH: float = 1.5
-const RIVER_BANK_WIDTH: float = 2.4
+## 斜向贯穿世界（同一世界所有河流平行），河面宽 6~9 格。
+const RIVER_HALF_WIDTH: float = 3.3
+const RIVER_BANK_WIDTH: float = 3.0
+## 河流主轴与世界的夹角范围（度）。
+const RIVER_ANGLE_MIN: float = 26.0
+const RIVER_ANGLE_MAX: float = 62.0
+## 两条河之间的最小垂直间距（格）。
+const RIVER_SPACING: float = 34.0
 ## 折线采样步长（格）与空间索引网格（格）。
 const RIVER_STEP: float = 5.0
 const RIVER_CELL: int = 32
@@ -415,9 +421,9 @@ func entry_position(map_node_id: int, side: int = 0, gate_y: int = -1) -> Vector
 
 # ------------------------------------------------------------ 世界级河流
 
-## 规划跨箱庭的河流：同一世界里河流互相平行（不交叉，避免围出封闭水域），
-## 从世界一侧流入、贯穿若干区域后从另一侧流出。避开门口、落点与起始小屋；
-## 穿屏障处是水峡（仍阻挡），区内每隔一段留浅滩保证连通。
+## 规划跨箱庭的河流：同一世界里所有河流沿同一个斜向平行流淌（不交叉，
+## 避免围出封闭水域），从世界一侧流入、贯穿若干区域后从另一侧流出。
+## 避开门口、落点与起始小屋；穿屏障处是水峡（仍阻挡），区内每隔一段留浅滩保证连通。
 func _build_rivers() -> void:
 	_river_segments.clear()
 	_river_cells.clear()
@@ -429,22 +435,29 @@ func _build_rivers() -> void:
 		bounds = bounds.merge(Rect2(Vector2(spec.origin), Vector2(spec.extent)))
 	var protected: Array[Vector2] = _protected_water_points()
 	var flow_rng: RandomNumberGenerator = rng.rng(MapRng.Stream.DECOR, MapRng.mix(0x52495652, variant))
-	var horizontal: bool = flow_rng.randf() < 0.5
+	var angle: float = deg_to_rad(flow_rng.randf_range(RIVER_ANGLE_MIN, RIVER_ANGLE_MAX))
+	var direction := Vector2(cos(angle), sin(angle))
+	if flow_rng.randf() < 0.5:
+		direction = Vector2(-direction.x, direction.y)
+	var perpendicular := Vector2(-direction.y, direction.x)
+	var span: float = absf(bounds.size.x * perpendicular.x) + absf(bounds.size.y * perpendicular.y)
 	var count: int = flow_rng.randi_range(1, 3)
-	var span: float = bounds.size.y if horizontal else bounds.size.x
 	var used: Array[float] = []
 	for river_index: int in count:
-		for attempt: int in 12:
-			var lateral: float = span * (0.16 + 0.26 * float(river_index))
-			lateral += flow_rng.randf_range(-span * 0.06, span * 0.06)
-			if not _lateral_is_free(lateral, used, span * 0.16):
+		for attempt: int in 14:
+			var lateral: float = span * (float(river_index) / 3.0 - 0.2)
+			lateral += flow_rng.randf_range(-span * 0.10, span * 0.10)
+			if not _lateral_is_free(lateral, used, RIVER_SPACING):
 				continue
-			var path: PackedVector2Array = _trace_river(bounds, horizontal, lateral)
+			var path: PackedVector2Array = _trace_river(bounds, direction, perpendicular, lateral)
 			if path.size() < 3:
 				continue
 			if not _river_clear_of(path, protected):
 				continue
-			_register_river(path, flow_rng.randf_range(RIVER_HALF_WIDTH * 0.85, RIVER_HALF_WIDTH * 1.35))
+			_register_river(
+				path,
+				flow_rng.randf_range(RIVER_HALF_WIDTH * 0.85, RIVER_HALF_WIDTH * 1.35)
+			)
 			used.append(lateral)
 			break
 
@@ -470,46 +483,32 @@ func _protected_water_points() -> Array[Vector2]:
 	return points
 
 
-## 沿固定轴向贯穿世界，用噪声横向蜿蜒；摆幅被夹住，只弯不绕。
-func _trace_river(bounds: Rect2, horizontal: bool, lateral: float) -> PackedVector2Array:
+## 沿斜向主轴贯穿世界，用噪声做横向蜿蜒；摆幅被夹住，只弯不绕。
+## lateral 是主轴相对世界中心的垂直偏移，同世界的河流共用方向，因此互不交叉。
+func _trace_river(
+	bounds: Rect2, direction: Vector2, perpendicular: Vector2, lateral: float
+) -> PackedVector2Array:
 	var path := PackedVector2Array()
-	var direction := Vector2.RIGHT
-	var start := Vector2.ZERO
-	if horizontal:
-		direction = Vector2.RIGHT if _hash_side(bounds, lateral) else Vector2.LEFT
-		start = Vector2(
-			bounds.position.x - RIVER_STEP * 2.0 if direction.x > 0.0 else bounds.end.x + RIVER_STEP * 2.0,
-			bounds.position.y + lateral
-		)
-	else:
-		direction = Vector2.DOWN if _hash_side(bounds, lateral) else Vector2.UP
-		start = Vector2(
-			bounds.position.x + lateral,
-			bounds.position.y - RIVER_STEP * 2.0 if direction.y > 0.0 else bounds.end.y + RIVER_STEP * 2.0
-		)
-	var point: Vector2 = start
-	var lateral_axis := Vector2(-direction.y, direction.x)
-	var steps: int = int((bounds.size.x + bounds.size.y) / RIVER_STEP) + 12
+	var origin: Vector2 = bounds.get_center() + perpendicular * lateral
+	var travel: float = bounds.size.length() * 0.8
+	var point: Vector2 = origin - direction * travel
+	var steps: int = int(travel * 2.0 / RIVER_STEP) + 8
 	for step: int in steps:
 		path.append(point)
 		var sway: float = _flow.get_noise_2d(point.x, point.y)
 		var bend: float = _flow.get_noise_2d(point.y * 0.7 + 137.0, point.x * 0.7 - 61.0)
-		point += direction * RIVER_STEP + lateral_axis * (sway * 2.4 + bend * 0.9)
-		var offset: float = (point - start).dot(lateral_axis)
+		point += direction * RIVER_STEP + perpendicular * (sway * 3.4 + bend * 1.1)
+		# 把横向偏移夹在主轴附近：河可以弯，但不会拐回来围出封闭水域。
+		var offset: float = (point - origin).dot(perpendicular)
 		var clamped: float = clampf(offset, -RIVER_MEANDER, RIVER_MEANDER)
 		if not is_equal_approx(clamped, offset):
-			point -= lateral_axis * (offset - clamped)
-		if point.x < bounds.position.x - RIVER_STEP * 5.0 or point.x > bounds.end.x + RIVER_STEP * 5.0:
+			point -= perpendicular * (offset - clamped)
+		if point.x < bounds.position.x - RIVER_STEP * 6.0 or point.x > bounds.end.x + RIVER_STEP * 6.0:
 			break
-		if point.y < bounds.position.y - RIVER_STEP * 5.0 or point.y > bounds.end.y + RIVER_STEP * 5.0:
+		if point.y < bounds.position.y - RIVER_STEP * 6.0 or point.y > bounds.end.y + RIVER_STEP * 6.0:
 			break
 	path.append(point)
 	return path
-
-
-## 河流从哪一侧起流：由位置与变体决定，保证同种子一致。
-func _hash_side(bounds: Rect2, lateral: float) -> bool:
-	return posmod(int(bounds.size.x + bounds.size.y) * 31 + int(lateral) * 17 + variant * 7, 2) == 0
 
 
 ## 河流离关键点至少 12 格，避免淹掉门口和落点；起始小屋所在的箱庭整体不落河。
