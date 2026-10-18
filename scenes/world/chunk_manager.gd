@@ -58,6 +58,10 @@ var _layers: Dictionary = {}
 ## node_id -> {root, spec, layers, chunks}；chunks 覆盖该地图完整矩形。
 var _regions: Dictionary = {}
 var _desired: Dictionary = {}
+## 邻图门口预加载窗口缓存（每次换图重建）。
+var _gate_windows: Dictionary = {}
+## 过场里点名预铺的窗口：图 id -> Rect2i。
+var _prewarm_windows: Dictionary = {}
 var _cache: Dictionary = {}
 var _queue: Array[Vector2i] = []
 var _in_flight: Dictionary = {}
@@ -119,6 +123,8 @@ func load_map(map_node_id: int) -> void:
 		return
 	_spec = next_spec
 	_desired.clear()
+	_gate_windows.clear()
+	_prewarm_windows.clear()
 	_desired[map_node_id] = true
 	# gate_links 包含入口与出口，所有直接邻居都隐藏预加载。
 	for link: Dictionary in _generator.gate_links(map_node_id):
@@ -139,6 +145,97 @@ func load_map(map_node_id: int) -> void:
 	prepare_visible()
 	_rebuild_queue()
 	version += 1
+
+
+## 当前相机可见区域对应的区块范围（含 RENDER_RADIUS 圈）。
+## 加载与排队都以它为准：只处理屏幕会画到的部分。
+func _visible_chunk_bounds() -> Rect2i:
+	if _spec == null or focus_node == null:
+		return Rect2i()
+	var viewport: Viewport = focus_node.get_viewport()
+	var camera: Camera2D = viewport.get_camera_2d()
+	var half_view: Vector2 = viewport.get_visible_rect().size * 0.5
+	var center: Vector2 = focus_node.global_position
+	if camera != null:
+		half_view /= camera.zoom.abs().max(Vector2.ONE * 0.001)
+		center += camera.offset
+	var bounds := Rect2(
+		Vector2(_spec.origin) * WorldGenerator.TILE_SIZE,
+		Vector2(_spec.extent) * WorldGenerator.TILE_SIZE
+	)
+	var low: Vector2 = bounds.position + half_view
+	var high: Vector2 = bounds.end - half_view
+	center.x = clampf(center.x, low.x, high.x) if low.x <= high.x else bounds.get_center().x
+	center.y = clampf(center.y, low.y, high.y) if low.y <= high.y else bounds.get_center().y
+	var visible: Rect2 = Rect2(center - half_view, half_view * 2.0).grow(WorldGenerator.TILE_SIZE).intersection(bounds)
+	if not visible.has_area():
+		return Rect2i()
+	var first: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(visible.position))
+	var last: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(visible.end - Vector2.ONE * 0.001))
+	var grow: Vector2i = Vector2i.ONE * RENDER_RADIUS
+	var window := Rect2i(first - grow, last - first + Vector2i.ONE + grow * 2)
+	# 窗口必须裁进本图范围：图外区块永远排不进队列，否则就绪判定永远不成立。
+	var map_first: Vector2i = WorldGenerator.tile_to_chunk(_spec.origin)
+	var map_last: Vector2i = WorldGenerator.tile_to_chunk(_spec.origin + _spec.extent - Vector2i.ONE)
+	return window.intersection(Rect2i(map_first, map_last - map_first + Vector2i.ONE))
+
+
+## 过场里点名预铺一处位置周围的窗口。
+## 只加载屏幕会画到的部分之后，进图开销主要就是这块预热。
+func prewarm_around(map_id: int, position: Vector2, chunks_around: int = 3) -> void:
+	if _generator == null or not _regions.has(map_id):
+		return
+	var spec: MapSpec = _generator.map_spec(map_id)
+	if spec == null:
+		return
+	var coords: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(position))
+	var grow: Vector2i = Vector2i.ONE * maxi(chunks_around, 1)
+	var map_first: Vector2i = WorldGenerator.tile_to_chunk(spec.origin)
+	var map_last: Vector2i = WorldGenerator.tile_to_chunk(spec.origin + spec.extent - Vector2i.ONE)
+	var window: Rect2i = Rect2i(coords - grow, grow * 2 + Vector2i.ONE).intersection(
+		Rect2i(map_first, map_last - map_first + Vector2i.ONE)
+	)
+	_prewarm_windows[map_id] = window
+	_rebuild_queue()
+
+
+func _prewarm_window_has(map_id: int, coords: Vector2i) -> bool:
+	if not _prewarm_windows.has(map_id):
+		return false
+	return (_prewarm_windows[map_id] as Rect2i).has_point(coords)
+
+
+## 邻图门口窗口的缓存查询。
+func _gate_window_has(map_id: int, coords: Vector2i) -> bool:
+	if not _gate_windows.has(map_id):
+		_gate_windows[map_id] = _build_gate_windows(map_id)
+	for window: Rect2i in _gate_windows[map_id]:
+		if window.has_point(coords):
+			return true
+	return false
+
+
+## 用这张图自己的门口位置算出预加载窗口。
+func _build_gate_windows(map_id: int) -> Array[Rect2i]:
+	var windows: Array[Rect2i] = []
+	var spec: MapSpec = _generator.map_spec(map_id) if _generator != null else null
+	if spec == null:
+		return windows
+	for link: Dictionary in _generator.gate_links(map_id):
+		windows.append(_gate_chunk_bounds(spec, link["point"] as Vector2i))
+	return windows
+
+
+## 门附近的预加载窗口（邻图只排这一小块，进图时门口已经铺好）。
+func _gate_chunk_bounds(spec: MapSpec, gate_tile: Vector2i) -> Rect2i:
+	var coords: Vector2i = WorldGenerator.tile_to_chunk(gate_tile)
+	var grow: Vector2i = Vector2i.ONE * 2
+	var bounds := Rect2i(
+		WorldGenerator.tile_to_chunk(spec.origin) - Vector2i.ONE,
+		WorldGenerator.tile_to_chunk(spec.origin + spec.extent - Vector2i.ONE)
+			- WorldGenerator.tile_to_chunk(spec.origin) + Vector2i.ONE * 2
+	)
+	return Rect2i(coords - grow, grow * 2 + Vector2i.ONE).intersection(bounds)
 
 
 ## 同步补齐当前相机视口。若该坐标已在线程中生成，等待它而不重复生成。
@@ -201,11 +298,20 @@ func describe_map() -> String:
 	return _generator.run.describe(_spec.node_id)
 
 
+## 可见窗口铺好就算就绪（不再等整张图）。
 func map_ready() -> bool:
 	if _spec == null or not _regions.has(_spec.node_id):
 		return false
-	var chunks: Array[Vector2i] = _regions[_spec.node_id]["chunks"]
-	return _layers.size() == chunks.size()
+	var window: Rect2i = _visible_chunk_bounds()
+	if not window.has_area():
+		var chunks: Array[Vector2i] = _regions[_spec.node_id]["chunks"]
+		return _layers.size() == chunks.size()
+	# Rect2i 的 end 是开区间，别再 +1，否则会去查图外那一列区块。
+	for cy: int in range(window.position.y, window.end.y):
+		for cx: int in range(window.position.x, window.end.x):
+			if not _layers.has(Vector2i(cx, cy)):
+				return false
+	return true
 
 
 func get_stats() -> Dictionary:
@@ -314,7 +420,9 @@ func _rebuild_queue() -> void:
 	if focus_node != null:
 		_focus_chunk = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(focus_node.global_position))
 	var queued: Dictionary = {}
-	# 当前整图优先，其余直接邻居随后；同坐标只提交一次生成。
+	# 只排屏幕会画到的区块：当前图的可见窗口 + 邻图门口的一小块。
+	# 以前把当前图与所有直连邻图的整张图都塞进队列，区块数上百，
+	# 生成/应用被挤爆，草迟迟 populate 不出来，表现为"草消失 + 卡顿"。
 	var ids: Array[int] = [_spec.node_id]
 	for id: int in _desired.keys():
 		if id != _spec.node_id:
@@ -323,6 +431,12 @@ func _rebuild_queue() -> void:
 		var layers: Dictionary = _regions[id]["layers"]
 		var chunks: Array[Vector2i] = _regions[id]["chunks"]
 		for coords: Vector2i in chunks:
+			if id == _spec.node_id:
+				var window: Rect2i = _visible_chunk_bounds()
+				if window.has_area() and not window.has_point(coords):
+					continue
+			elif not (_gate_window_has(id, coords) or _prewarm_window_has(id, coords)):
+				continue
 			if layers.has(coords):
 				continue
 			var data: ChunkData = available.get(coords, _cache.get(coords))

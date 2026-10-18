@@ -490,9 +490,14 @@ func _trace_river(
 ) -> PackedVector2Array:
 	var path := PackedVector2Array()
 	var origin: Vector2 = bounds.get_center() + perpendicular * lateral
-	var travel: float = bounds.size.length() * 0.8
-	var point: Vector2 = origin - direction * travel
-	var steps: int = int(travel * 2.0 / RIVER_STEP) + 8
+	# 先把起点推到世界矩形内部（沿主轴向前推进），否则一上来就判出界，
+	# 整条河会被 size<3 的检查丢掉。
+	var point: Vector2 = origin - direction * (bounds.size.length() * 0.6)
+	var guard: int = 0
+	while not bounds.has_point(point) and guard < 400:
+		point += direction * RIVER_STEP
+		guard += 1
+	var steps: int = int(bounds.size.length() * 1.4 / RIVER_STEP) + 8
 	for step: int in steps:
 		path.append(point)
 		var sway: float = _flow.get_noise_2d(point.x, point.y)
@@ -503,9 +508,7 @@ func _trace_river(
 		var clamped: float = clampf(offset, -RIVER_MEANDER, RIVER_MEANDER)
 		if not is_equal_approx(clamped, offset):
 			point -= perpendicular * (offset - clamped)
-		if point.x < bounds.position.x - RIVER_STEP * 6.0 or point.x > bounds.end.x + RIVER_STEP * 6.0:
-			break
-		if point.y < bounds.position.y - RIVER_STEP * 6.0 or point.y > bounds.end.y + RIVER_STEP * 6.0:
+		if not bounds.grow(RIVER_STEP).has_point(point):
 			break
 	path.append(point)
 	return path

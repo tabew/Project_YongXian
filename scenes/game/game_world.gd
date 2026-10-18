@@ -446,6 +446,7 @@ func _sync_layer_visibility() -> void:
 func _setup_grass(spec: MapSpec) -> void:
 	if _generator == null:
 		return
+	_release_distant_grass(spec)
 	_ensure_grass_context(spec)
 	# 换地图时丢掉上一张图没做完的队列，重新按新位置排。
 	_grass_queue.clear()
@@ -453,6 +454,21 @@ func _setup_grass(spec: MapSpec) -> void:
 	_grass_queued.clear()
 	_grass_focus_chunk = INVALID_CHUNK
 	_queue_grass_around(spec)
+
+
+## 只保留当前图与直连邻图的草丛容器；走远的图整棵释放。
+## 草丛数据（清除记录）留在 _grass_cleared 里，回来时按同一种子重新长出。
+func _release_distant_grass(spec: MapSpec) -> void:
+	var keep: Dictionary = {spec.node_id: true}
+	for link: Dictionary in _generator.gate_links(spec.node_id):
+		keep[int(link["target"])] = true
+	for id: int in _grass_roots.keys():
+		if keep.has(id):
+			continue
+		var root: Node = _grass_roots[id]
+		_grass_roots.erase(id)
+		if is_instance_valid(root):
+			root.queue_free()
 
 
 ## 把玩家周围视野圈内已经铺好的区块排进队列，近的先做。
@@ -613,6 +629,10 @@ func _prewarm_map(spec: MapSpec, side: int, gate_y: int) -> void:
 		return
 	_ensure_grass_context(spec)
 	var arrival: Vector2 = _generator.entry_position(spec.node_id, side, gate_y)
+	# 只加载屏幕会画到的部分：到达点周围的窗口必须在过场里先铺好，
+	# 否则进图那一帧要同步生成几十个区块，会出现明显卡顿。
+	if chunk_manager != null:
+		chunk_manager.call("prewarm_around", spec.node_id, arrival)
 	_queue_grass_ring(spec, WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(arrival)))
 
 
