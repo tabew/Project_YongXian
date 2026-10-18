@@ -8,4 +8,5 @@ attribute_id = 6
 name = "爆炸"
 max_level = 3
 need_target = false
+can_be_weapon_enchant = true
 metadata/_custom_type_script = "uid://d215mgiwgbdot"

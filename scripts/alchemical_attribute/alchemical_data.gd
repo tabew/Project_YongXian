@@ -15,6 +15,19 @@ extends Resource
 #效果是否是瞬时触发且只触发一次
 @export var is_take_only_one:bool = false
 
+##作为武器附魔时效果作用到谁：need_target = false 的属性固定作用在命中点(爆炸这类)
+enum EnchantTarget
+{
+	HIT_TARGET, ## 被命中的目标
+	WIELDER,    ## 武器持有者，治疗/恢复这类对自己生效
+}
+
+@export var enchant_target: EnchantTarget = EnchantTarget.HIT_TARGET
+
+##能不能用于武器附魔。默认 false：普通炼金属性只参与炼药，不做武器附魔；
+##附魔专属属性(单独出的附魔资源)把自己的模板设成 true。
+@export var can_be_weapon_enchant: bool = false
+
 ##可反应属性名单
 @export var can_be_interacted_attribute:Array[int];
 

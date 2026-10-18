@@ -314,3 +314,185 @@ func quick_move_to_bag(pos:int) ->int:
 
     return count
 #////////////////////////
+
+#////////////////////附魔
+##用药水给背包里的武器附魔。同一个 attribute_id 只有更高等级才会顶替，
+##等级不够的整条忽略——低级药水不会让已经附魔过的武器回退。
+##药水在拖拽开始时就已被拿掉一份，所以这里失败要把它还回背包。
+func enchant_bag_weapon(weapon_item_id:int,potion_item_id:int) ->bool:
+
+    if weapon_item_id < 0 or !has_items.has(weapon_item_id):
+        return false
+
+    var instance:WeaponData = _weapon_instance_for(get_item_template(weapon_item_id) as WeaponData)
+
+    if instance == null:
+        return false
+
+    var potion:PotionData = get_item_template(potion_item_id) as PotionData
+    var consumed:bool = _consume_enchant_potion(potion_item_id)
+    var applied:Array[String] = _apply_enchant(instance,potion)
+
+    if applied.is_empty():
+        _return_enchant_potion(potion_item_id,consumed)
+        return false
+
+    #模板武器换成附魔实例：武器不可堆叠，只换走一份，剩下的同款留在原 id
+    if instance.id != weapon_item_id:
+        _swap_one_bag_item_id(weapon_item_id,instance.id)
+
+    _finish_enchant(instance,applied,potion_item_id)
+
+    return true
+
+##用药水给物品栏(快捷栏)某一格里的武器附魔
+func enchant_handy_weapon(pos:int,potion_item_id:int) ->bool:
+
+    var weapon_item_id:int = get_handy_slot_id(pos)
+
+    if weapon_item_id < 0:
+        return false
+
+    var instance:WeaponData = _weapon_instance_for(get_item_template(weapon_item_id) as WeaponData)
+
+    if instance == null:
+        return false
+
+    var potion:PotionData = get_item_template(potion_item_id) as PotionData
+    var consumed:bool = _consume_enchant_potion(potion_item_id)
+    var applied:Array[String] = _apply_enchant(instance,potion)
+
+    if applied.is_empty():
+        _return_enchant_potion(potion_item_id,consumed)
+        return false
+
+    #模板武器换成附魔实例：本格换成实例，多出来的同款模板武器退回背包
+    if instance.id != weapon_item_id:
+        _swap_one_handy_item_id(pos,weapon_item_id,instance.id)
+
+    _finish_enchant(instance,applied,potion_item_id)
+
+    return true
+
+##取这把武器的可附魔实例：模板要先复制成独立实例并登记运行时 id(400+)，
+##已经是实例的直接用——它的武器定义本来就是本实例独有的一份，原地改就行。
+func _weapon_instance_for(weapon_item:WeaponData) ->WeaponData:
+
+    if weapon_item == null or weapon_item.weapon == null:
+        return null
+
+    var registry:Node = get_registry_node()
+
+    if registry != null and registry.has_runtime_instance(weapon_item.id):
+        return weapon_item
+
+    var instance:WeaponData = weapon_item.duplicate() as WeaponData
+
+    if instance == null:
+        return null
+
+    #附魔写在武器定义上，必须是本实例独有的一份，不能改共享模板
+    instance.weapon = weapon_item.weapon.duplicate(true) as WeaponDefinition
+    instance.id = WeaponData.next_instance_id()
+
+    if registry != null:
+        while !registry.register_instance(instance):
+            instance.id = WeaponData.next_instance_id()
+
+    return instance
+
+##把药水的炼金属性逐条附上，返回真正生效的属性名
+func _apply_enchant(instance:WeaponData,potion:PotionData) ->Array[String]:
+
+    var applied:Array[String] = []
+
+    if potion == null:
+        return applied
+
+    for attribute:AlchemicalData in potion.alchemical_attribute:
+
+        if attribute != null and instance.weapon.add_enchant(attribute):
+            applied.append(attribute.name)
+
+    return applied
+
+##附魔收尾：登记新实例、药水用完就注销它的运行时实例、通知 UI
+func _finish_enchant(instance:WeaponData,applied:Array[String],potion_item_id:int) ->void:
+
+    get_item_data[instance.id] = instance
+
+    _drop_runtime_instance_if_gone(potion_item_id)
+
+    inventory_update.emit()
+
+    _notify("附魔成功：%s + %s" % [instance.name,"、".join(applied)])
+
+##附魔要消耗一份药水。拖拽路径上药水已经被拿走了(背包里没有)，直接调用时还在背包里，
+##所以这里统一扣：扣到了返回 true，附魔失败时要还回去。
+func _consume_enchant_potion(potion_item_id:int) ->bool:
+
+    if get_count(potion_item_id) > 0:
+        remove_item(potion_item_id,1)
+        return true
+
+    return false
+
+##附魔没生效：把刚才扣掉的那份药水放回背包
+func _return_enchant_potion(potion_item_id:int,consumed:bool) ->void:
+
+    if consumed:
+        add_item(potion_item_id,1)
+
+    _notify("附魔失败：药水没有能上武器的属性(属性没开武器附魔，或等级不高于已有的同类附魔)")
+
+##背包里某种物品只换走一份(模板武器 -> 附魔实例)。
+##武器是不可堆叠的独立实例：同 id 堆叠时只迁移一份，剩下的还留在原 id 里，
+##否则一瓶药水会把整堆武器都变成同一个实例、数量也一起搬过去。
+func _swap_one_bag_item_id(old_id:int,new_id:int) ->void:
+
+    if get_count(old_id) <= 0:
+        return
+
+    remove_item(old_id,1)
+
+    items[new_id] = 1
+
+    if !has_items.has(new_id):
+        has_items.append(new_id)
+
+    get_item_data[new_id] = get_item_template(new_id)
+
+##物品栏某一格的物品只换走一份(模板武器 -> 附魔实例)。
+##本格留给附魔实例(数量 1)，多出来的同款模板武器退回背包：物品栏一格只能装一种 id。
+func _swap_one_handy_item_id(pos:int,old_id:int,new_id:int) ->void:
+
+    if get_handy_slot_id(pos) != old_id:
+        return
+
+    var leftover:int = get_handy_slot_count(pos) - 1
+
+    handy_items_pos[pos] = new_id
+    handy_items[pos] = 1
+
+    get_item_data[new_id] = get_item_template(new_id)
+
+    if leftover > 0:
+        add_item(old_id,leftover)
+
+##事件总线：UI 提示用。取不到就安静跳过，--script 测试里没有 HUD 也不会炸
+func _notify(message:String) ->void:
+
+    var loop:MainLoop = Engine.get_main_loop()
+
+    if !(loop is SceneTree):
+        return
+
+    var tree:SceneTree = loop as SceneTree
+
+    if tree.root == null:
+        return
+
+    var bus:Node = tree.root.get_node_or_null("EventBus")
+
+    if bus != null and bus.has_signal("notification"):
+        bus.emit_signal("notification",message)

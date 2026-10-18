@@ -50,6 +50,7 @@ func bag_update() ->void:
 		slot_node.take_item_signal.connect(take_item)
 		slot_node.put_item_signal.connect(put_item)
 		slot_node.quick_move_signal.connect(_on_slot_quick_move) #shift+左键：整堆挪进快捷栏
+		slot_node.enchant_item_signal.connect(_on_slot_enchant) #药水拖到武器上：附魔
 		slot_node.slot_insert(slot_item_)
 
 		slot_node.tooltip_text = _build_item_tooltip(item)
@@ -84,6 +85,14 @@ func _on_slot_quick_move(item_id:int,num:int) ->void:
 		return
 
 	_refresh_slot(item_id)
+
+##药水拖到武器上：交给背包附魔。附魔只换走一份，原来的 id 还有剩余(同款武器堆叠)
+##就保留旧格子，整份都被换走才把格子收掉。
+func _on_slot_enchant(weapon_item_id:int,potion_item_id:int) ->void:
+	if !inventory.enchant_bag_weapon(weapon_item_id,potion_item_id):
+		return
+
+	_refresh_slot(weapon_item_id)
 
 ##背包里某种物品的数量变了就同步显示，整堆拿完就把格子收掉
 func _refresh_slot(item_id:int) ->void:
@@ -129,9 +138,17 @@ func _build_item_tooltip(item: ItemData) -> String:
 	if item == null:
 		return ""
 
+	var attributes:Array[AlchemicalData] = []
+	attributes.assign(item.alchemical_attribute)
+
+	#武器附魔挂在武器定义上，一并列出来
+	if item is WeaponData and (item as WeaponData).weapon != null:
+		for enchant:AlchemicalData in (item as WeaponData).weapon.enchant_attributes:
+			attributes.append(enchant)
+
 	var attribute_text:String = ""
 
-	for attribute:AlchemicalData in item.alchemical_attribute:
+	for attribute:AlchemicalData in attributes:
 
 		if attribute == null:
 			continue

@@ -40,6 +40,8 @@ func init_button() -> void:
 
 		button.select_item_signal.connect(_on_slot_select.bind(pos)) #左键切换选中
 
+		button.enchant_item_signal.connect(_on_slot_enchant.bind(pos)) #药水拖到本格武器上：附魔
+
 
 
 ##物品栏更新函数，同步物品栏数据
@@ -126,6 +128,12 @@ func _next_slot(from:int, step:int) ->int:
 ##快捷移动
 func _on_slot_quick_move(_item_id:int,_num:int,pos:int) ->void:
 	inventory.quick_move_to_bag(pos)
+
+##药水拖到本格的武器上：附魔。附魔成功后这一格的 id 会变成武器实例 id，
+##本格同款还有多份的话退回背包；背包数据变了会发 inventory_update，
+##_slot_update 会照着新 id 重建本格显示。
+func _on_slot_enchant(_weapon_item_id:int,potion_item_id:int,pos:int) ->void:
+	inventory.enchant_handy_weapon(pos,potion_item_id)
 
 
 func _input(event: InputEvent) -> void:
