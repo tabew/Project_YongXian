@@ -119,7 +119,9 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 
 
 ## 武器附魔：命中后把武器上的炼金属性逐个作用出去。
-## need_target 的属性作用到被命中的实体，其余(爆炸这类)作用到命中点；
+## 附魔效果在武器命中结算之后单独触发，不并入 hit.damage；
+## 爆炸等 need_target = false 的属性会用自己的 use_effect 再生成一次伤害判定。
+## need_target 的属性作用到被命中的实体，其余作用到命中点；
 ## enchant_target = WIELDER 的属性(治疗/恢复)作用到持武器的人自己。
 func _apply_enchant_effects(hurtbox: CombatHurtbox) -> void:
 	if definition == null or definition.enchant_attributes.is_empty():

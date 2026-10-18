@@ -53,8 +53,6 @@ func bag_update() ->void:
 		slot_node.enchant_item_signal.connect(_on_slot_enchant) #药水拖到武器上：附魔
 		slot_node.slot_insert(slot_item_)
 
-		slot_node.tooltip_text = _build_item_tooltip(item)
-
 		item_for_button[item_id] = slot_node
 
 
@@ -131,37 +129,3 @@ func _input_update():
 			item_for_button[item_id].queue_free()
 		item_for_button.clear()
 		bag_update()
-
-##鼠标悬停提示的物品名，空一行后列出炼金属性。
-func _build_item_tooltip(item: ItemData) -> String:
-
-	if item == null:
-		return ""
-
-	var attributes:Array[AlchemicalData] = []
-	attributes.assign(item.alchemical_attribute)
-
-	#武器附魔挂在武器定义上，一并列出来
-	if item is WeaponData and (item as WeaponData).weapon != null:
-		for enchant:AlchemicalData in (item as WeaponData).weapon.enchant_attributes:
-			attributes.append(enchant)
-
-	var attribute_text:String = ""
-
-	for attribute:AlchemicalData in attributes:
-
-		if attribute == null:
-			continue
-
-		if attribute_text != "":
-			attribute_text += "\n"
-
-		if attribute.level > 0:
-			attribute_text += str(attribute.name) + str(attribute.level)
-		else:
-			attribute_text += str(attribute.name)
-
-	if attribute_text == "":
-		return str(item.name) + "\n\n无属性"
-
-	return str(item.name) + "\n\n" + attribute_text
