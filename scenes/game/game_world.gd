@@ -48,6 +48,8 @@ var _nearby_pickup: GroundPickup = null
 var _nearby_chest: WorldChest = null
 ## 站在旁边的野外炼金台；按 E 开关炼金界面。
 var _nearby_station: WorldStructure = null
+## 已打碎的木桶（按 地图:坐标 记录，切图/回图不再长回来）。
+var _barrels_broken: Dictionary = {}
 var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
 ## 草层容器本身压在地形之上：每个草块再按人物脚底决定画在前还是后（0 / 1），
@@ -393,6 +395,16 @@ func _setup_world_population(spec: MapSpec) -> void:
 		chest.bind(entry, _generator)
 		chest.position = WorldGenerator.tile_to_world(entry["tile"])
 		entity_root.add_child(chest)
+	for entry: Dictionary in population.get("barrels", []):
+		var tile: Vector2i = entry["tile"]
+		if _barrels_broken.has(_barrel_key(spec.node_id, tile)):
+			continue
+		var barrel := WorldBarrel.new()
+		barrel.name = "Barrel_%d_%d" % [tile.x, tile.y]
+		barrel.bind(int(entry["item_id"]), int(entry["amount"]))
+		barrel.position = WorldGenerator.tile_to_world(tile)
+		barrel.broken.connect(_on_barrel_broken.bind(spec.node_id, tile))
+		entity_root.add_child(barrel)
 	for entry: Dictionary in population.get("drops", []):
 		var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
 		if data == null:
@@ -403,6 +415,31 @@ func _setup_world_population(spec: MapSpec) -> void:
 		pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 		entity_root.add_child(pickup)
 	_population_maps[spec.node_id] = true
+
+
+## 木桶被打碎：记录状态、按数量掉木棍。
+func _on_barrel_broken(barrel: WorldBarrel, map_id: int, tile: Vector2i) -> void:
+	if barrel == null:
+		return
+	_barrels_broken[_barrel_key(map_id, tile)] = true
+	var data: IngredientData = ItemListGlobal.get_template(barrel.item_id) as IngredientData
+	var root: Node2D = _map_entity_roots.get(map_id)
+	if data != null and root != null:
+		var drop_point: Vector2 = barrel.position
+		for index: int in maxi(barrel.amount, 1):
+			var pickup := GroundPickup.new()
+			pickup.name = "BarrelLoot_%d_%d_%d" % [tile.x, tile.y, index]
+			pickup.bind(data, 1, _generator)
+			pickup.position = drop_point + Vector2(
+				float(index - (barrel.amount - 1) * 0.5) * 7.0,
+				float(posmod(index * 5, 4)) - 2.0
+			)
+			root.add_child(pickup)
+	AudioManager.play_sfx(&"stone_land", barrel.position)
+
+
+func _barrel_key(map_id: int, tile: Vector2i) -> String:
+	return "%d:%d,%d" % [map_id, tile.x, tile.y]
 
 
 func _setup_ground_materials(spec: MapSpec) -> void:

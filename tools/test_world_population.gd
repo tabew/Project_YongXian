@@ -32,6 +32,7 @@ func _check_plans() -> void:
 		var replica := WorldGenerator.new(seed_value)
 		var worker := WorldGenerator.new(seed_value, generator.config, generator.variant, generator.population_snapshot())
 		var kinds: Dictionary = {}
+		var barrel_total: int = 0
 		var chest_total: int = 0
 		var structure_total: int = 0
 		var drop_total: int = 0
@@ -57,6 +58,22 @@ func _check_plans() -> void:
 				centers.append(structure["tile"] as Vector2i)
 			# 每张箱庭保证有一台炼金台；结构之间留出间距，不挤成一堆。
 			_check(alchemy_count >= 1, "region_has_an_alchemy_station")
+			_check(
+				(population["structures"] as Array).size() <= WorldPopulation.STRUCTURE_MAX,
+				"structure_count_stays_sparse"
+			)
+			# 木桶：只摆在营地/补给点/炼金台旁，占一格，旁边有可站的空地。
+			for barrel: Dictionary in population["barrels"]:
+				var barrel_tile: Vector2i = barrel["tile"]
+				barrel_total += 1
+				_check(not generator.is_walkable(barrel_tile), "barrel_blocks_its_tile")
+				_check(int(barrel["item_id"]) == WorldPopulation.BARREL_ITEM, "barrel_drops_wood")
+				_check(int(barrel["amount"]) >= 1, "barrel_has_loot")
+				var open_neighbour: bool = false
+				for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+					if generator.is_walkable(barrel_tile + offset):
+						open_neighbour = true
+				_check(open_neighbour, "barrel_is_reachable")
 			var too_close: bool = false
 			for left: int in centers.size():
 				for right: int in range(left + 1, centers.size()):
@@ -86,7 +103,9 @@ func _check_plans() -> void:
 		_check(kinds.size() == WorldPopulation.KINDS.size(), "all_five_structure_types_spawn")
 		_check(MapValidator.validate(generator).is_empty(), "world_constraints_remain_valid")
 		signatures[var_to_str(generator.population_for(0))] = true
-		print("POPULATION_SAMPLE seed=%d structures=%d chests=%d drops=%d" % [seed_value, structure_total, chest_total, drop_total])
+		_check(barrel_total > 0, "world_has_wooden_barrels")
+		print("POPULATION_SAMPLE seed=%d structures=%d barrels=%d chests=%d drops=%d" % [
+			seed_value, structure_total, barrel_total, chest_total, drop_total])
 	_check(signatures.size() == 4, "different_seeds_change_population")
 
 

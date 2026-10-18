@@ -6,7 +6,20 @@ const KINDS: Array[StringName] = [&"camp", &"ruins", &"alchemy", &"supplies", &"
 ## 炼金台：野外唯一的炼金交互点，每张箱庭保证至少一台。
 const ALCHEMY_KIND: StringName = &"alchemy"
 ## 结构之间留出的最小间隔（格）。之前是 3，结构容易挤在一起。
-const STRUCTURE_GAP: int = 6
+const STRUCTURE_GAP: int = 8
+## 结构数量按面积摊：以前每 2400 格一处（大地图能有 16 处），显得太密；
+## 现在每 4200 格一处，并压到 5~11 处，小图也至少保留 5 种。
+const STRUCTURE_DIVISOR: int = 4200
+const STRUCTURE_MIN: int = 5
+const STRUCTURE_MAX: int = 11
+## 木桶只摆在"有人活动"的结构旁：营地、补给点、炼金台。
+const BARREL_KINDS: Array[StringName] = [&"camp", &"supplies", &"alchemy"]
+## 木桶相对结构中心的候选位置（结构底面是 9x7，贴边摆）。
+const BARREL_SLOTS: Array[Vector2i] = [
+	Vector2i(3, 2), Vector2i(-3, 2), Vector2i(4, -1), Vector2i(-4, -1), Vector2i(3, 3), Vector2i(-3, 3)
+]
+## 木桶掉落物：木棍（id 1）。
+const BARREL_ITEM: int = 1
 const LOOT_POOL: Array[int] = [0, 1, 2, 5]
 const SALT: int = 0x504F5055
 
@@ -25,7 +38,7 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 		safe_points.append(WorldGenerator.world_to_tile(generator.entry_position(spec.node_id, link["side"], link["y"])))
 	if spec.cottage != null:
 		reserved.append(Rect2i(spec.origin + spec.cottage.bounds.position, spec.cottage.bounds.size).grow(5))
-	var count: int = clampi(spec.extent.x * spec.extent.y / 2400, 6, 16)
+	var count: int = clampi(spec.extent.x * spec.extent.y / STRUCTURE_DIVISOR, STRUCTURE_MIN, STRUCTURE_MAX)
 	var rotation: int = decor_rng.randi_range(0, KINDS.size() - 1)
 	for attempt: int in 900:
 		if structures.size() >= count:
@@ -49,6 +62,29 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 			blocked[tile + offset] = true
 		structures.append({"kind": kind, "tile": tile, "rect": footprint, "variant": decor_rng.randi_range(0, 2)})
 		reserved.append(footprint.grow(STRUCTURE_GAP))
+	# 木桶：贴着营地 / 补给点 / 炼金台摆，打碎掉木棍。先于宝箱与掉落规划，
+	# 因为它们会占用格子，后续点位会自动避开。
+	var barrels: Array[Dictionary] = []
+	var slot: int = 0
+	for entry: Dictionary in structures:
+		if not BARREL_KINDS.has(entry["kind"] as StringName):
+			continue
+		var base: Vector2i = entry["tile"] as Vector2i
+		var wanted: int = 2 if decor_rng.randf() < 0.45 else 1
+		for index: int in wanted:
+			var tile: Vector2i = base + BARREL_SLOTS[slot % BARREL_SLOTS.size()]
+			slot += 1
+			if blocked.has(tile) or not Rect2i(spec.origin, spec.extent).grow(-2).has_point(tile):
+				continue
+			if not generator.is_walkable(tile):
+				continue
+			barrels.append({
+				"tile": tile,
+				"item_id": BARREL_ITEM,
+				"amount": decor_rng.randi_range(1, 3),
+			})
+			blocked[tile] = true
+			reserved.append(Rect2i(tile, Vector2i.ONE))
 	var chest_count: int = loot_rng.randi_range(2, 4)
 	if generator.run.type_of(spec.node_id) == RoomType.Kind.REWARD:
 		chest_count += 2
@@ -78,7 +114,14 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 		# 草药、木棍、石头；怪物专属掉落仍由原怪物系统提供。
 		drops.append({"tile": tile, "item_id": loot_rng.randi_range(0, 2), "amount": loot_rng.randi_range(1, 3)})
 		reserved.append(footprint.grow(1))
-	return {"structures": structures, "chests": chests, "drops": drops, "blocked": blocked, "reserved": reserved}
+	return {
+		"structures": structures,
+		"barrels": barrels,
+		"chests": chests,
+		"drops": drops,
+		"blocked": blocked,
+		"reserved": reserved,
+	}
 
 
 static func _candidate(spec: MapSpec, source: RandomNumberGenerator, margin: int) -> Vector2i:
