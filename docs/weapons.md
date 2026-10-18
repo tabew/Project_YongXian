@@ -217,6 +217,45 @@ Enemy (Node2D / CharacterBody2D)
 
 如果未来为玩家增加受击框，使用 PlayerHurtbox 层（第 2 层，掩码值 2）、team 1；敌方武器的 `hit_mask` 相应设为 2。
 
+## 武器附魔（用药水）
+
+用药水给武器附魔：把药水的炼金属性原样搬到武器上，命中时这些属性被逐个 `use_effect` 出去。不新增一套"能力"系统——属性自己怎么生效（爆炸、挂 buff），就怎么作用到武器上。
+
+### 怎么用
+
+在背包或快捷栏里把药水拖到**武器格**上：
+
+- 拖起来的那一刻药水就从背包扣掉一份，拖拽被拒绝或取消会自动还回原格，所以"放下去"就等于"消耗一瓶"。
+- 目标格不是武器、载荷不是药水，或者药水等级不够，`_can_drop_data` 直接返回 `false`：拖拽失败、药水自动回家，不会出现"扣了瓶没效果"。
+- 附魔成功会走 `EventBus.notification` 弹提示；武器的鼠标提示里会多出附魔属性。
+
+### 叠加规则
+
+- 只有 `AlchemicalData.can_be_weapon_enchant = true` 的属性上得了武器：炼药专属属性默认 `false`，拖到武器上会被直接拒绝、药水原样退回；附魔专属属性在自己的 `.tres` 里把这个开关打开。
+- 不同 `attribute_id` 可以叠加，一把武器能挂多条不同附魔。
+- 同一个 `attribute_id` 只保留一条，**只有等级更高才会顶替**；同级或更低整条忽略，武器不回退（`WeaponDefinition.can_enchant_with()` / `add_enchant()`）。
+
+### 数据与接线
+
+| 位置 | 作用 |
+| --- | --- |
+| `resources/weapons/weapon_definition.gd` | `enchant_attributes` + `can_enchant_with()` / `add_enchant()`：附魔数据与叠加规则 |
+| `scripts/alchemical_attribute/alchemical_data.gd` | `enchant_target`：作为附魔时作用到 `HIT_TARGET`（默认）还是 `WIELDER`（治疗/恢复对自己）；`can_be_weapon_enchant`：这条属性能不能上武器，默认 false |
+| `scripts/items/weapons/weapon_data.gd` | `INSTANCE_ID_START = 400` 与 `next_instance_id()`：附魔武器是独立实例 |
+| `scripts/ui/inventory/inventory.gd` | `enchant_bag_weapon()` / `enchant_handy_weapon()`：造实例、附属性、只换走一份、扣药水、注销药水实例 |
+| `scripts/ui/inventory/slot_button.gd` | 药水→武器的拖放判定与 `enchant_item_signal` |
+| `scripts/ui/inventory/bag_ui.gd` / `bottom_bag_ui.gd` | 转发拖放请求；背包侧附魔只换走一份，旧格子按剩余数量保留或收掉 |
+| `scripts/weapons/weapon_attack.gd` | `_apply_enchant_effects()`：命中后把附魔逐个作用出去 |
+| `scripts/player.gd` | 按类型判断武器；附魔把武器换成实例后自动重新装备 |
+
+要点：
+
+- **附魔写在武器定义上，不写在模板上。** 模板武器（id 200-202）第一次被附魔时复制成运行时实例（id 400+，走 `ItemListGlobal.register_instance`），并把自己那份 `WeaponDefinition` 深拷贝出来再挂附魔，所以共享 `.tres` 和别的同款武器都不受影响。
+- **`id >= 300` 不再一律当药水。** `ItemListGlobal` 按区间分派：300-399 药水实例、400+ 附魔武器实例（必须登记过，否则视为无效 id）。
+- `need_target = false` 的属性（爆炸）作用在**命中点**：用一个临时标记点当作用位置，不把效果挂到怪物身上（怪死了会把挂在它下面的特效一起带走）。
+- **武器不可堆叠，附魔只动一份。** 背包用 id→数量存东西，同 id 武器会堆在一条记录里；附魔时只迁走一份（`_swap_one_bag_item_id()`），剩下的还留在原 id。快捷栏那一格换成附魔实例，多出来的同款模板武器退回背包；不然一瓶药水会把整堆都变成同一个实例。
+- 附魔目前是永久的，还没有充能/次数限制。
+
 ## 判定与边界
 
 - 每次攻击锁定方向和数值，位移仍跟随持有者。
@@ -239,6 +278,7 @@ godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/test_weapons.gd
 godot --headless --path . --script res://tests/test_combat_integration.gd
 godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
+godot --headless --path . --script res://tools/test_weapon_enchant.gd
 ```
 
 测试覆盖三类模板的复制、独立调参、装备、正确动作类型、命中伤害和来源 ID，以及攻击阶段、方向、范围、阵营、碰撞层、多受击框去重、多目标、高速攻击、位移扫掠、数据快照、暴击、防御、击退、死亡重生、自动重复、快速点按、冷却、装备取消和不同攻击行为的扩展接口。溜溜球另外覆盖指针内定位、绳长边界、松手收回、重复命中冷却、跟随速度限制与无人按住的自动回收。集成测试另外验证开局按快捷栏选中装备、通过快捷栏格子上装武器、模板副本做成物品后同样能装备、HUD 更新，以及玩家输入、世界重建和场景衔接。物品栏验收另外验证选中不触发使用、`use()` 返回值决定扣数、武器物品装备后不消耗、滚轮可以停在空格上。

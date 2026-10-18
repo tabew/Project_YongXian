@@ -160,11 +160,11 @@ func rebuild_weapon() -> void:
 	weapon_controller.equip(base)
 
 
-## 当前选中格对应的基础武器定义（原始 .tres，未被升级卡污染）。
+## 当前选中格对应的基础武器定义（模板或附魔实例，未被升级卡叠改）。
 func _base_weapon() -> WeaponDefinition:
-	if inventory == null or handy_item < 200 or handy_item >= 300:
+	if inventory == null:
 		return null
-	var data: ItemData = inventory.get_item_data.get(handy_item)
+	var data: ItemData = inventory.get_item_template(handy_item)
 	if data == null or not (data is WeaponData):
 		return null
 	return (data as WeaponData).weapon
@@ -237,11 +237,20 @@ func _unhandled_input(event: InputEvent) -> void:
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
 
-	if handy_item >=200&&handy_item<300:
+	#附魔过的武器是运行时实例(id 400+)，这里按类型判断，不再靠 id 段
+	var data:ItemData = inventory.get_item_template(handy_item)
+
+	if data is WeaponData:
 		rebuild_weapon()
 	else:
 		weapon_controller.equip(null)
 
+
+##背包变化后同步手上这把：选中格换成了别的物品（拖拽、附魔把武器换成实例、用完）
+##就重新装备。只在格子里的 id 真的变了才动作，避免捡个材料也把正在挥的攻击打断。
+func _sync_handy_item() ->void:
+	if inventory.get_handy_slot_id(inventory.get_selected_handy()) != handy_item:
+		handy_item_changed()
 
 ##ui是否挡着世界操作
 func is_ui_blocking() -> bool:

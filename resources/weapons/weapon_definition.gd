@@ -62,3 +62,41 @@ func validation_errors() -> PackedStringArray:
 	if hit_mask == 0:
 		errors.append("Select at least one hurtbox collision layer.")
 	return errors
+
+
+@export_group("Enchant")
+## 附魔属性：命中时逐个 use_effect 到目标/命中点。不同 attribute_id 可以叠加；
+## 同一个 attribute_id 只保留最高级（见 add_enchant）。
+## 只有 AlchemicalData.can_be_weapon_enchant 为 true 的属性上得了武器。
+@export var enchant_attributes: Array[AlchemicalData] = []
+
+
+## 这条属性能不能附到本武器上：属性自己得先允许武器附魔
+## (AlchemicalData.can_be_weapon_enchant，炼药专属属性默认 false)，
+## 再看有没有同类属性、同类是否等级更高。
+## 等级相同或更低时整条忽略，也就是低级药水不会让武器回退。
+func can_enchant_with(attribute: AlchemicalData) -> bool:
+	if attribute == null:
+		return false
+	if not attribute.can_be_weapon_enchant:
+		return false
+	for existing: AlchemicalData in enchant_attributes:
+		if existing != null and existing.attribute_id == attribute.attribute_id:
+			return attribute.level > existing.level
+	return true
+
+
+## 附上一条属性（复制一份，不跟药水实例共用同一个对象）。
+## 同 attribute_id 时只有更高等级会顶替原条；否则返回 false 且不做任何改动。
+func add_enchant(attribute: AlchemicalData) -> bool:
+	if not can_enchant_with(attribute):
+		return false
+	var copy: AlchemicalData = attribute.duplicate() as AlchemicalData
+	copy.level = attribute.level
+	for index: int in enchant_attributes.size():
+		var existing: AlchemicalData = enchant_attributes[index]
+		if existing != null and existing.attribute_id == copy.attribute_id:
+			enchant_attributes[index] = copy
+			return true
+	enchant_attributes.append(copy)
+	return true
