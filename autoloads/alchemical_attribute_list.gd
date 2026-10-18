@@ -31,6 +31,22 @@ enum ATTRIBUTE
 	THUNDER = 23,
 	RAGE = 24,
 	AGILITY = 25,
+	DEFTNESS = 26,
+	SHARPNESS = 27,
+	HASTE = 28,
+	REND = 29,
+	WATER = 30,
+	EARTH = 31,
+	METAL = 32,
+	WIND = 33,
+	FLOWER = 34,
+	FLESH = 35,
+	FUR = 36,
+	BONE = 37,
+	ACID = 38,
+	OIL = 39,
+	SALT = 40,
+	ASH = 41,
 }
 
 
@@ -65,7 +81,23 @@ enum ATTRIBUTE
 	# ===== AI 修改结束 =====
 	preload("res://resources/alchemical_attribute/thunder.tres"),
 	preload("res://resources/alchemical_attribute/rage.tres"),
-	preload("res://resources/alchemical_attribute/agility.tres")
+	preload("res://resources/alchemical_attribute/agility.tres"),
+	preload("res://resources/alchemical_attribute/deftness.tres"),
+	preload("res://resources/alchemical_attribute/sharpness.tres"),
+	preload("res://resources/alchemical_attribute/haste.tres"),
+	preload("res://resources/alchemical_attribute/rend.tres"),
+	preload("res://resources/alchemical_attribute/water.tres"),
+	preload("res://resources/alchemical_attribute/earth.tres"),
+	preload("res://resources/alchemical_attribute/metal.tres"),
+	preload("res://resources/alchemical_attribute/wind.tres"),
+	preload("res://resources/alchemical_attribute/flower.tres"),
+	preload("res://resources/alchemical_attribute/flesh.tres"),
+	preload("res://resources/alchemical_attribute/fur.tres"),
+	preload("res://resources/alchemical_attribute/bone.tres"),
+	preload("res://resources/alchemical_attribute/acid.tres"),
+	preload("res://resources/alchemical_attribute/oil.tres"),
+	preload("res://resources/alchemical_attribute/salt.tres"),
+	preload("res://resources/alchemical_attribute/ash.tres")
 ]
 
 ##id -> 模板

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://bfcr7f1u8rhui"]
+
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_bv4l6"]
+[ext_resource type="Texture2D" uid="uid://dhsv2ppsx7xen" path="res://assets/ui/buffs/deftness.png" id="1_xe61p"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_xe61p"]
+
+[sub_resource type="Resource" id="Resource_mbi2t"]
+script = ExtResource("1_bv4l6")
+stat = &"dodge_recovery"
+value = 0.35
+value_per_level = 0.15
+
+[resource]
+script = ExtResource("2_xe61p")
+id = &"deftness"
+display_name = "灵巧"
+description = "闪避次数的回复速度提高，持续 8 秒。"
+icon = ExtResource("1_xe61p")
+duration = 8.0
+modifiers = Array[ExtResource("1_bv4l6")]([SubResource("Resource_mbi2t")])

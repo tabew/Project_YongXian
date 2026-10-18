@@ -9,6 +9,8 @@ signal died(hit: CombatHit)
 @export_range(0.0, 10000.0, 0.5) var defense: float = 0.0
 #buff 修改的受到的伤害倍率，1.0为正常
 @export_range(0.0, 10.0, 0.05) var damage_taken: float = 1.0
+##无敌帧：为真时 receive_hit 直接不结算（闪避等用）
+var invulnerable: bool = false
 
 var current_health: float = 0.0
 
@@ -47,6 +49,10 @@ func set_current_health(value: float) -> void:
 func receive_hit(hit: CombatHit) -> bool:
 	if hit == null or not is_alive():
 		return false
+	# ===== AI 修改开始 (无敌帧：闪避期间免疫伤害) =====
+	if invulnerable:
+		return false
+	# ===== AI 修改结束 =====
 	#先过 buff 的受伤倍率，再减防御
 	var mitigated: float = maxf(hit.damage * damage_taken - defense, 0.0)
 	#伤害吸收效果，各类增减免伤正常结算完，再把最终伤害反转成回复

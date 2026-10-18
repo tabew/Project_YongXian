@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Rend" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/rend.gd" id="1_rend"]
+
+[resource]
+script = ExtResource("1_rend")
+attribute_id = 29
+name = "裂伤"
+max_level = 3
+can_be_weapon_enchant = true

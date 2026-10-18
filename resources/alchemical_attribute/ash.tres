@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Ash" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/ash.gd" id="1_ash"]
+
+[resource]
+script = ExtResource("1_ash")
+attribute_id = 41
+name = "灰"
+max_level = 0

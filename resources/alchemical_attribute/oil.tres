@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Oil" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/oil.gd" id="1_oil"]
+
+[resource]
+script = ExtResource("1_oil")
+attribute_id = 39
+name = "油"
+max_level = 0

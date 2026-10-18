@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Haste" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/haste.gd" id="1_haste"]
+[ext_resource type="Resource" path="res://resources/buffs/haste.tres" id="2_haste"]
+
+[resource]
+script = ExtResource("1_haste")
+attribute_id = 28
+name = "急速"
+max_level = 3
+can_be_weapon_enchant = true
+enchant_target = 1
+buff = ExtResource("2_haste")

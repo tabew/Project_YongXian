@@ -424,6 +424,8 @@ func _finish_enchant(instance:WeaponData,applied:Array[String],potion_item_id:in
     _drop_runtime_instance_if_gone(potion_item_id)
 
     inventory_update.emit()
+    #武器的定义变了：玩家的手持武器是装备时的副本，必须重新装备一次附魔才会立刻生效
+    handy_selection_changed.emit()
 
     _notify("附魔成功：%s + %s" % [instance.name,"、".join(applied)])
 

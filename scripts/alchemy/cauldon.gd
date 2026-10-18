@@ -264,13 +264,29 @@ func create_from_attributes() -> PotionData:
 	#属性各自复制一份
 	potion.alchemical_attribute = []
 
+	# ===== AI 修改开始 (装瓶时同属性只留最高等级) =====
+	# 炼金途中同属性不同等级是各占一条的（不允许合并，否则没法按等级区分），
+	# 装瓶结算时才按 attribute_id 去重：只取等级最高的那条，顺序按第一次出现的位置。
+	var by_id: Dictionary = {}
+	var order: Array[int] = []
+
 	for attribute:AlchemicalData in attributes:
 		if attribute == null:
 			continue
+		if !order.has(attribute.attribute_id):
+			order.append(attribute.attribute_id)
+		var current:AlchemicalData = by_id.get(attribute.attribute_id) as AlchemicalData
+		if current == null or attribute.level > current.level:
+			by_id[attribute.attribute_id] = attribute
 
-		var attr = attribute.duplicate()
-		attr.level = attribute.level
+	for id:int in order:
+		var chosen:AlchemicalData = by_id.get(id) as AlchemicalData
+		if chosen == null:
+			continue
+		var attr = chosen.duplicate()
+		attr.level = chosen.level
 		potion.alchemical_attribute.append(attr)
+	# ===== AI 修改结束 =====
 
 	potion.id = PotionData.next_potion_id()
 

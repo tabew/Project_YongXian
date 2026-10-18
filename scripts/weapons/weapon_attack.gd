@@ -103,10 +103,12 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 	var multiplier: float = 1.0
 	if wielder != null and wielder.has_method("outgoing_damage_multiplier"):
 		multiplier = float(wielder.call("outgoing_damage_multiplier", hurtbox))
-	#buff 的攻击力倍率：玩家/怪物实现了 read_stat 才生效
+	#buff / 附魔的加成：固定加值加在基础伤害上，倍率乘在后面
+	var flat_add: float = 0.0
 	if wielder != null and wielder.has_method("read_stat"):
+		flat_add = maxf(float(wielder.call("read_stat", &"damage_add")), 0.0)
 		multiplier *= maxf(float(wielder.call("read_stat", &"damage_dealt")), 0.0)
-	hit.damage = definition.damage * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
+	hit.damage = (definition.damage + flat_add) * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()
 	if direction.is_zero_approx():

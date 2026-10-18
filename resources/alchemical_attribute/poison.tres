@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_poison")
 attribute_id = 10
+can_be_weapon_enchant = true
 name = "中毒"
 max_level = 3
 can_be_interacted_attribute = Array[int]([4, 10])

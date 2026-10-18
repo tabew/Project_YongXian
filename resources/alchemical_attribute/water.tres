@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Water" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/water.gd" id="1_water"]
+
+[resource]
+script = ExtResource("1_water")
+attribute_id = 30
+name = "水"
+max_level = 0

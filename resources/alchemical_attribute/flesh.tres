@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Flesh" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/flesh.gd" id="1_flesh"]
+
+[resource]
+script = ExtResource("1_flesh")
+attribute_id = 35
+name = "血肉"
+max_level = 0

@@ -93,6 +93,8 @@ func read_stat(stat: StringName) -> float:
 			return lifesteal
 		&"crit_chance":
 			return crit_chance
+		&"damage_add":
+			return damage_add
 		&"attack_speed":
 			return attack_speed
 		&"max_health":
@@ -119,6 +121,8 @@ func apply_stat(stat: StringName, value: float) -> void:
 			lifesteal = value
 		&"crit_chance":
 			crit_chance = value
+		&"damage_add":
+			damage_add = value
 		&"attack_speed":
 			attack_speed = value
 		&"max_health":
@@ -136,6 +140,8 @@ var outgoing_damage_multiplier: float = 1.0
 var lifesteal: float = 0.0
 ##暴击率加成（暴怒 buff 写回）
 var crit_chance: float = 0.0
+##武器伤害的固定加值（锋利附魔写回）
+var damage_add: float = 0.0
 ##攻击速度加成（敏捷 buff 写回）：出手阶段按 1+它 加快
 var attack_speed: float = 0.0
 

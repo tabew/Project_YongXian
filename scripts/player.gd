@@ -65,8 +65,47 @@ var damage_dealt: float = 1.0
 var lifesteal: float = 0.0
 ##暴击率加成：0 表示不加成，暴怒 buff 会提高它（武器结算时叠加）
 var crit_chance: float = 0.0
+##武器伤害的固定加值：锋利附魔会提高它（武器结算时加在基础伤害上）
+var damage_add: float = 0.0
 ##攻击速度加成：0 表示正常，敏捷 buff 会提高它（出手阶段按 1+它 加快）
 var attack_speed: float = 0.0
+
+# ===== AI 修改开始 (闪避) =====
+##闪避可用次数上限
+@export var dodge_max_charges: int = 2
+##恢复一次可用次数要多少秒（灵巧会缩短它）
+@export var dodge_recharge_seconds: float = 3.0
+##闪避位移速度(像素/秒)
+@export var dodge_speed: float = 560.0
+##闪避位移持续多久(秒)
+@export var dodge_seconds: float = 0.18
+##闪避的无敌帧时长(秒)
+@export var dodge_invulnerable_seconds: float = 0.5
+
+##当前可用闪避次数
+var dodge_charges: int = 0
+##充能进度：攒满 dodge_recharge_seconds 回一次
+var _dodge_recharge: float = 0.0
+##剩余闪避位移时间
+var _dodge_left: float = 0.0
+##剩余无敌帧时间
+var _invulnerable_left: float = 0.0
+##本次闪避方向
+var _dodge_direction: Vector2 = Vector2.DOWN
+##闪避充能速度加成：灵巧 buff 写回，速度 = 1 + 它
+var dodge_recovery: float = 0.0
+
+##闪避时要不要留残影
+@export var dodge_afterimage_enabled: bool = true
+##残影生成间隔(秒)
+@export var dodge_afterimage_interval: float = 0.035
+##残影淡出时长(秒)
+@export var dodge_afterimage_fade: float = 0.22
+##残影颜色（会再乘上角色自身的透明度）
+@export var dodge_afterimage_tint: Color = Color(0.60, 0.85, 1.0, 0.55)
+##残影生成计时
+var _afterimage_timer: float = 0.0
+# ===== AI 修改结束 =====
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -88,6 +127,9 @@ func _ready() -> void:
 	health_component.health_changed.connect(_on_health_changed)
 	health_component.max_health = max_health
 	health_component.current_health = max_health
+	# ===== AI 修改开始 (闪避：开局补满可用次数) =====
+	dodge_charges = dodge_max_charges
+	# ===== AI 修改结束 =====
 
 	# 直接实例化 player.tscn 的场景（测试、编辑器单跑）可能没有背包，
 	# 缺背包时跳过装备初始化，但成长仍然要应用。
@@ -176,6 +218,9 @@ func _physics_process(delta: float) -> void:
 	if weapon_controller.is_attacking():
 		reveal_by_action()
 	_tick_progress(delta)
+	# ===== AI 修改开始 (闪避计时：无敌帧与充能) =====
+	_tick_dodge(delta)
+	# ===== AI 修改结束 =====
 	if health <= 0.0:
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
@@ -183,6 +228,13 @@ func _physics_process(delta: float) -> void:
 	input_direction = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
+	# ===== AI 修改开始 (闪避期间由闪避接管移动) =====
+	if is_dodging():
+		velocity = _dodge_direction * dodge_speed
+		_integrate_movement(delta)
+		_update_facing()
+		return
+	# ===== AI 修改结束 =====
 	_apply_input(delta)
 	_integrate_movement(delta)
 	_update_facing()
@@ -233,6 +285,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		
+	# ===== AI 修改开始 (空格闪避) =====
+		elif event.is_action_pressed("dodge"):
+			if is_ui_blocking():
+				return
+
+			if try_dodge(input_direction):
+				get_viewport().set_input_as_handled()
+			return
+	# ===== AI 修改结束 =====
 
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
@@ -294,6 +355,110 @@ func _apply_input(delta: float) -> void:
 		_update_blend_position(input_direction)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+
+
+# ===== AI 修改开始 (闪避) =====
+##是否在闪避位移中
+func is_dodging() -> bool:
+	return _dodge_left > 0.0
+
+
+##是否处于无敌帧
+func is_invulnerable() -> bool:
+	return _invulnerable_left > 0.0
+
+
+##还有没有可用闪避次数
+func can_dodge() -> bool:
+	return health > 0.0 and dodge_charges > 0
+
+
+##可用次数比例（0~1），给以后做 HUD 用
+func dodge_charges_ratio() -> float:
+	return float(dodge_charges) / float(maxi(dodge_max_charges, 1))
+
+
+##当前充能进度（0~1）：满次数时为 1，给闪避次数 UI 画恢复弧用
+func dodge_recharge_ratio() -> float:
+	if dodge_charges >= dodge_max_charges:
+		return 1.0
+	return clampf(_dodge_recharge / maxf(dodge_recharge_seconds, 0.01), 0.0, 1.0)
+
+
+##闪避充能速度加成：灵巧 buff 写回 dodge_recovery
+func dodge_recovery_speed() -> float:
+	return 1.0 + maxf(dodge_recovery, 0.0)
+
+
+##尝试闪避：有次数就朝 direction（没输入时用当前输入/上次朝向）位移，并进入无敌帧
+func try_dodge(direction: Vector2 = Vector2.ZERO) -> bool:
+	if not can_dodge():
+		return false
+
+	var dir: Vector2 = direction
+
+	if dir.is_zero_approx():
+		dir = input_direction
+	if dir.is_zero_approx():
+		dir = _dodge_direction
+	if dir.is_zero_approx():
+		dir = Vector2.DOWN
+
+	_dodge_direction = dir.normalized()
+	_dodge_left = maxf(dodge_seconds, 0.01)
+	_invulnerable_left = maxf(dodge_invulnerable_seconds, _dodge_left)
+	dodge_charges = maxi(dodge_charges - 1, 0)
+	if is_instance_valid(health_component):
+		health_component.invulnerable = true
+	velocity = _dodge_direction * dodge_speed
+
+	return true
+
+
+##闪避计时：无敌帧、位移时间、以及可用次数的充能
+func _tick_dodge(delta: float) -> void:
+	if _invulnerable_left > 0.0:
+		_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
+		if _invulnerable_left <= 0.0 and is_instance_valid(health_component):
+			health_component.invulnerable = false
+	if _dodge_left > 0.0:
+		_dodge_left = maxf(_dodge_left - delta, 0.0)
+		# ===== AI 修改开始 (闪避残影) =====
+		if dodge_afterimage_enabled:
+			_afterimage_timer -= delta
+			if _afterimage_timer <= 0.0:
+				_afterimage_timer = maxf(dodge_afterimage_interval, 0.01)
+				_spawn_afterimage()
+		# ===== AI 修改结束 =====
+	if dodge_charges < dodge_max_charges:
+		_dodge_recharge += delta * dodge_recovery_speed()
+		while _dodge_recharge >= dodge_recharge_seconds and dodge_charges < dodge_max_charges:
+			_dodge_recharge -= maxf(dodge_recharge_seconds, 0.01)
+			dodge_charges += 1
+		if dodge_charges >= dodge_max_charges:
+			_dodge_recharge = 0.0
+
+
+##闪避残影：复制角色当前帧留一张影子，稍后淡出
+func _spawn_afterimage() -> void:
+	if sprite == null or not is_instance_valid(sprite) or get_parent() == null:
+		return
+
+	var ghost: DodgeAfterimage = DodgeAfterimage.new()
+
+	ghost.texture = sprite.texture
+	ghost.hframes = sprite.hframes
+	ghost.vframes = sprite.vframes
+	ghost.frame = sprite.frame
+	ghost.flip_h = sprite.flip_h
+	ghost.scale = sprite.scale
+	ghost.z_index = -1
+	ghost.modulate = Color(dodge_afterimage_tint.r, dodge_afterimage_tint.g,
+			dodge_afterimage_tint.b, dodge_afterimage_tint.a * clampf(modulate.a, 0.0, 1.0))
+	get_parent().add_child(ghost)
+	ghost.global_position = sprite.global_position
+	ghost.fade(dodge_afterimage_fade)
+# ===== AI 修改结束 =====
 
 #武器动画修改
 func _update_facing() -> void:
@@ -374,8 +539,12 @@ func read_stat(stat: StringName) -> float:
 			return lifesteal
 		&"crit_chance":
 			return crit_chance
+		&"damage_add":
+			return damage_add
 		&"attack_speed":
 			return attack_speed
+		&"dodge_recovery":
+			return dodge_recovery
 		&"max_health":
 			return base_max_health
 	return 0.0
@@ -399,8 +568,12 @@ func apply_stat(stat: StringName, value: float) -> void:
 			lifesteal = value
 		&"crit_chance":
 			crit_chance = value
+		&"damage_add":
+			damage_add = value
 		&"attack_speed":
 			attack_speed = value
+		&"dodge_recovery":
+			dodge_recovery = value
 		&"max_health":
 			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
 			base_max_health = maxf(value, 1.0)
@@ -439,6 +612,10 @@ func reveal_by_action() -> void:
 func take_damage(amount: float, source: Node = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
+	# ===== AI 修改开始 (无敌帧内不吃伤害) =====
+	if is_invulnerable():
+		return
+	# ===== AI 修改结束 =====
 	var scaled: float = _incoming_damage(amount)
 	if scaled <= 0.0:
 		return

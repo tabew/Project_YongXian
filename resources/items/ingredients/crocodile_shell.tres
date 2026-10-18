@@ -1,17 +1,13 @@
 [gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://dw0hb83jpqmwn"]
 
-[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Texture2D" uid="uid://dndoai7nlfqqt" path="res://assets/items/ingredients/crocodile_shell.svg" id="2_icon"]
-[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
-[ext_resource type="Resource" uid="uid://i57ovpqcwurd" path="res://resources/alchemical_attribute/guard.tres" id="4_guard"]
-[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_7r6b6"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/binding.tres" id="5_binding"]
-[ext_resource type="Resource" uid="uid://d0cfayl2cqimi" path="res://resources/alchemical_attribute/absorb.tres" id="6_absorb"]
+[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/items/ingredients/crocodile_shell.svg" id="2_icon"]
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
+[ext_resource type="Script" path="res://scripts/physical_attribute/physical_data.gd" id="5_7r6b6"]
 
 [resource]
 script = ExtResource("1_data")
 id = 7
 name = "饿甲壳"
 texture = ExtResource("2_icon")
-alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_guard"), ExtResource("5_binding"), ExtResource("6_absorb")])
 item_scene_path = "res://scenes/items/ingredients/crocodile_shell.tscn"

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Earth" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/earth.gd" id="1_earth"]
+
+[resource]
+script = ExtResource("1_earth")
+attribute_id = 31
+name = "土"
+max_level = 0
