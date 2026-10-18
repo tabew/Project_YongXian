@@ -8,11 +8,6 @@ extends AlchemicalData
 
 
 ##目前不参与反应
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	return result
-
 
 func use_effect(object: Node = null) -> void:
 	if buff == null:

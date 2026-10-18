@@ -7,4 +7,3 @@ script = ExtResource("1_cleanse")
 attribute_id = 15
 name = "净化"
 max_level = 0
-can_be_interacted_attribute = Array[int]([10])

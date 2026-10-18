@@ -32,7 +32,15 @@ func reset() -> void:
 func heal(amount: float) -> float:
 	if amount <= 0.0 or not is_alive():
 		return 0.0
+	#受到的回复量加成（祝福这类 buff 写回宿主的 healing_received）
+	var host: Node = get_parent()
+
+	if host != null and host.has_method("read_stat"):
+		amount *= maxf(float(host.call("read_stat", &"healing_received")), 0.0)
+	if amount <= 0.0:
+		return 0.0
 	var before: float = current_health
+
 	current_health = minf(current_health + amount, max_health)
 	var healed: float = current_health - before
 	if healed > 0.0:
@@ -49,10 +57,8 @@ func set_current_health(value: float) -> void:
 func receive_hit(hit: CombatHit) -> bool:
 	if hit == null or not is_alive():
 		return false
-	# ===== AI 修改开始 (无敌帧：闪避期间免疫伤害) =====
 	if invulnerable:
 		return false
-	# ===== AI 修改结束 =====
 	#先过 buff 的受伤倍率，再减防御
 	var mitigated: float = maxf(hit.damage * damage_taken - defense, 0.0)
 	#伤害吸收效果，各类增减免伤正常结算完，再把最终伤害反转成回复

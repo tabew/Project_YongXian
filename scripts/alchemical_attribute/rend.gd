@@ -1,4 +1,3 @@
-# ===== AI 新增文件 (裂伤：附魔专属，命中追加伤害) =====
 class_name Rend
 extends AlchemicalData
 
@@ -17,11 +16,6 @@ func extra_total() -> float:
 
 
 ##没有炼药反应配方
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	return result
-
 
 func use_effect(object: Node = null) -> void:
 	if object == null or not is_instance_valid(object):

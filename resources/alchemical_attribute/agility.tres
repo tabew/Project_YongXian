@@ -8,5 +8,4 @@ script = ExtResource("1_agility")
 attribute_id = 25
 name = "敏捷"
 max_level = 3
-can_be_interacted_attribute = Array[int]([])
 buff = ExtResource("2_agility_buff")

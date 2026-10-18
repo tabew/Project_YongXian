@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_flesh")
-attribute_id = 35
+attribute_id = 32
 name = "血肉"
 max_level = 0

@@ -21,6 +21,8 @@ const REVEAL_SECONDS: float = 3
 const FLAG_ABSORB: StringName = &"damage_absorb"
 ##荆棘标记：持有期间受到伤害会反伤，反伤比例按 buff 等级放大
 const FLAG_THORNS: StringName = &"thorns"
+##硬控标记：冰冻/眩晕都用它，宿主实现 set_buff_flag(&"stunned", active) 就会被定住
+const FLAG_STUNNED: StringName = &"stunned"
 ##荆棘每级反伤比例（占承受伤害的比例）
 const THORNS_RATIO_PER_LEVEL: float = 0.35
 ##反伤命中的来源标识
@@ -51,7 +53,25 @@ static func apply(target: Node, buff: BuffData, level: int = 0, source: Node = n
 	var holder: BuffHolder = holder_of(target)
 	if holder == null:
 		return false
-	return holder.apply(buff, level, source)
+	#药水"延时"属性设置的时长倍率，用一次就复位
+	var scale: float = _next_duration_scale
+
+	_next_duration_scale = 1.0
+	return holder.apply(buff, level, source, scale)
+
+
+##药水"延时"属性用：下一次施加 buff 的时长倍率
+static var _next_duration_scale: float = 1.0
+
+
+##设置下一次施加 buff 的时长倍率
+static func set_next_duration_scale(scale: float) -> void:
+	_next_duration_scale = maxf(scale, 0.1)
+
+
+##复位时长倍率：一整套效果结算完调用，避免影响别处
+static func reset_duration_scale() -> void:
+	_next_duration_scale = 1.0
 
 
 static func remove(target: Node, id: StringName) -> bool:

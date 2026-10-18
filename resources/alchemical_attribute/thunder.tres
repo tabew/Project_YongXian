@@ -9,5 +9,4 @@ attribute_id = 23
 can_be_weapon_enchant = true
 name = "雷"
 max_level = 3
-can_be_interacted_attribute = Array[int]([23])
 strike_scene = ExtResource("2_strike")

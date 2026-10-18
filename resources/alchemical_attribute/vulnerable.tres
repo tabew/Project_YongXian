@@ -8,5 +8,4 @@ script = ExtResource("1_vulnerable")
 attribute_id = 18
 can_be_weapon_enchant = true
 name = "易伤"
-can_be_interacted_attribute = Array[int]([18])
 level = 3

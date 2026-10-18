@@ -10,4 +10,3 @@ can_be_weapon_enchant = true
 enchant_target = 1
 name = "吸血"
 max_level = 3
-can_be_interacted_attribute = Array[int]([19])

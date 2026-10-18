@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_wind")
-attribute_id = 33
+attribute_id = 31
 name = "风"
 max_level = 0

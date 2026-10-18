@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/blessing.png" id="1_nqw37"]
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_lof31"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_6sgpr"]
+
+[sub_resource type="Resource" id="Resource_sig01"]
+script = ExtResource("2_lof31")
+stat = &"healing_received"
+mode = 1
+value = 0.3
+value_per_level = 0.1
+
+[resource]
+script = ExtResource("3_6sgpr")
+id = &"blessing"
+display_name = "祝福"
+description = "受到的回复量提高，持续 8 秒。"
+icon = ExtResource("1_nqw37")
+duration = 8.0
+modifiers = Array[ExtResource("2_lof31")]([SubResource("Resource_sig01")])

@@ -7,4 +7,3 @@ script = ExtResource("1_linger")
 attribute_id = 22
 name = "滞留"
 max_level = 3
-can_be_interacted_attribute = Array[int]([22])

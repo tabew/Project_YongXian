@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="Bone" load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/bone.gd" id="1_bone"]
-
-[resource]
-script = ExtResource("1_bone")
-attribute_id = 37
-name = "骨"
-max_level = 0

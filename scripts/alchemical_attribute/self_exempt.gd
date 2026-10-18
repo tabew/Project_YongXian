@@ -19,13 +19,10 @@ func exempts_user() -> bool:
 
 
 ##目前不参与反应（以后要配方就在 match 里按枚举写，写法参照 heal.gd）
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	return result
 
 
 ##本身不对生物产生效果
+
 func use_effect(_object: Node = null) -> void:
 	pass
 

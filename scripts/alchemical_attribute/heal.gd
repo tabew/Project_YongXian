@@ -1,45 +1,9 @@
 class_name Heal
 extends AlchemicalData
 
-func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalData]:
-	var result:Array[AlchemicalData]
-
-	if attribute.is_empty():
-		return result
-
-	#单属性反应一定优先是第一个，多属性反应才需要单独遍历数组内其它属性
-	#相同属性但不能升级的情况就continue，其它情况直接break，无需遍历
-	for i in attribute.size():
-		match attribute[i].attribute_id:
-			AlchemicalAttributeList.ATTRIBUTE.HEAL:
-				if !can_upgrade_level(attribute[i]):
-					continue
-
-				if which == 2:
-					result.append(self)
-					result.append(attribute[i])
-				else:
-					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.HEAL, level+1))
-
-			AlchemicalAttributeList.ATTRIBUTE.HOLY:
-				if which == 2:
-					result.append(self)
-					result.append(attribute[i])
-				else:
-					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.CONTINUOUS_HEAL,level))
-
-
-		#除了升级会continue外，其它情况直接break
-		break
-	return result
-			
-
-## 按最大生命百分比回复：等级 1/2/3 对应 30% / 45% / 60%。
-##
-## 生命刻度统一到 100 点之后，固定值回复在玩家与怪物两边都没有可感知的分量，
-## 所以这里按“目标自己的生命上限”算比例。玩家走 PlayerCharacter.heal()，
-## 因此受“药材学”与“以血换知”影响；怪物没有 heal()，直接补给它的生命组件。
+##基础回血比例（1 级）
 const BASE_RATIO: float = 0.30
+##每级追加的回血比例
 const RATIO_PER_LEVEL: float = 0.15
 
 

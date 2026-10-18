@@ -95,6 +95,8 @@ func read_stat(stat: StringName) -> float:
 			return crit_chance
 		&"damage_add":
 			return damage_add
+		&"healing_received":
+			return healing_received
 		&"attack_speed":
 			return attack_speed
 		&"max_health":
@@ -123,6 +125,8 @@ func apply_stat(stat: StringName, value: float) -> void:
 			crit_chance = value
 		&"damage_add":
 			damage_add = value
+		&"healing_received":
+			healing_received = value
 		&"attack_speed":
 			attack_speed = value
 		&"max_health":
@@ -142,12 +146,19 @@ var lifesteal: float = 0.0
 var crit_chance: float = 0.0
 ##武器伤害的固定加值（锋利附魔写回）
 var damage_add: float = 0.0
+##受到的回复量倍率（祝福 buff 写回）
+var healing_received: float = 1.0
+##是否被硬控（冰冻/眩晕）
+var stunned: bool = false
 ##攻击速度加成（敏捷 buff 写回）：出手阶段按 1+它 加快
 var attack_speed: float = 0.0
 
 
-##BuffHolder 通知标记类效果（隐身）
+##BuffHolder 通知标记类效果（隐身、硬控）
 func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag == Buffs.FLAG_STUNNED:
+		stunned = active
+		return
 	if flag != Buffs.FLAG_INVISIBLE:
 		return
 	invisible = active
@@ -226,6 +237,11 @@ func _physics_process(delta: float) -> void:
 			navigator.clear()
 		return
 	if brain != null:
+		if stunned:
+			#硬控：不驱动 AI，只清掉寻路
+			if navigator != null:
+				navigator.clear()
+			return
 		brain.tick(delta)
 
 

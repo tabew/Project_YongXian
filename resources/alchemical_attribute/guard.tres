@@ -8,4 +8,3 @@ script = ExtResource("1_guard")
 attribute_id = 13
 name = "防御"
 max_level = 3
-can_be_interacted_attribute = Array[int]([13])

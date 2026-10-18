@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="Flower" load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/flower.gd" id="1_flower"]
-
-[resource]
-script = ExtResource("1_flower")
-attribute_id = 34
-name = "花"
-max_level = 0

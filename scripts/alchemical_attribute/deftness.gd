@@ -1,4 +1,3 @@
-# ===== AI 新增文件 (灵巧：加快闪避次数回复) =====
 class_name Deftness
 extends AlchemicalData
 
@@ -10,11 +9,6 @@ extends AlchemicalData
 
 
 ##暂时没有反应配方
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	return result
-
 
 func use_effect(object: Node = null) -> void:
 	if buff == null:

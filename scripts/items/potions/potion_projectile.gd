@@ -182,19 +182,26 @@ func _break_at(at: Vector2) -> void:
 
 	var world: Node = _potion.get_parent()
 
-	#药水滞留时间
+	#药水滞留时间（延时属性按倍率放大）
 	var linger_seconds: float = 0.0
 
 	for attribute: AlchemicalData in _attributes:
 		if attribute != null and attribute.has_method("linger_seconds"):
 			linger_seconds = maxf(linger_seconds, float(attribute.call("linger_seconds")))
 
+	var duration_scale: float = 1.0
+
+	for attribute: AlchemicalData in _attributes:
+		if attribute != null and attribute.has_method("duration_scale_total"):
+			duration_scale *= maxf(float(attribute.call("duration_scale_total")), 0.1)
+	linger_seconds *= duration_scale
+
 	if world != null and not burst_attributes.is_empty():
 		var burst: PotionBurst = PotionData.BURST_SCENE.instantiate() as PotionBurst
 
 		if burst != null:
 			world.add_child(burst)
-			burst.setup(at, _burst_radius, linger_seconds, burst_attributes, exempt_target)
+			burst.setup(at, _burst_radius, linger_seconds, burst_attributes, exempt_target, duration_scale)
 
 	_potion.queue_free()
 

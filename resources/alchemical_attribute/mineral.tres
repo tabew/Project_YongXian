@@ -7,4 +7,3 @@ script = ExtResource("1_attribute")
 attribute_id = 3
 name = "矿物"
 max_level = 0
-can_be_interacted_attribute = Array[int]([4, 7])

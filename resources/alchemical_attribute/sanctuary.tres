@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Sanctuary" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/sanctuary.gd" id="1_sanctuary"]
+[ext_resource type="Resource" path="res://resources/buffs/holy.tres" id="2_holy"]
+
+[resource]
+script = ExtResource("1_sanctuary")
+attribute_id = 38
+name = "圣佑"
+max_level = 3
+buff = ExtResource("2_holy")

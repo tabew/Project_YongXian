@@ -9,4 +9,3 @@ attribute_id = 11
 can_be_weapon_enchant = true
 name = "迟缓"
 max_level = 3
-can_be_interacted_attribute = Array[int]([10, 11])

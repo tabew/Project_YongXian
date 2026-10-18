@@ -76,11 +76,15 @@ func critical_chance_total() -> float:
 	return clampf(chance, 0.0, 1.0)
 
 
-## 出手速度倍率
+## 出手速度倍率：持有者的攻速加成 + 武器附魔直接加的攻速（急速）
 func speed_multiplier() -> float:
+	var bonus: float = 0.0
+
 	if wielder != null and is_instance_valid(wielder) and wielder.has_method("read_stat"):
-		return 1.0 + maxf(float(wielder.call("read_stat", &"attack_speed")), 0.0)
-	return 1.0
+		bonus += maxf(float(wielder.call("read_stat", &"attack_speed")), 0.0)
+	if definition != null:
+		bonus += definition.enchant_attack_speed()
+	return 1.0 + bonus
 
 
 func _try_hit(hurtbox: CombatHurtbox) -> void:
@@ -108,14 +112,14 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 	if wielder != null and wielder.has_method("read_stat"):
 		flat_add = maxf(float(wielder.call("read_stat", &"damage_add")), 0.0)
 		multiplier *= maxf(float(wielder.call("read_stat", &"damage_dealt")), 0.0)
-	hit.damage = (definition.damage + flat_add) * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
+	hit.damage = (definition.damage + flat_add + definition.enchant_damage()) * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()
 	if direction.is_zero_approx():
 		direction = aim_direction
 	hit.knockback = direction * definition.knockback
 	if hurtbox.receive_hit(hit):
-		_apply_enchant_effects(hurtbox)
+		_apply_enchant_effects(hurtbox, hit)
 		hit_landed.emit(hit, hurtbox)
 		_apply_on_hit_effects(hurtbox)
 
@@ -125,7 +129,7 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 ## 爆炸等 need_target = false 的属性会用自己的 use_effect 再生成一次伤害判定。
 ## need_target 的属性作用到被命中的实体，其余作用到命中点；
 ## enchant_target = WIELDER 的属性(治疗/恢复)作用到持武器的人自己。
-func _apply_enchant_effects(hurtbox: CombatHurtbox) -> void:
+func _apply_enchant_effects(hurtbox: CombatHurtbox, hit: CombatHit) -> void:
 	if definition == null or definition.enchant_attributes.is_empty():
 		return
 	var point: Node2D = null
@@ -134,7 +138,7 @@ func _apply_enchant_effects(hurtbox: CombatHurtbox) -> void:
 			continue
 		if attribute.need_target:
 			var target: Node = wielder if attribute.enchant_target == AlchemicalData.EnchantTarget.WIELDER else hurtbox.get_parent()
-			attribute.use_effect(target)
+			attribute.apply_weapon_enchant(target, hit)
 			continue
 		if point == null:
 			point = _make_enchant_point(hurtbox.global_position)

@@ -67,10 +67,11 @@ var lifesteal: float = 0.0
 var crit_chance: float = 0.0
 ##武器伤害的固定加值：锋利附魔会提高它（武器结算时加在基础伤害上）
 var damage_add: float = 0.0
+##受到的回复量倍率：1.0 表示正常，祝福 buff 会提高它
+var healing_received: float = 1.0
 ##攻击速度加成：0 表示正常，敏捷 buff 会提高它（出手阶段按 1+它 加快）
 var attack_speed: float = 0.0
 
-# ===== AI 修改开始 (闪避) =====
 ##闪避可用次数上限
 @export var dodge_max_charges: int = 2
 ##恢复一次可用次数要多少秒（灵巧会缩短它）
@@ -105,7 +106,6 @@ var dodge_recovery: float = 0.0
 @export var dodge_afterimage_tint: Color = Color(0.60, 0.85, 1.0, 0.55)
 ##残影生成计时
 var _afterimage_timer: float = 0.0
-# ===== AI 修改结束 =====
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -127,9 +127,7 @@ func _ready() -> void:
 	health_component.health_changed.connect(_on_health_changed)
 	health_component.max_health = max_health
 	health_component.current_health = max_health
-	# ===== AI 修改开始 (闪避：开局补满可用次数) =====
 	dodge_charges = dodge_max_charges
-	# ===== AI 修改结束 =====
 
 	# 直接实例化 player.tscn 的场景（测试、编辑器单跑）可能没有背包，
 	# 缺背包时跳过装备初始化，但成长仍然要应用。
@@ -218,23 +216,24 @@ func _physics_process(delta: float) -> void:
 	if weapon_controller.is_attacking():
 		reveal_by_action()
 	_tick_progress(delta)
-	# ===== AI 修改开始 (闪避计时：无敌帧与充能) =====
 	_tick_dodge(delta)
-	# ===== AI 修改结束 =====
 	if health <= 0.0:
+		velocity = Vector2.ZERO
+		weapon_controller.cancel_attack()
+		return
+	if stunned:
+		#硬控：不能移动也不能出手
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
 		return
 	input_direction = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
-	# ===== AI 修改开始 (闪避期间由闪避接管移动) =====
 	if is_dodging():
 		velocity = _dodge_direction * dodge_speed
 		_integrate_movement(delta)
 		_update_facing()
 		return
-	# ===== AI 修改结束 =====
 	_apply_input(delta)
 	_integrate_movement(delta)
 	_update_facing()
@@ -263,7 +262,7 @@ func _tick_progress(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if health > 0.0:
+	if health > 0.0 and not stunned:
 		if event.is_action_pressed("attack"):
 			#选中物品左键使用
 			if is_ui_blocking():
@@ -285,7 +284,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		
-	# ===== AI 修改开始 (空格闪避) =====
 		elif event.is_action_pressed("dodge"):
 			if is_ui_blocking():
 				return
@@ -293,7 +291,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			if try_dodge(input_direction):
 				get_viewport().set_input_as_handled()
 			return
-	# ===== AI 修改结束 =====
 
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
@@ -357,7 +354,6 @@ func _apply_input(delta: float) -> void:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
 
 
-# ===== AI 修改开始 (闪避) =====
 ##是否在闪避位移中
 func is_dodging() -> bool:
 	return _dodge_left > 0.0
@@ -370,7 +366,7 @@ func is_invulnerable() -> bool:
 
 ##还有没有可用闪避次数
 func can_dodge() -> bool:
-	return health > 0.0 and dodge_charges > 0
+	return health > 0.0 and dodge_charges > 0 and not stunned
 
 
 ##可用次数比例（0~1），给以后做 HUD 用
@@ -423,13 +419,11 @@ func _tick_dodge(delta: float) -> void:
 			health_component.invulnerable = false
 	if _dodge_left > 0.0:
 		_dodge_left = maxf(_dodge_left - delta, 0.0)
-		# ===== AI 修改开始 (闪避残影) =====
 		if dodge_afterimage_enabled:
 			_afterimage_timer -= delta
 			if _afterimage_timer <= 0.0:
 				_afterimage_timer = maxf(dodge_afterimage_interval, 0.01)
 				_spawn_afterimage()
-		# ===== AI 修改结束 =====
 	if dodge_charges < dodge_max_charges:
 		_dodge_recharge += delta * dodge_recovery_speed()
 		while _dodge_recharge >= dodge_recharge_seconds and dodge_charges < dodge_max_charges:
@@ -451,14 +445,15 @@ func _spawn_afterimage() -> void:
 	ghost.vframes = sprite.vframes
 	ghost.frame = sprite.frame
 	ghost.flip_h = sprite.flip_h
+	ghost.offset = sprite.offset
 	ghost.scale = sprite.scale
-	ghost.z_index = -1
+	#和角色同层：设成 -1 会被画到地面 tile 底下，完全看不见
+	ghost.z_index = sprite.z_index
 	ghost.modulate = Color(dodge_afterimage_tint.r, dodge_afterimage_tint.g,
 			dodge_afterimage_tint.b, dodge_afterimage_tint.a * clampf(modulate.a, 0.0, 1.0))
 	get_parent().add_child(ghost)
 	ghost.global_position = sprite.global_position
 	ghost.fade(dodge_afterimage_fade)
-# ===== AI 修改结束 =====
 
 #武器动画修改
 func _update_facing() -> void:
@@ -541,10 +536,14 @@ func read_stat(stat: StringName) -> float:
 			return crit_chance
 		&"damage_add":
 			return damage_add
+		&"healing_received":
+			return healing_received
 		&"attack_speed":
 			return attack_speed
 		&"dodge_recovery":
 			return dodge_recovery
+		&"dodge_max_charges":
+			return float(dodge_max_charges)
 		&"max_health":
 			return base_max_health
 	return 0.0
@@ -570,10 +569,19 @@ func apply_stat(stat: StringName, value: float) -> void:
 			crit_chance = value
 		&"damage_add":
 			damage_add = value
+		&"healing_received":
+			healing_received = value
 		&"attack_speed":
 			attack_speed = value
 		&"dodge_recovery":
 			dodge_recovery = value
+		&"dodge_max_charges":
+			#闪避次数上限：上限提高时立刻补上多出来的次数，上限回落时把当前次数压回上限
+			var new_max: int = maxi(int(round(value)), 1)
+			if new_max > dodge_max_charges:
+				dodge_charges += new_max - dodge_max_charges
+			dodge_max_charges = new_max
+			dodge_charges = clampi(dodge_charges, 0, dodge_max_charges)
 		&"max_health":
 			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
 			base_max_health = maxf(value, 1.0)
@@ -585,10 +593,15 @@ func apply_stat(stat: StringName, value: float) -> void:
 
 ##当前是否处于隐身状态
 var invisible: bool = false
+##是否被硬控（冰冻/眩晕）
+var stunned: bool = false
 
 
-##BuffHolder 通知标记类效果（目前只有隐身使用）
+##BuffHolder 通知标记类效果（隐身、硬控）
 func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag == Buffs.FLAG_STUNNED:
+		stunned = active
+		return
 	if flag != Buffs.FLAG_INVISIBLE:
 		return
 	invisible = active
@@ -612,10 +625,8 @@ func reveal_by_action() -> void:
 func take_damage(amount: float, source: Node = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
-	# ===== AI 修改开始 (无敌帧内不吃伤害) =====
 	if is_invulnerable():
 		return
-	# ===== AI 修改结束 =====
 	var scaled: float = _incoming_damage(amount)
 	if scaled <= 0.0:
 		return

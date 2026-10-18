@@ -7,4 +7,3 @@
 script = ExtResource("1_attribute")
 attribute_id = 5
 name = "固结"
-can_be_interacted_attribute = Array[int]([10, 7])

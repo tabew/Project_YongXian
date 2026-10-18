@@ -1,23 +1,19 @@
-# ===== AI 新增文件 (锋利：附魔专属，提高武器伤害) =====
+
 class_name Sharpness
 extends AlchemicalData
 
-## 锋利：附魔专属属性。命中后给持武器的人挂上"锋利"增益，
-## 提高武器伤害（写回持有者的 damage_add，武器结算时加在基础伤害上）。
-## 只做武器附魔，不参与炼药反应。
+## 锋利：附魔专用。附到武器上后，武器的伤害直接提高（不走 buff）。
 
-##本属性施加的 buff：默认指向锋利
-@export var buff: BuffData = preload("res://resources/buffs/edge.tres")
+##0 级加的伤害
+@export var damage_bonus: float = 3.0
+##每级追加的伤害
+@export var damage_bonus_per_level: float = 1.5
+
+
+##直接加在武器上的伤害，由 WeaponDefinition.enchant_damage() 读取
+func weapon_damage_bonus() -> float:
+	return damage_bonus + damage_bonus_per_level * float(maxi(level, 0))
 
 
 ##没有炼药反应配方
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
 
-	return result
-
-
-func use_effect(object: Node = null) -> void:
-	if buff == null:
-		return
-	Buffs.apply(object, buff, level)

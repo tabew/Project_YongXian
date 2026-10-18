@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_salt")
-attribute_id = 40
+attribute_id = 34
 name = "盐"
 max_level = 0

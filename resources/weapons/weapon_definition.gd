@@ -100,3 +100,23 @@ func add_enchant(attribute: AlchemicalData) -> bool:
 			return true
 	enchant_attributes.append(copy)
 	return true
+
+
+## 附魔直接加在武器上的伤害（锋利这类）：结算时加在武器基础伤害上。
+func enchant_damage() -> float:
+	var total: float = 0.0
+
+	for attribute: AlchemicalData in enchant_attributes:
+		if attribute != null and attribute.has_method("weapon_damage_bonus"):
+			total += maxf(float(attribute.call("weapon_damage_bonus")), 0.0)
+	return total
+
+
+## 附魔直接加在武器上的攻速（急速这类）：和持有者的攻速加成相加。
+func enchant_attack_speed() -> float:
+	var total: float = 0.0
+
+	for attribute: AlchemicalData in enchant_attributes:
+		if attribute != null and attribute.has_method("weapon_attack_speed_bonus"):
+			total += maxf(float(attribute.call("weapon_attack_speed_bonus")), 0.0)
+	return total
