@@ -150,9 +150,9 @@ text = "装瓶"
 
 [node name="AttributesText" parent="Cauldon" unique_id=326303259 instance=ExtResource("2_p2eye")]
 offset_left = -140.0
-offset_top = 80.0
+offset_top = 140.0
 offset_right = -140.0
-offset_bottom = 80.0
+offset_bottom = 140.0
 
 [node name="LeftDropZone" type="Control" parent="Cauldon" unique_id=1448328919]
 layout_mode = 3

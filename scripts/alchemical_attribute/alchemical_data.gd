@@ -62,6 +62,10 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 		return result
 	var reaction:Dictionary = AlchemyReactions.lookup(attribute_id,other.attribute_id)
 
+	#同名属性表里没单独配对角线的，按"同级升一级"兜底
+	if reaction.is_empty() and attribute_id == other.attribute_id:
+		reaction = {"products": [[attribute_id,1]]}
+
 	if reaction.is_empty():
 		return result
 	if which == 2:
