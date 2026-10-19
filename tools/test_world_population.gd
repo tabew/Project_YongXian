@@ -177,7 +177,12 @@ func _check_runtime() -> void:
 	var before: int = _children_of_type(holder, "pickup").size()
 	_press_e(world)
 	_check(chest.opened, "e_opens_chest")
-	_check(_children_of_type(holder, "pickup").size() == before + chest.loot.size(), "opening_creates_exact_loot_count")
+	# 除固定的材料堆数外，宝箱还可能追一件武器或一瓶随机配方药水，所以是区间。
+	var dropped: int = _children_of_type(holder, "pickup").size() - before
+	_check(
+		dropped >= chest.loot.size() and dropped <= chest.loot.size() + 2,
+		"opening_creates_loot_plus_optional_bonus"
+	)
 	_check(not chest.open(), "chest_cannot_open_twice")
 	for child: Node in _children_of_type(holder, "pickup"):
 		var sprite: Sprite2D = child.get_node("Sprite2D") as Sprite2D
