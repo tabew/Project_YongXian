@@ -5,7 +5,8 @@ extends Node2D
 ## 由 GameWorld 选择最近物品后显式调用 collect，不监听输入或自动拾取。
 signal collected(item_id: int, amount: int)
 
-var data: IngredientData = null
+## 地面物品：材料、药水、武器都能落地（都是 ItemData 子类）。
+var data: ItemData = null
 var amount: int = 1
 var _sprite: Sprite2D = null
 var _collected: bool = false
@@ -30,8 +31,8 @@ func _ready() -> void:
 	_update_visual()
 
 
-func bind(ingredient: IngredientData, quantity: int = 1, generator: WorldGenerator = null) -> void:
-	data = ingredient
+func bind(item: ItemData, quantity: int = 1, generator: WorldGenerator = null) -> void:
+	data = item
 	amount = maxi(quantity, 0)
 	_generator = generator
 	_collected = false
@@ -62,7 +63,15 @@ func is_available_for_pickup() -> bool:
 
 
 func can_be_thrown() -> bool:
-	return is_available_for_pickup() and GroundMaterials.is_throwable(data.id) and is_inside_tree() and is_visible_in_tree() and can_process()
+	# 只有材料里的石块一类能投掷；药水与武器走各自的使用方式。
+	return (
+		is_available_for_pickup()
+		and data is IngredientData
+		and GroundMaterials.is_throwable(data.id)
+		and is_inside_tree()
+		and is_visible_in_tree()
+		and can_process()
+	)
 
 
 ## 使用现有地面石头作为弹体，落地后仍是同一份材料；目标位置在出手时固定。
