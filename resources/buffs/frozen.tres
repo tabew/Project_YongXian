@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cx5p0q1x2viov"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/frozen.png" id="1_c7tsl"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_st26k"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_p8wo7"]
+[ext_resource type="Texture2D" uid="uid://d0cr8tco6vbst" path="res://assets/ui/buffs/frozen.png" id="1_c7tsl"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_st26k"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_p8wo7"]
 
 [resource]
 script = ExtResource("3_p8wo7")
@@ -12,5 +12,4 @@ description = "被冻住，无法移动和出手。"
 icon = ExtResource("1_c7tsl")
 is_debuff = true
 duration = 1.5
-max_level = 0
 flags = Array[StringName]([&"stunned"])

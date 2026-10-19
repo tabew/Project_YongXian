@@ -49,6 +49,12 @@ var _nearby_pickup: GroundPickup = null
 var _nearby_chest: WorldChest = null
 ## 站在旁边的野外炼金台；按 E 开关炼金界面。
 var _nearby_station: WorldStructure = null
+## 已打碎的木桶（按 地图:坐标 记录，切图/回图不再长回来）。
+var _barrels_broken: Dictionary = {}
+## 地图事件的规划结果：过场里先算好，进图那帧只建节点。
+var _event_plans: Dictionary = {}
+var _nearby_event: WorldEvent = null
+var _event_maps: Dictionary = {}
 var _population_maps: Dictionary = {}
 const PICKUP_RADIUS: float = 36.0
 ## 草层容器本身压在地形之上：每个草块再按人物脚底决定画在前还是后（0 / 1），
@@ -160,6 +166,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _nearby_pickup.collect(player):
 				EventBus.notification.emit("获得 %s ×%d" % [material_name, quantity])
 			_refresh_pickup()
+		elif is_instance_valid(_nearby_event):
+			_nearby_event.interact(player)
+			_refresh_pickup()
 		elif is_instance_valid(_nearby_station):
 			# 炼金台：站旁边按 E 开关界面（B 键的老入口已移除）。
 			$GameHUD/Alchemy.call("toggle_station")
@@ -239,6 +248,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	_limit_camera(spec)
 	chunk_manager.load_map(map_node_id)
 	_setup_world_population(spec)
+	_setup_map_events(spec)
 	_setup_ground_materials(spec)
 	_setup_grass(spec)
 	_refresh_pickup()
@@ -395,12 +405,17 @@ func _clear_map_entities() -> void:
 		_nearby_chest.set_highlighted(false)
 	_nearby_chest = null
 	_population_maps.clear()
+	if is_instance_valid(_nearby_event):
+		_nearby_event.set_highlighted(false)
+	_nearby_event = null
+	_event_maps.clear()
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
 	_material_maps.clear()
 	_material_tiles.clear()
 	_material_plans.clear()
+	_event_plans.clear()
 	_grass_contexts.clear()
 	_grass_views.clear()
 	_grass_cleared.clear()
@@ -442,6 +457,16 @@ func _setup_world_population(spec: MapSpec) -> void:
 		chest.bind(entry, _generator)
 		chest.position = WorldGenerator.tile_to_world(entry["tile"])
 		entity_root.add_child(chest)
+	for entry: Dictionary in population.get("barrels", []):
+		var tile: Vector2i = entry["tile"]
+		if _barrels_broken.has(_barrel_key(spec.node_id, tile)):
+			continue
+		var barrel := WorldBarrel.new()
+		barrel.name = "Barrel_%d_%d" % [tile.x, tile.y]
+		barrel.bind(int(entry["item_id"]), int(entry["amount"]))
+		barrel.position = WorldGenerator.tile_to_world(tile)
+		barrel.broken.connect(_on_barrel_broken.bind(spec.node_id, tile))
+		entity_root.add_child(barrel)
 	for entry: Dictionary in population.get("drops", []):
 		var data: IngredientData = ItemListGlobal.get_template(int(entry["item_id"])) as IngredientData
 		if data == null:
@@ -452,6 +477,75 @@ func _setup_world_population(spec: MapSpec) -> void:
 		pickup.position = WorldGenerator.tile_to_world(entry["tile"])
 		entity_root.add_child(pickup)
 	_population_maps[spec.node_id] = true
+
+
+## 木桶被打碎：记录状态、按数量掉木棍。
+func _on_barrel_broken(barrel: WorldBarrel, map_id: int, tile: Vector2i) -> void:
+	if barrel == null:
+		return
+	_barrels_broken[_barrel_key(map_id, tile)] = true
+	var data: IngredientData = ItemListGlobal.get_template(barrel.item_id) as IngredientData
+	var root: Node2D = _map_entity_roots.get(map_id)
+	if data != null and root != null:
+		var drop_point: Vector2 = barrel.position
+		for index: int in maxi(barrel.amount, 1):
+			var pickup := GroundPickup.new()
+			pickup.name = "BarrelLoot_%d_%d_%d" % [tile.x, tile.y, index]
+			pickup.bind(data, 1, _generator)
+			pickup.position = drop_point + Vector2(
+				float(index - (barrel.amount - 1) * 0.5) * 7.0,
+				float(posmod(index * 5, 4)) - 2.0
+			)
+			root.add_child(pickup)
+	AudioManager.play_sfx(&"stone_land", barrel.position)
+
+
+func _barrel_key(map_id: int, tile: Vector2i) -> String:
+	return "%d:%d,%d" % [map_id, tile.x, tile.y]
+## 事件与地刺挂在所属地图实体根下，切图时随地图统一隐藏、暂停和恢复。
+func _setup_map_events(spec: MapSpec) -> void:
+	if _event_maps.has(spec.node_id):
+		return
+	var entity_root: Node2D = _map_entity_root(spec.node_id)
+	for entry: Dictionary in _ensure_event_plan(spec):
+		var event_id: StringName = entry["event_id"]
+		var tile: Vector2i = entry["tile"]
+		var event_node: Node2D = _create_event_node(event_id)
+		event_node.name = "MapEvent_%s_%d_%d" % [event_id, tile.x, tile.y]
+		event_node.position = WorldGenerator.tile_to_world(tile)
+		if event_node is WorldEvent:
+			(event_node as WorldEvent).bind(event_id, int(entry["seed"]))
+		entity_root.add_child(event_node)
+	_event_maps[spec.node_id] = true
+
+
+## 事件点位是纯函数结果，过场里先算好并缓存，进图时直接按点位建节点。
+func _ensure_event_plan(spec: MapSpec) -> Array:
+	if not _event_plans.has(spec.node_id):
+		var population: Dictionary = _generator.population_for(spec.node_id)
+		var reserved: Array[Rect2i] = []
+		reserved.assign(population.get("reserved", []))
+		_event_plans[spec.node_id] = MapEventPlanner.plan(_generator, spec, reserved)
+	return _event_plans[spec.node_id]
+
+
+func _create_event_node(event_id: StringName) -> Node2D:
+	match event_id:
+		MapEventPlanner.SPIKE_TRAP:
+			return SpikeTrap.new()
+		MapEventPlanner.ALCHEMY_SPIRIT:
+			return AlchemySpiritEvent.new()
+		MapEventPlanner.SUSPICIOUS_POTION:
+			return SuspiciousPotionEvent.new()
+		MapEventPlanner.BEAR_TRAP:
+			return BearTrapEvent.new()
+		MapEventPlanner.TRIPWIRE:
+			return TripwireEvent.new()
+		MapEventPlanner.POISON_MUSHROOM:
+			return PoisonMushroomEvent.new()
+		MapEventPlanner.TRAPPED_CHEST:
+			return TrappedChestEvent.new()
+	return WorldEvent.new()
 
 
 func _setup_ground_materials(spec: MapSpec) -> void:
@@ -686,6 +780,8 @@ func _prewarm_map(spec: MapSpec, side: int, gate_y: int) -> void:
 	chunk_manager.prewarm_arrival(spec.node_id, arrival)
 	# 保留远端的可见窗口排队，同时优先在黑屏期间铺好到达视口。
 	chunk_manager.prewarm_around(spec.node_id, arrival)
+	# 事件点位同样在过场里算好，避免进图那帧现算导致卡顿。
+	_ensure_event_plan(spec)
 	_queue_grass_ring(spec, WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(arrival)))
 
 
@@ -755,11 +851,15 @@ func _refresh_pickup() -> void:
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(false)
 	_nearby_pickup = null
+	if is_instance_valid(_nearby_event):
+		_nearby_event.set_highlighted(false)
+	_nearby_event = null
 	if player.health <= 0 or player.inventory == null or $GameHUD/BagUi.visible or $GameHUD/Alchemy.visible or get_viewport().gui_is_dragging():
 		hud.show_pickup(null)
 		return
 	# 界面关着才重新扫站点；打开期间保留它，玩家再按一次 E 才能关掉。
 	_nearby_station = null
+	_nearby_event = null
 	var entity_root: Node2D = _map_entity_roots.get(_current_node)
 	# 新击杀掉落暂存在 spawner，切图后归入所属地图；两处都要能立即拾取。
 	var pickup_roots: Array[Node2D] = [monster_spawner]
@@ -785,12 +885,24 @@ func _refresh_pickup() -> void:
 					station_closest = station_distance
 					_nearby_station = child
 				continue
+			if child is WorldEvent:
+				var world_event := child as WorldEvent
+				if not world_event.can_interact(player):
+					continue
+				var event_distance: float = player.global_position.distance_squared_to(world_event.global_position)
+				if event_distance < closest and _can_reach_pickup(world_event.global_position):
+					closest = event_distance
+					_nearby_event = world_event
+					_nearby_chest = null
+					_nearby_pickup = null
+				continue
 			if child is WorldChest and not child.opened and not child.is_queued_for_deletion():
 				var chest_distance: float = player.global_position.distance_squared_to(child.global_position)
 				if chest_distance < closest and _can_reach_pickup(child.global_position):
 					closest = chest_distance
 					_nearby_chest = child
 					_nearby_pickup = null
+					_nearby_event = null
 				continue
 			if not child is GroundPickup or child.is_queued_for_deletion():
 				continue
@@ -802,6 +914,7 @@ func _refresh_pickup() -> void:
 				closest = distance
 				_nearby_pickup = pickup
 				_nearby_chest = null
+				_nearby_event = null
 	# 三类交互物各用各的服务半径，最后只留最近的那个。
 	if is_instance_valid(_nearby_station):
 		var other: Node2D = null
@@ -809,18 +922,24 @@ func _refresh_pickup() -> void:
 			other = _nearby_chest
 		elif is_instance_valid(_nearby_pickup):
 			other = _nearby_pickup
+		elif is_instance_valid(_nearby_event):
+			other = _nearby_event
 		if other != null:
 			if player.global_position.distance_squared_to(other.global_position) <= station_closest:
 				_nearby_station = null
 			else:
 				_nearby_chest = null
 				_nearby_pickup = null
+				_nearby_event = null
 	if is_instance_valid(_nearby_pickup):
 		_nearby_pickup.set_highlighted(true)
 	hud.show_pickup(_nearby_pickup)
 	if is_instance_valid(_nearby_chest):
 		_nearby_chest.set_highlighted(true)
 		hud.show_chest(_nearby_chest)
+	if is_instance_valid(_nearby_event):
+		_nearby_event.set_highlighted(true)
+		hud.show_event(_nearby_event)
 	if is_instance_valid(_nearby_station):
 		hud.show_alchemy_station(_nearby_station)
 

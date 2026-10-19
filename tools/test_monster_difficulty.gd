@@ -220,37 +220,41 @@ func _test_room_entries() -> void:
 func _test_damage() -> void:
 	var f: Dictionary = _fixture(GIVE, 2, Vector2(128, 0))
 	var stone := GroundPickup.new()
-	stone.bind(load("res://resources/items/ingredients/stone.tres") as IngredientData, 1, f.monster.world_generator)
+	stone.bind(load("res://resources/items/ingredients/desert_crystal.tres") as IngredientData, 1, f.monster.world_generator)
 	f.holder.add_child(stone)
 	stone.global_position = f.monster.global_position + Vector2(4, 0)
+	var starting_health: float = f.player.health
 	check(f.monster.attack.perform_attack(f.monster, f.player), "scaled_give_throw_starts")
 	check(is_equal_approx(stone._throw_damage, 15.0), "stone_captures_fractional_damage_from_throwing_monster")
 	stone.set_physics_process(false)
 	stone._physics_process(1.0)
-	check(is_equal_approx(f.player.health, 85.0), "scaled_stone_deals_fractional_damage_on_hit")
+	check(is_equal_approx(f.player.health, starting_health - 15.0), "scaled_stone_deals_fractional_damage_on_hit")
 	await _close(f.holder)
 
 	f = _fixture(GIVE, 2, Vector2(48, 0))
 	var leap := f.monster.attack as GiveMonsterAttack
+	starting_health = f.player.health
 	check(leap.perform_attack(f.monster, f.player), "scaled_give_leap_starts")
 	leap.update(f.monster, GiveMonsterAttack.LEAP_DURATION)
-	check(is_equal_approx(f.player.health, 85.0), "give_leap_uses_monster_multiplier")
+	check(is_equal_approx(f.player.health, starting_health - 15.0), "give_leap_uses_monster_multiplier")
 	await _close(f.holder)
 
 	f = _fixture(CROC, 2, Vector2(16, 0))
 	var bite := f.monster.attack as CrocodileBiteAttack
+	starting_health = f.player.health
 	check(bite.perform_attack(f.monster, f.player), "scaled_crocodile_bite_starts")
 	bite.update(f.monster, CrocodileBiteAttack.WINDUP + 0.01)
-	check(is_equal_approx(f.player.health, 70.0), "crocodile_bite_uses_monster_multiplier")
+	check(is_equal_approx(f.player.health, starting_health - 30.0), "crocodile_bite_uses_monster_multiplier")
 	await _close(f.holder)
 
 	f = _fixture(RABBIT, 4, Vector2(100, 0))
 	var wave := ShabeiSoundWave.new()
 	f.holder.add_child(wave)
 	wave.launch(f.monster, f.player, f.monster.global_position, Vector2.RIGHT)
+	starting_health = f.player.health
 	wave.set_physics_process(false)
 	wave._physics_process(1.0)
-	check(is_equal_approx(f.player.health, 76.0), "rabbit_wave_uses_owning_monster_multiplier")
+	check(is_equal_approx(f.player.health, starting_health - 24.0), "rabbit_wave_uses_owning_monster_multiplier")
 	await _close(f.holder)
 
 	var holder := Node2D.new()
@@ -279,9 +283,10 @@ func _test_damage() -> void:
 	var projectile := ShiSlimeProjectile.new()
 	holder.add_child(projectile)
 	projectile.launch(trio[0], player, trio[0].global_position)
+	starting_health = player.health
 	projectile.set_physics_process(false)
 	projectile._physics_process(1.0)
-	check(is_equal_approx(player.health, 90.0), "slime_projectile_uses_leader_multiplier")
+	check(is_equal_approx(player.health, starting_health - 10.0), "slime_projectile_uses_leader_multiplier")
 	player.global_position = trio[0].global_position
 	await physics_frame
 	await physics_frame
@@ -289,7 +294,7 @@ func _test_damage() -> void:
 	attack._form_remaining = 0.0
 	attack._contact_remaining = 0.0
 	attack.update(trio[0], 0.01)
-	check(is_equal_approx(player.health, 30.0), "slime_group_contact_uses_leader_multiplier")
+	check(is_equal_approx(player.health, starting_health - 70.0), "slime_group_contact_uses_leader_multiplier")
 	await _close(holder)
 
 func _run() -> void:

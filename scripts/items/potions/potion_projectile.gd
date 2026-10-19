@@ -22,6 +22,8 @@ var _burst_duration: float = 0.0
 var _attributes: Array[AlchemicalData] = []
 ##最大飞行距离(像素)：<= 0 表示不限制。升级卡“投掷精通”会把它乘大。
 var _max_distance: float = 0.0
+##药水效果强度倍率（等级成长 + 药材学）：出手时从玩家身上取，碎点结算时用
+var _power: float = 1.0
 ##已飞过的距离，用来判断有没有超程。
 var _travelled: float = 0.0
 var _spin: float = SPIN_RADIANS_PER_SECOND
@@ -42,6 +44,8 @@ func start(player: PlayerCharacter, direction: Vector2, speed: float, burst_radi
 	_attributes = attributes
 	_max_distance = maxf(max_distance, 0.0)
 	_travelled = 0.0
+	#效果强度在出手这一刻定格：飞行途中升级也按这瓶药出手时的强度结算
+	_power = player.potion_power_mult() if player != null else 1.0
 	_spin = SPIN_RADIANS_PER_SECOND if _direction.x >= 0.0 else -SPIN_RADIANS_PER_SECOND
 	_view_radius = _measure_view_radius()
 	_out_of_view_seconds = 0.0
@@ -178,7 +182,9 @@ func _break_at(at: Vector2) -> void:
 			burst_attributes.append(attribute)
 		else:
 			#不需要目标：直接调用一次，效果自己从药水模型上取属性或碎点坐标
+			Buffs.set_next_power_scale(_power)
 			attribute.use_effect(_potion)
+			Buffs.reset_power_scale()
 
 	var world: Node = _potion.get_parent()
 
@@ -196,12 +202,20 @@ func _break_at(at: Vector2) -> void:
 			duration_scale *= maxf(float(attribute.call("duration_scale_total")), 0.1)
 	linger_seconds *= duration_scale
 
+	#没有滞留作用圈会立刻消失；此时落点上带周期效果的属性(比如雷)至少结算一次
+	if linger_seconds <= 0.0:
+		for attribute: AlchemicalData in _attributes:
+			if attribute != null and attribute.has_method("zone_interval"):
+				Buffs.set_next_power_scale(_power)
+				attribute.use_effect(_potion)
+				Buffs.reset_power_scale()
+
 	if world != null and not burst_attributes.is_empty():
 		var burst: PotionBurst = PotionData.BURST_SCENE.instantiate() as PotionBurst
 
 		if burst != null:
 			world.add_child(burst)
-			burst.setup(at, _burst_radius, linger_seconds, burst_attributes, exempt_target, duration_scale)
+			burst.setup(at, _burst_radius, linger_seconds, burst_attributes, exempt_target, duration_scale, _power)
 
 	_potion.queue_free()
 

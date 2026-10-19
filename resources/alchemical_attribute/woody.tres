@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="Woody" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="Woody" format=3 uid="uid://c6cgcep5tc0ks"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/woody.gd" id="1_attribute"]
+[ext_resource type="Script" uid="uid://dgwoowoucmxnc" path="res://scripts/alchemical_attribute/woody.gd" id="1_attribute"]
 
 [resource]
 script = ExtResource("1_attribute")
 attribute_id = 4
 name = "木质"
-max_level = 0
+max_level = 3

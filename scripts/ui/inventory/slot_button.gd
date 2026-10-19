@@ -26,6 +26,10 @@ signal enchant_item_signal(weapon_item_id:int, potion_item_id:int)
 ##自己在快捷栏里的格子位置，不是快捷栏格子则为-1
 var handy_slot:int = -1
 
+##本格正被拖拽出去：拖拽结束前宿主不能把本格节点收掉，
+##否则"取消拖拽要把物品还回原格"就没了落脚点，物品会凭空消失
+var is_dragging_item:bool = false
+
 ##记录被选中的物品id（-1表示没有）
 var dragged_item_id:int = -1
 var dragged_count:int = 0
@@ -82,6 +86,9 @@ func take_item(num:int = 1) -> SlotItem:
 	if slot_item != null:
 		held = slot_item.duplicate()
 		held.count = num
+		#先标记再发信号：宿主收到 take_item_signal 时会立刻同步背包数据，
+		#那时不能把本格节点收掉
+		is_dragging_item = true
 		take_item_signal.emit(slot_item.item_id,num)
 
 	return held
@@ -269,6 +276,8 @@ func _rotate_dragged(degrees:float) -> void:
 ## 拖拽结束
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
+
+		is_dragging_item = false
 
 		if dragged_item_id != -1 and not get_viewport().gui_is_drag_successful():
 			put_item_by_id(dragged_item_id,dragged_count)

@@ -12,6 +12,10 @@ signal cards_changed()
 ## 1 级升 2 级所需经验；之后每级按 CURVE_STEP 递增。
 const BASE_EXPERIENCE: int = 8
 const CURVE_STEP: int = 4
+## 每升一级自带的成长：生命上限、武器伤害、药水效果各 +10%。
+## 加算不叠乘：1级 +0%，2级 +10%，3级 +20%…… 和升级卡走同一套聚合，所以是
+## "等级成长 + 卡加成" 直接相加（3级 + 卡 &"sharp" 1层 = +20% + 12% = +32%）。
+const LEVEL_GROWTH_PER_LEVEL: float = 0.10
 ## 装瓶成功的基础炼金经验。
 const ALCHEMY_BASE_EXPERIENCE: int = 6
 ## 本局首次合成某配方的额外经验。
@@ -52,6 +56,21 @@ func reset() -> void:
 ## 升到下一级还需要多少经验。
 func experience_required() -> float:
 	return float(BASE_EXPERIENCE + CURVE_STEP * (level - 1))
+
+
+## 等级自带的成长增量：1级为 0，之后每级 +10%，加算不叠乘。
+func level_growth() -> float:
+	return LEVEL_GROWTH_PER_LEVEL * float(maxi(level - 1, 0))
+
+
+## 每级成长的步长（给 UI 展示用）。
+func level_growth_per_level() -> float:
+	return LEVEL_GROWTH_PER_LEVEL
+
+
+## 生命上限倍率：等级成长只乘基础生命，升级卡的固定值(体质/孤注)另加，互不放大。
+func max_health_mult() -> float:
+	return 1.0 + level_growth()
 
 
 ## 升级进度 0~1。
@@ -161,7 +180,7 @@ func damage_taken_mult() -> float:
 
 
 func damage_mult() -> float:
-	return maxf(1.0 + UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_DAMAGE_MULT), 0.0)
+	return maxf(1.0 + level_growth() + UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_DAMAGE_MULT), 0.0)
 
 
 func move_speed_mult() -> float:
@@ -218,8 +237,9 @@ func regen_per_second() -> float:
 	return UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_REGEN)
 
 
+## 药水效果强度倍率：等级成长 + 药材学。
 func alchemy_power_mult() -> float:
-	return maxf(1.0 + UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_ALCHEMY_POWER), 0.0)
+	return maxf(1.0 + level_growth() + UpgradePool.sum_effects(cards_taken, UpgradePool.KEY_ALCHEMY_POWER), 0.0)
 
 
 func potion_range_mult() -> float:

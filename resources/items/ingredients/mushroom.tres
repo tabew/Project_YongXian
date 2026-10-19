@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://d02g0rdw772ij"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://ckfyo1lvp7xv1" path="res://assets/items/ingredients/mushroom.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="4_fcmvb"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://dfhj0wk87xw48" path="res://resources/alchemical_attribute/poison.tres" id="50_attr10"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/weakness.tres" id="50_attr17"]
+
+[resource]
+script = ExtResource("1_data")
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr10")])
+id = 19
+name = "蘑菇"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr10"), ExtResource("50_attr17")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

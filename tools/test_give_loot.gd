@@ -29,15 +29,15 @@ func _loot(parent: Node) -> Array[GroundPickup]:
 func _run() -> void:
 	var items: Node = root.get_node("ItemListGlobal")
 	# 阈值两侧与端点必须覆盖整个抽样范围，没有空掉落或双掉落区间。
-	_check(GiveMonster.death_loot_for_roll(0.0).id == 4, "zero_roll_is_fur")
-	_check(GiveMonster.death_loot_for_roll(0.699999).id == 4, "fur_interval_ends_below_70_percent")
-	_check(GiveMonster.death_loot_for_roll(0.70).id == 3, "hide_interval_starts_at_70_percent")
-	_check(GiveMonster.death_loot_for_roll(1.0).id == 3, "maximum_roll_still_drops_hide")
-	for item_id: int in [4, 3]:
+	_check(GiveMonster.death_loot_for_roll(0.0).id == 1, "zero_roll_is_fur")
+	_check(GiveMonster.death_loot_for_roll(0.699999).id == 1, "fur_interval_ends_below_70_percent")
+	_check(GiveMonster.death_loot_for_roll(0.70).id == 0, "hide_interval_starts_at_70_percent")
+	_check(GiveMonster.death_loot_for_roll(1.0).id == 0, "maximum_roll_still_drops_hide")
+	for item_id: int in [1, 0]:
 		var data: IngredientData = items.create(item_id) as IngredientData
 		_check(data != null and data.id == item_id and data.texture != null, "registered_loot_has_data_and_icon")
 		if data != null:
-			if item_id == 4:
+			if item_id == 1:
 				_check(data.name == "仙缔毛", "fur_uses_new_display_name")
 			var model: ItemModel = data.create_model()
 			_check(model != null and model.data.id == item_id, "registered_loot_has_inventory_drag_model")
@@ -68,7 +68,7 @@ func _run() -> void:
 		if world._generator.run.type_of(spec.node_id) in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS]:
 			_check(spec.biome_id in pool, "actual_combat_region_supports_registered_monster_pool")
 		for entry: Dictionary in GroundMaterials.plan(world._generator, spec):
-			_check(entry["item_id"] not in [4, 3], "exclusive_death_loot_never_spawns_as_ground_material")
+			_check(entry["item_id"] not in [1, 0], "exclusive_death_loot_never_spawns_as_ground_material")
 
 	var original_position: Vector2 = world.player.global_position
 	var original_tile: Vector2i = WorldGenerator.world_to_tile(original_position)
@@ -87,7 +87,7 @@ func _run() -> void:
 		quit(1)
 		return
 	var drop: GroundPickup = pickups[0]
-	_check(drop.data.id in [4, 3] and drop.amount == 1, "drop_is_one_requested_material")
+	_check(drop.data.id in [1, 0] and drop.amount == 1, "drop_is_one_requested_material")
 	_check(drop.global_position.is_equal_approx(original_position), "drop_uses_death_position")
 	monster.kill()
 	_check(_loot(world.monster_spawner).size() == 1, "repeated_kill_does_not_duplicate_loot")
@@ -130,8 +130,8 @@ func _run() -> void:
 	var fur_count: int = 0
 	var hide_count: int = 0
 	for pickup: GroundPickup in _loot(holder):
-		fur_count += int(pickup.data.id == 4)
-		hide_count += int(pickup.data.id == 3)
+		fur_count += int(pickup.data.id == 1)
+		hide_count += int(pickup.data.id == 0)
 	_check(fur_count + hide_count == 100 and fur_count > 0 and hide_count > 0, "seeded_deaths_cover_both_exclusive_outcomes")
 	print("GIVE_LOOT_SAMPLE fur=%d hide=%d total=%d" % [fur_count, hide_count, fur_count + hide_count])
 	holder.queue_free()

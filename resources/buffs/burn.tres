@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cwyn4g4e4sjue"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/burn.png" id="1_xk7kj"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_4fqu2"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_gxtow"]
+[ext_resource type="Texture2D" uid="uid://cjawmel13tlhg" path="res://assets/ui/buffs/burn.png" id="1_xk7kj"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_4fqu2"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_gxtow"]
 
 [resource]
 script = ExtResource("3_gxtow")

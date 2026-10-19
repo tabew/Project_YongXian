@@ -2,14 +2,77 @@ class_name GroundMaterials
 extends RefCounted
 
 ## 仅规划点位；实例化、E 键交互与各地图拾取状态由 GameWorld 管理。
-const STONE_ID: int = 2
-const STICK_ID: int = 1
 const GRID_SIZE: int = 16
 const MIN_SPACING: int = 6
 const MIN_COUNT: int = 20
 const MAX_COUNT: int = 70
 const SAFE_RADIUS: int = 3
 const STREAM_SALT: int = 0x47524F55
+##可以被投掷出去的材料（石块一类）：沙晶/冰晶/铁矿/岩盐/雷石
+const THROWABLE_IDS: Array[int] = [14, 28, 30, 31, 36]
+
+##每个群系在野外能捡到的材料（2~3 种，与材料表一致）；海域没有可站的陆地，退回海岸材料
+const BIOME_ITEMS: Dictionary = {
+	Biome.Kind.BEACH: [11, 12],
+	Biome.Kind.DESERT: [13, 14],
+	Biome.Kind.SAVANNA: [15, 16],
+	Biome.Kind.GRASSLAND: [10, 17, 18],
+	Biome.Kind.FOREST: [19, 20],
+	Biome.Kind.TROPICAL_RAINFOREST: [21, 22, 34],
+	Biome.Kind.SWAMP: [23, 35, 37],
+	Biome.Kind.TAIGA: [24, 25],
+	Biome.Kind.TUNDRA: [26, 27],
+	Biome.Kind.SNOWY_PLAINS: [28, 29],
+	Biome.Kind.MOUNTAIN: [30, 31, 36],
+	Biome.Kind.ALPINE: [32, 33],
+}
+
+
+##这个群系的可捡材料列表；海域没有陆地，退回海岸材料
+static func items_for(biome: int) -> Array:
+	if BIOME_ITEMS.has(biome):
+		return BIOME_ITEMS[biome]
+	return BIOME_ITEMS[Biome.Kind.BEACH]
+
+
+##是不是可以投掷的材料
+static func is_throwable(item_id: int) -> bool:
+	return THROWABLE_IDS.has(item_id)
+
+
+##稀有度权重：普通 6、罕见 2、稀有 1，越稀有的材料在地面越少见。
+const RARITY_WEIGHT: Array[int] = [6, 2, 1]
+
+
+##按群系随机挑一种，按稀有度加权。
+static func _pick_item(source: RandomNumberGenerator, biome: int) -> int:
+	var pool: Array = items_for(biome)
+	var total: float = 0.0
+	for item_id: int in pool:
+		total += float(RARITY_WEIGHT[_rarity_of(item_id)])
+	if total <= 0.0:
+		return int(pool[0])
+	var roll: float = source.randf() * total
+	var cumulative: float = 0.0
+	for item_id: int in pool:
+		cumulative += float(RARITY_WEIGHT[_rarity_of(item_id)])
+		if roll < cumulative:
+			return int(item_id)
+	return int(pool[pool.size() - 1])
+
+
+## 材料稀有度（与材料表一致，也和各个 .tres 里的 rarity 字段对应）。
+## 这里用常量表而不是查 ItemListGlobal：后者是自动加载单例，
+## 纯脚本测试里取不到会让整个生成器编译失败。
+const RARITY: Dictionary = {
+	14: 1, 20: 1, 22: 1, 25: 1, 28: 1, 30: 1, 36: 1,   # 罕见
+	32: 2, 37: 2,                                        # 稀有
+}
+
+
+##材料的稀有度（0 普通 / 1 罕见 / 2 稀有）。
+static func _rarity_of(item_id: int) -> int:
+	return clampi(int(RARITY.get(item_id, 0)), 0, RARITY_WEIGHT.size() - 1)
 
 
 static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
@@ -49,7 +112,7 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
 			var tile: Vector2i = cell * GRID_SIZE + Vector2i(source.randi_range(1, GRID_SIZE - 2), source.randi_range(1, GRID_SIZE - 2))
 			if not _can_place(generator, spec, tile, result, exclusions):
 				continue
-			var item_id: int = STONE_ID if source.randf() < _stone_ratio(spec.biome_id) else STICK_ID
+			var item_id: int = _pick_item(source, spec.biome_id)
 			_append(result, occupied, tile, item_id, 1)
 			break
 	# 很小或密林占比高的地图，穷举尚未占用网格内的格子兜底，仍不突破密度限制。
@@ -64,27 +127,37 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:
 				for x: int in GRID_SIZE:
 					var tile: Vector2i = cell * GRID_SIZE + Vector2i(x, y)
 					if _can_place(generator, spec, tile, result, exclusions):
-						var item_id: int = STONE_ID if source.randf() < _stone_ratio(spec.biome_id) else STICK_ID
+						var item_id: int = _pick_item(source, spec.biome_id)
 						_append(result, occupied, tile, item_id, 1)
 						placed = true
 						break
 				if placed:
 					break
-	# 每图均可获得两种材料，不只依赖有限次数的概率抽样。
-	for required_id: int in [STONE_ID, STICK_ID]:
+	# 每张图都能捡到该群系的两种材料：缺哪种就把一条不属于必得清单的记录换掉
+	var pool: Array = items_for(spec.biome_id)
+
+	for required_id: int in pool:
 		var found: bool = false
+
 		for entry: Dictionary in result:
 			found = found or entry["item_id"] == required_id
-		if not found and not result.is_empty():
-			result[result.size() - 1]["item_id"] = required_id
+		if found or result.is_empty():
+			continue
+		for replace_index: int in result.size():
+			if not pool.has(result[replace_index]["item_id"]):
+				result[replace_index]["item_id"] = required_id
+				break
 	return result
 
 
 static func _add_starter(generator: WorldGenerator, spec: MapSpec, result: Array[Dictionary], occupied: Dictionary, exclusions: Array[Vector2i]) -> void:
 	var porch: Vector2i = spec.origin + spec.cottage.porch_tile
 	# 初图平台世界 y=0，南北两组点分属不同16格网格，且均在平台右侧。
-	for item_id: int in [STONE_ID, STICK_ID]:
-		var direction: int = -1 if item_id == STONE_ID else 1
+	var starter_items: Array = items_for(spec.biome_id)
+
+	for index: int in starter_items.size():
+		var item_id: int = int(starter_items[index])
+		var direction: int = -1 if index == 0 else 1
 		var candidates: Array[Vector2i] = [Vector2i(4, direction * 3), Vector2i(6, direction * 4), Vector2i(5, direction * 5)]
 		for y: int in range(1, 8):
 			for x: int in range(3, 9):
@@ -129,12 +202,3 @@ static func _append(result: Array[Dictionary], occupied: Dictionary, tile: Vecto
 
 static func _grid_cell(tile: Vector2i) -> Vector2i:
 	return Vector2i(floori(float(tile.x) / GRID_SIZE), floori(float(tile.y) / GRID_SIZE))
-
-
-static func _stone_ratio(biome: int) -> float:
-	match biome:
-		Biome.Kind.DESERT, Biome.Kind.MOUNTAIN, Biome.Kind.TUNDRA, Biome.Kind.SNOWY_PLAINS, Biome.Kind.ALPINE:
-			return 0.72
-		Biome.Kind.FOREST, Biome.Kind.TAIGA, Biome.Kind.TROPICAL_RAINFOREST, Biome.Kind.SWAMP:
-			return 0.35
-	return 0.50

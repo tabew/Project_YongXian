@@ -16,6 +16,8 @@ var radius: float = 32.0
 var duration: float = 1.0
 ##延时属性给的时长倍率：作用到目标身上的 buff 按它延长
 var duration_scale: float = 1.0
+##药水效果强度倍率（等级成长 + 药材学）：出手时定格，每次脉冲按它结算
+var power_scale: float = 1.0
 ##要作用到目标上的属性，只放 need_target 为 true 的
 var attributes: Array[AlchemicalData] = []
 
@@ -53,12 +55,13 @@ func _ready() -> void:
 
 
 ##由药水在碎点调用，设置范围参数并立刻放第一个脉冲
-##exempt：只参与正面效果；duration_scale：延时属性给的时长倍率
+##exempt：只参与正面效果；duration_scale：延时属性给的时长倍率；power：药水效果强度倍率
 func setup(at: Vector2, burst_radius: float, burst_duration: float, burst_attributes: Array[AlchemicalData],
-		exempt: Node = null, burst_duration_scale: float = 1.0) -> void:
+		exempt: Node = null, burst_duration_scale: float = 1.0, burst_power_scale: float = 1.0) -> void:
 	radius = burst_radius
 	duration = burst_duration
 	duration_scale = maxf(burst_duration_scale, 0.1)
+	power_scale = maxf(burst_power_scale, 0.0)
 	attributes = burst_attributes
 	exempt_target = exempt
 	#护己的使用者记在圈上
@@ -143,8 +146,10 @@ func _tick_zone_effects() -> void:
 
 		_zone_next[id] = _elapsed + interval
 		Buffs.set_next_duration_scale(duration_scale)
+		Buffs.set_next_power_scale(power_scale)
 		attribute.use_effect(self)
 		Buffs.reset_duration_scale()
+		Buffs.reset_power_scale()
 
 
 
@@ -192,8 +197,10 @@ func _apply_attributes(target: Node, for_self: bool) -> void:
 			if not for_self and attribute.is_positive_effect():
 				continue
 		Buffs.set_next_duration_scale(duration_scale)
+		Buffs.set_next_power_scale(power_scale)
 		attribute.use_effect(target)
 		Buffs.reset_duration_scale()
+		Buffs.reset_power_scale()
 		if attribute.is_take_only_one == true:
 			attributes.erase(attribute)
 

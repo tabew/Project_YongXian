@@ -39,22 +39,22 @@ func _run() -> void:
 	Engine.max_fps = 240
 	root.size = Vector2i(1280,720)
 	var items: Node = root.get_node("ItemListGlobal")
-	for id: int in [11,12,13]:
+	for id: int in [8,9,10]:
 		var data: IngredientData = items.create(id)
 		check(data != null and data.texture != null,"loot_registered_with_icon")
 		var model: ItemModel = data.create_model()
 		check(model != null and model.data.id == id,"loot_models_exist")
 		model.free()
-	check(items.create(12).name == "糯糯肉团","rabbit_meat_new_display_name")
-	check(items.create(13).name == "操操操。！","carrot_exact_requested_name")
+	check(items.create(9).name == "糯糯肉团","rabbit_meat_new_display_name")
+	check(items.create(10).name == "胡萝卜","carrot_current_display_name")
 	check(items.templates.back().id == 300,"potion_remains_last")
 	var rabbit_data := load("res://resources/monsters/shabei_spawn_data.tres") as MonsterSpawnData
 	check(rabbit_data.allowed_biomes == [Biome.Kind.TAIGA, Biome.Kind.TUNDRA, Biome.Kind.SNOWY_PLAINS],"rabbit_adds_taiga_and_preserves_snow_habitats")
 	var loot: MonsterLootTable = load("res://resources/monsters/shabei_loot_table.tres")
-	var counts: Dictionary = {11:0,12:0,13:0}
+	var counts: Dictionary = {8:0,9:0,10:0}
 	for index: int in 1000:
 		counts[loot.choose_for_roll((index+0.5)/1000.0).id] += 1
-	check(counts == {11:300,12:500,13:200},"exact_30_50_20_intervals")
+	check(counts == {8:300,9:500,10:200},"exact_30_50_20_intervals")
 	var f: Dictionary = fixture()
 	var actor: ShabeiMonster = f.actor
 	check((actor.get_node("NameLabel") as Label).text == "糯糯","rabbit_uses_new_display_name")
@@ -124,7 +124,7 @@ func _run() -> void:
 	actor.kill()
 	var dropped: int = 0
 	for child: Node in f.holder.get_children():
-		if child is GroundPickup and child.data.id in [11,12,13]:
+		if child is GroundPickup and child.data.id in [8,9,10]:
 			dropped += 1
 	check(dropped == 1,"real_death_drops_one_of_three_items")
 	await clear_fixture(f.holder)
