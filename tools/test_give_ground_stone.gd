@@ -67,8 +67,8 @@ func _wait_stone(stone: GroundPickup) -> void:
 
 
 func _run() -> void:
-	_stone_data = load("res://resources/items/ingredients/stone.tres") as IngredientData
-	_stick_data = load("res://resources/items/ingredients/stick.tres") as IngredientData
+	_stone_data = load("res://resources/items/ingredients/desert_crystal.tres") as IngredientData
+	_stick_data = load("res://resources/items/ingredients/pinecone.tres") as IngredientData
 	Engine.max_fps = 120
 	root.size = Vector2i(1280, 720)
 	var f: Dictionary = _fixture()

@@ -1,13 +1,17 @@
 [gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://dxmwl8wjsjdqp"]
 
-[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
-[ext_resource type="Texture2D" path="res://assets/items/ingredients/shabei_meat.svg" id="2_icon"]
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
-[ext_resource type="Script" path="res://scripts/physical_attribute/physical_data.gd" id="5_lbam1"]
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://bo01wtmkatcqb" path="res://assets/items/ingredients/shabei_meat.svg" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_lbam1"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://h1c8y2alrnnn" path="res://resources/alchemical_attribute/powerful.tres" id="50_attr14"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/flesh.tres" id="50_attr32"]
 
 [resource]
 script = ExtResource("1_data")
-id = 12
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr14")])
+id = 9
 name = "啥杯肉"
 texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr14"), ExtResource("50_attr32")])
 item_scene_path = "res://scenes/items/ingredients/shabei_meat.tscn"

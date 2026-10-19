@@ -196,6 +196,12 @@ func _break_at(at: Vector2) -> void:
 			duration_scale *= maxf(float(attribute.call("duration_scale_total")), 0.1)
 	linger_seconds *= duration_scale
 
+	#没有滞留作用圈会立刻消失；此时落点上带周期效果的属性(比如雷)至少结算一次
+	if linger_seconds <= 0.0:
+		for attribute: AlchemicalData in _attributes:
+			if attribute != null and attribute.has_method("zone_interval"):
+				attribute.use_effect(_potion)
+
 	if world != null and not burst_attributes.is_empty():
 		var burst: PotionBurst = PotionData.BURST_SCENE.instantiate() as PotionBurst
 

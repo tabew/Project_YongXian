@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://cl1e2eyu7jjfw"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://bhpohscijym6d" path="res://assets/items/ingredients/wildflower.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="4_65gk0"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="50_attr0"]
+[ext_resource type="Resource" uid="uid://dfrxptdcjp3ae" path="res://resources/alchemical_attribute/self_exempt.tres" id="50_attr9"]
+
+[resource]
+script = ExtResource("1_data")
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr0")])
+id = 17
+name = "野花"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr0"), ExtResource("50_attr9")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

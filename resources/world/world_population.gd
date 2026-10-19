@@ -7,8 +7,16 @@ const KINDS: Array[StringName] = [&"camp", &"ruins", &"alchemy", &"supplies", &"
 const ALCHEMY_KIND: StringName = &"alchemy"
 ## 结构之间留出的最小间隔（格）。之前是 3，结构容易挤在一起。
 const STRUCTURE_GAP: int = 6
-const LOOT_POOL: Array[int] = [0, 1, 2, 5]
 const SALT: int = 0x504F5055
+
+
+##某个群系的战利品池：地面材料 + 炸弹
+static func _loot_pool(spec: MapSpec) -> Array:
+	var pool: Array = GroundMaterials.items_for(spec.biome_id).duplicate()
+
+	if not pool.has(5):
+		pool.append(5)
+	return pool
 
 
 static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
@@ -61,13 +69,16 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 			continue
 		var rare: bool = loot_rng.randf() < 0.25
 		var loot: Array[Dictionary] = []
+		var pool: Array = _loot_pool(spec)
 		# 四个方向全在已验证的空地内，落地物资互不重叠。
 		var offsets: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.UP]
 		for index: int in (4 if rare else 3):
-			loot.append({"tile": tile + offsets[index], "item_id": LOOT_POOL[loot_rng.randi_range(0, LOOT_POOL.size() - 1)], "amount": loot_rng.randi_range(2, 5) if rare else loot_rng.randi_range(1, 3)})
+			loot.append({"tile": tile + offsets[index], "item_id": pool[loot_rng.randi_range(0, pool.size() - 1)], "amount": loot_rng.randi_range(2, 5) if rare else loot_rng.randi_range(1, 3)})
 		chests.append({"tile": tile, "rare": rare, "loot": loot})
 		reserved.append(footprint.grow(2))
 	var drop_count: int = clampi(spec.extent.x * spec.extent.y / 1800, 10, 24)
+	var drop_pool: Array = GroundMaterials.items_for(spec.biome_id)
+
 	for attempt: int in 600:
 		if drops.size() >= drop_count:
 			break
@@ -75,8 +86,8 @@ static func plan(generator: WorldGenerator, spec: MapSpec) -> Dictionary:
 		var footprint := Rect2i(tile - Vector2i.ONE, Vector2i(3, 3))
 		if not _site_is_clear(generator, spec, footprint, reserved, safe_points):
 			continue
-		# 草药、木棍、石头；怪物专属掉落仍由原怪物系统提供。
-		drops.append({"tile": tile, "item_id": loot_rng.randi_range(0, 2), "amount": loot_rng.randi_range(1, 3)})
+		# 用当前群系的地面材料
+		drops.append({"tile": tile, "item_id": drop_pool[loot_rng.randi_range(0, drop_pool.size() - 1)], "amount": loot_rng.randi_range(1, 3)})
 		reserved.append(footprint.grow(1))
 	return {"structures": structures, "chests": chests, "drops": drops, "blocked": blocked, "reserved": reserved}
 

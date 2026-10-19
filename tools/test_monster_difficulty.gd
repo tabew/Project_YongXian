@@ -165,7 +165,7 @@ func _test_room_entries() -> void:
 func _test_damage() -> void:
 	var f: Dictionary = _fixture(GIVE, 2, Vector2(128, 0))
 	var stone := GroundPickup.new()
-	stone.bind(load("res://resources/items/ingredients/stone.tres") as IngredientData, 1, f.monster.world_generator)
+	stone.bind(load("res://resources/items/ingredients/desert_crystal.tres") as IngredientData, 1, f.monster.world_generator)
 	f.holder.add_child(stone)
 	stone.global_position = f.monster.global_position + Vector2(4, 0)
 	check(f.monster.attack.perform_attack(f.monster, f.player), "scaled_give_throw_starts")

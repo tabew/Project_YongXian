@@ -341,6 +341,7 @@ func _notification(what: int) -> void:
 func _update_blend_position(directionVector:Vector2):
 	animation_tree.set("parameters/StateMachine/Stand/blend_position",directionVector);
 	animation_tree.set("parameters/StateMachine/Walk/blend_position",directionVector);
+	animation_tree.set("parameters/StateMachine/Die/blend_position",directionVector);
 
 
 ## 有输入时朝目标速度加速，松手后按摩擦力减速到 0。

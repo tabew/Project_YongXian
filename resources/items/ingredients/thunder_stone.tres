@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ThunderStone" format=3 uid="uid://b6m327g700x18"]
+
+[ext_resource type="Script" uid="uid://bhpmosiq1s4aj" path="res://scripts/items/ingredients/thunder_stone.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://ywrfbdhadba6" path="res://assets/items/ingredients/thunder_stone.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="4_pqavx"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/mineral.tres" id="50_attr3"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/thunder.tres" id="50_attr23"]
+
+[resource]
+script = ExtResource("1_data")
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr23")])
+id = 36
+name = "雷石"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr23"), ExtResource("50_attr3")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

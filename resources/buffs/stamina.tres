@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://4aojeps30vkq"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/stamina.png" id="1_08l8d"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_wo16c"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_08l8d"]
+[ext_resource type="Texture2D" uid="uid://cgramwd50qa1b" path="res://assets/ui/buffs/stamina.png" id="1_08l8d"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_wo16c"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_08l8d"]
 
 [sub_resource type="Resource" id="Resource_bkatv"]
 script = ExtResource("1_wo16c")

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="IngredientData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/items/ingredients/transparent_flower.png" id="2_icon"]
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attrtype"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/invisibility.tres" id="4_attr0"]
+
+[resource]
+script = ExtResource("1_data")
+alchemical_attribute = Array[ExtResource("3_attrtype")]([ExtResource("4_attr0")])
+for_use_attribute = Array[ExtResource("3_attrtype")]([ExtResource("4_attr0")])
+id = 37
+name = "透明花"
+texture = ExtResource("2_icon")
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

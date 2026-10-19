@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://c0cjupfaq2ck7"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://cr7dbqn5d0krp" path="res://assets/items/ingredients/fern_leaf.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="4_ct1bs"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://h1c8y2alrnnn" path="res://resources/alchemical_attribute/powerful.tres" id="50_attr14"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/herbal.tres" id="50_attr35"]
+
+[resource]
+script = ExtResource("1_data")
+id = 22
+name = "巨型蕨叶"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr35"), ExtResource("50_attr14")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

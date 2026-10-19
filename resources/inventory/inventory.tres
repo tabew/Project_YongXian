@@ -4,11 +4,11 @@
 
 [resource]
 script = ExtResource("4_dl6u7")
-has_items = Array[int]([0, 1, 201, 202, 203, 204, 300, 5])
+has_items = Array[int]([17, 20, 201, 202, 203, 204, 300, 2])
 items = Dictionary[int, int]({
-0: 5,
-1: 999,
-5: 5,
+2: 5,
+17: 5,
+20: 999,
 201: 2,
 202: 1,
 203: 1,

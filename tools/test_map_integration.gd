@@ -64,7 +64,7 @@ func _run() -> void:
 	_check((world.hud.get_node("WeaponLabel") as Label).text.contains(equipped.display_name), "原武器HUD信号仍同步")
 	player.take_damage(3)
 	var remaining_health: int = player.health
-	var drop_scene: PackedScene = load("res://scenes/items/ingredients/herb.tscn")
+	var drop_scene: PackedScene = load("res://scenes/items/ingredients/ingredient_ground.tscn")
 	var drop: Node2D = drop_scene.instantiate() as Node2D
 	world.monster_spawner.add_child(drop)
 	drop.global_position = player.global_position + Vector2(24, 24)

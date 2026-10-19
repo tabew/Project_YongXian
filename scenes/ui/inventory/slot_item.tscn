@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://bl88m473qw5s6"]
 
 [ext_resource type="Script" uid="uid://beik12il45io6" path="res://scripts/ui/inventory/slot_item.gd" id="1_4u4ee"]
-[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_p0qky"]
 
 [node name="SlotItem" type="Control" unique_id=1964065137]
 layout_mode = 3
@@ -23,7 +22,6 @@ offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_p0qky")
 stretch_mode = 5
 
 [node name="AmountLabel" type="Label" parent="." unique_id=650801863]

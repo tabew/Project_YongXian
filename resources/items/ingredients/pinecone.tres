@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://ba75qwwb7ommq"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://bkwn7k0qr4e8x" path="res://assets/items/ingredients/pinecone.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_ribdb"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/fire.tres" id="50_attr7"]
+
+[resource]
+script = ExtResource("1_data")
+id = 20
+name = "枯木"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr7")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

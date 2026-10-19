@@ -6,9 +6,6 @@ extends Node
 ##模板清单
 #用资源引用(preload)而不是字符串路径：字符串路径不被导出器跟踪，
 @export var templates: Array[ItemData] = [
-	preload("res://resources/items/ingredients/herb.tres"),
-	preload("res://resources/items/ingredients/stone.tres"),
-	preload("res://resources/items/ingredients/stick.tres"),
 	preload("res://resources/items/ingredients/give_fur.tres"),
 	preload("res://resources/items/ingredients/monkey_hide.tres"),
 	preload("res://resources/items/ingredients/crocodile_eye.tres"),
@@ -25,6 +22,33 @@ extends Node
 	preload("res://resources/items/weapons/thunder_yoyo.tres"),
 	preload("res://resources/items/weapons/hive_yoyo.tres"),
 	preload("res://resources/items/ingredients/bomb.tres"),
+	preload("res://resources/items/ingredients/shell.tres"),
+	preload("res://resources/items/ingredients/driftwood.tres"),
+	preload("res://resources/items/ingredients/cactus_spine.tres"),
+	preload("res://resources/items/ingredients/desert_crystal.tres"),
+	preload("res://resources/items/ingredients/dry_grass.tres"),
+	preload("res://resources/items/ingredients/hard_nut.tres"),
+	preload("res://resources/items/ingredients/wildflower.tres"),
+	preload("res://resources/items/ingredients/wheat.tres"),
+	preload("res://resources/items/ingredients/mushroom.tres"),
+	preload("res://resources/items/ingredients/pinecone.tres"),
+	preload("res://resources/items/ingredients/vine.tres"),
+	preload("res://resources/items/ingredients/fern_leaf.tres"),
+	preload("res://resources/items/ingredients/peat.tres"),
+	preload("res://resources/items/ingredients/resin.tres"),
+	preload("res://resources/items/ingredients/birch_bark.tres"),
+	preload("res://resources/items/ingredients/moss.tres"),
+	preload("res://resources/items/ingredients/frozen_berry.tres"),
+	preload("res://resources/items/ingredients/ice_crystal.tres"),
+	preload("res://resources/items/ingredients/snow_moss.tres"),
+	preload("res://resources/items/ingredients/iron_ore.tres"),
+	preload("res://resources/items/ingredients/rock_salt.tres"),
+	preload("res://resources/items/ingredients/snow_lotus.tres"),
+	preload("res://resources/items/ingredients/glacier_shard.tres"),
+	preload("res://resources/items/ingredients/acid_fruit.tres"),
+	preload("res://resources/items/ingredients/corrosive_moss.tres"),
+	preload("res://resources/items/ingredients/thunder_stone.tres"),
+	preload("res://resources/items/ingredients/transparent_flower.tres"),
 	#药水模板始终保持在最后一个
 	preload("res://resources/items/potions/potion_model.tres")
 ]
