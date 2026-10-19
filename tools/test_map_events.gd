@@ -5,6 +5,8 @@ extends SceneTree
 ## 第一版地图事件验收：事件房必有草丛药水，点位确定、可达、避开道路与已有内容；
 ## 运行时能交互拿奖励，地刺能造成一次伤害。
 
+const GIVE_SCENE: PackedScene = preload("res://scenes/monsters/give_monster.tscn")
+
 var _checks: int = 0
 var _failures: int = 0
 
@@ -136,6 +138,23 @@ func _check_runtime() -> void:
 	await create_timer(SpikeTrap.TELEGRAPH_TIME + 0.15).timeout
 	_check(world.player.health < health_before, "spike_trap_damages_player")
 	trap.queue_free()
+
+	var monster_trap := SpikeTrap.new()
+	world.add_child(monster_trap)
+	monster_trap.global_position = world.player.global_position + Vector2(64, 0)
+	var monster := GIVE_SCENE.instantiate() as BaseMonster
+	_check(monster != null, "runtime_monster_instantiates_for_trap")
+	if monster != null:
+		world.add_child(monster)
+		monster.global_position = monster_trap.global_position
+		monster.configure(world.player, world._generator, Vector2i.ZERO)
+		monster.set_physics_process(false)
+		var monster_health := monster.get_node("Health") as HealthComponent
+		var monster_before: float = monster_health.current_health
+		monster_trap._on_body_entered(monster)
+		await create_timer(SpikeTrap.TELEGRAPH_TIME + 0.15).timeout
+		_check(monster_health.current_health < monster_before, "spike_trap_damages_monster")
+	monster_trap.queue_free()
 	world.queue_free()
 	await process_frame
 

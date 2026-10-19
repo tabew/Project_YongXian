@@ -2,7 +2,7 @@ class_name SpikeTrap
 extends Area2D
 
 ## 第一版无交互环境危险：踩到后短暂预警，再弹出地刺。
-## 只检测玩家层（1），不会误伤怪物；伤害带冷却，避免站在上面连续掉血。
+## 玩家和怪物都会触发并受到伤害；伤害带冷却，避免站在上面连续掉血。
 
 const TRIGGER_RADIUS: float = 10.0
 const TELEGRAPH_TIME: float = 0.28
@@ -17,7 +17,7 @@ const COOLDOWN: int = 3
 
 var _state: int = IDLE
 var _timer: float = 0.0
-var _target: PlayerCharacter = null
+var _targets: Array[Node2D] = []
 
 
 func _ready() -> void:
@@ -25,7 +25,7 @@ func _ready() -> void:
 	z_index = 2
 	add_to_group("world_traps")
 	collision_layer = 0
-	collision_mask = 1
+	collision_mask = 3
 	monitoring = true
 	monitorable = false
 	var shape_node := CollisionShape2D.new()
@@ -39,14 +39,16 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if _state != IDLE or not body is PlayerCharacter:
+	if not body is PlayerCharacter and not body is BaseMonster:
 		return
 	if _scene_manager_is_transitioning():
 		return
-	_target = body as PlayerCharacter
-	_state = TELEGRAPH
-	_timer = TELEGRAPH_TIME
-	set_process(true)
+	if _state == IDLE:
+		_state = TELEGRAPH
+		_timer = TELEGRAPH_TIME
+		set_process(true)
+	if not _targets.has(body):
+		_targets.append(body)
 	queue_redraw()
 
 
@@ -66,7 +68,7 @@ func _process(delta: float) -> void:
 			_timer -= delta
 			if _timer <= 0.0:
 				_state = IDLE
-				_target = null
+				_targets.clear()
 				set_process(false)
 				queue_redraw()
 
@@ -74,8 +76,19 @@ func _process(delta: float) -> void:
 func _fire() -> void:
 	_state = ACTIVE
 	_timer = ACTIVE_TIME
-	if is_instance_valid(_target) and _target.global_position.distance_to(global_position) <= TRIGGER_RADIUS + 9.0:
-		_target.take_damage(DAMAGE, self)
+	var hit_player: bool = false
+	for target: Node2D in _targets:
+		if not is_instance_valid(target):
+			continue
+		if target.global_position.distance_to(global_position) > TRIGGER_RADIUS + 9.0:
+			continue
+		if target is PlayerCharacter:
+			(target as PlayerCharacter).take_damage(DAMAGE, self)
+			hit_player = true
+		elif target is BaseMonster:
+			# 复用怪物的连锁伤害入口，保留受击、击退、死亡和掉落结算。
+			(target as BaseMonster).apply_chain_damage(DAMAGE, self)
+	if hit_player:
 		_notify("地刺弹出，受到 %d 点伤害" % int(DAMAGE))
 	_play_sfx(&"hit_stone", global_position)
 	queue_redraw()
