@@ -63,7 +63,8 @@ func _plan(generator: WorldGenerator, spec: MapSpec) -> Array:
 			result.append(_entry(LOOT, 1, MapRng.Stream.LOOT, spec.node_id))
 		RoomType.Kind.BOSS:
 			result.append(_entry(BOSS, 1, MapRng.Stream.ENEMY, spec.node_id))
-			result.append(_entry(ENEMY, 4, MapRng.Stream.ENEMY, spec.node_id))
+			if spec.node_id != generator.run.final_node():
+				result.append(_entry(ENEMY, 4, MapRng.Stream.ENEMY, spec.node_id))
 	return result
 
 

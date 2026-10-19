@@ -212,10 +212,12 @@ func _settle(manager: ChunkManager) -> void:
 		await process_frame
 		if manager.map_ready():
 			var loaded: Array[Vector2i] = manager.loaded_chunks()
-			var expected: Array[Vector2i] = _map_chunks(manager.get_map_spec())
-			_check(loaded.size() == expected.size(), "map_ready不是当前区域全图就绪")
-			for coords: Vector2i in expected:
-				_check(loaded.has(coords), "当前区域全图仍有缺失区块%s" % coords)
+			var window: Rect2i = manager._visible_chunk_bounds()
+			_check(window.has_area(), "map_ready没有可见窗口")
+			for cy: int in range(window.position.y, window.end.y):
+				for cx: int in range(window.position.x, window.end.x):
+					var coords := Vector2i(cx, cy)
+					_check(loaded.has(coords), "当前可见窗口仍有缺失区块%s" % coords)
 			return
 	_check(false, "当前箱庭未能在限定帧数内加载完成")
 

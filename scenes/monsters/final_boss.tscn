@@ -1,0 +1,44 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/monsters/base_monster.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/monsters/final_boss.gd" id="2_boss"]
+[ext_resource type="PackedScene" path="res://scenes/ui/boss_hud.tscn" id="3_hud"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 18.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurtbox"]
+radius = 24.0
+
+[node name="FinalBoss" instance=ExtResource("1_base")]
+z_index = 2
+script = ExtResource("2_boss")
+
+[node name="Visual" parent="." index="0"]
+z_index = -2
+
+[node name="Placeholder" parent="Visual" index="0"]
+polygon = PackedVector2Array(-13, 9, -13, -9, -8, -17, -5, -25, 0, -19, 5, -25, 8, -17, 13, -9, 13, 9, 0, 15)
+color = Color(0.718, 0.314, 0.447, 1)
+scale = Vector2(1.8, 1.8)
+
+[node name="Health" parent="." index="3"]
+max_health = 3000.0
+
+[node name="CollisionShape2D" parent="Hurtbox" index="0"]
+shape = SubResource("CircleShape2D_hurtbox")
+
+[node name="CollisionShape2D" parent="." index="6"]
+shape = SubResource("CircleShape2D_body")
+
+[node name="NameLabel" parent="." index="7"]
+visible = false
+text = "贝&%*#彩？？？"
+
+[node name="HealthBar" parent="." index="8"]
+visible = false
+
+[node name="BossOverlay" type="CanvasLayer" parent="."]
+layer = 3
+
+[node name="BossHud" parent="BossOverlay" instance=ExtResource("3_hud")]

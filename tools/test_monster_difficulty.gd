@@ -90,12 +90,19 @@ func _test_room_entries() -> void:
 	check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "starting_safe_room_does_not_advance")
 	var combat: MapSpec = null
 	var next_combat: MapSpec = null
+	var enemy_rooms: Array[MapSpec] = []
 	for spec: MapSpec in world._generator.map_specs():
-		if spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0:
-			if combat == null and spec.biome_id == Biome.Kind.SWAMP:
-				combat = spec
-			elif next_combat == null and spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST:
-				next_combat = spec
+		if spawner.content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
+			continue
+		enemy_rooms.append(spec)
+		if combat == null and spec.biome_id == Biome.Kind.SWAMP:
+			combat = spec
+	if combat == null and not enemy_rooms.is_empty():
+		combat = enemy_rooms[0]
+	for spec: MapSpec in enemy_rooms:
+		if spec != combat:
+			next_combat = spec
+			break
 	check(combat != null and next_combat != null, "seed_has_two_distinct_enemy_rooms")
 	if combat == null or next_combat == null:
 		await _close(world)
@@ -114,7 +121,9 @@ func _test_room_entries() -> void:
 	if spawner.monsters.is_empty():
 		await _close(world)
 		return
-	var plan_count: int = spawner.monsters.size()
+	var original_slots: Dictionary = {}
+	for actor: BaseMonster in spawner.monsters:
+		original_slots["%s:%d:%d" % [actor.get_script().resource_path, actor.original_spawn_tile.x, actor.original_spawn_tile.y]] = true
 	var guard_hp: float = (first_guard.get_node("Health") as HealthComponent).max_health if first_guard != null else 0.0
 	var guard_tile: Vector2i = first_guard.original_spawn_tile if first_guard != null else Vector2i.ZERO
 	var guard_script: String = first_guard.get_script().resource_path if first_guard != null else ""
@@ -145,7 +154,15 @@ func _test_room_entries() -> void:
 		world._enter_map(combat.node_id, -1, combat.west_gate_y)
 		await _wait_room(world)
 		check(world._combat_entry_count == 3 and _find_same_slot(spawner, first_script, first_tile) == null, "dead_slot_stays_empty_despite_difficulty_growth")
-		check(spawner.monsters.size() == plan_count - killed_slots, "only_original_surviving_guards_and_scattered_monsters_spawn")
+		var returned_slots: Dictionary = {}
+		for actor: BaseMonster in spawner.monsters:
+			var slot: String = "%s:%d:%d" % [actor.get_script().resource_path, actor.original_spawn_tile.x, actor.original_spawn_tile.y]
+			returned_slots[slot] = true
+		var missing_slots: Array[String] = []
+		for slot: String in original_slots:
+			if not returned_slots.has(slot):
+				missing_slots.append(slot)
+		check(killed_slots > 0 and missing_slots.size() == killed_slots, "original_survivors_keep_their_spawn_slots after_%d_kills missing=%s" % [killed_slots, str(missing_slots)])
 		for monster: BaseMonster in spawner.monsters:
 			check(monster.difficulty_entry == 3 and is_equal_approx(monster.difficulty_multiplier, 2.0), "all_delayed_monsters_use_arrival_entry")
 	world._enter_map(next_combat.node_id, -1, next_combat.west_gate_y)

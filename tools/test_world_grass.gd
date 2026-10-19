@@ -414,6 +414,9 @@ func _square(center: Vector2) -> PackedVector2Array:
 ## 端到端：启动真正的游戏世界。草丛按玩家视野圈懒生成，进图不再同步铺满整图。
 func _test_live_world() -> void:
 	root.size = Vector2i(1280, 720)
+	var seed_override: String = OS.get_environment("BOSS_GRASS_SEED")
+	if not seed_override.is_empty():
+		root.get_node("GameState").set("world_seed", seed_override.to_int())
 	var world := (load("res://scenes/game/game_world.tscn") as PackedScene).instantiate() as Node2D
 	root.add_child(world)
 	world.player.set_physics_process(false)
@@ -492,9 +495,14 @@ func _test_live_world() -> void:
 			break
 	_check(other != null, "start_region_has_a_neighbour_to_walk_into")
 	if other != null:
+		if not seed_override.is_empty():
+			print("  destination enemy budget: %d room_kind=%d" % [world.monster_spawner.content.budget_of(other.node_id, MapContent.ENEMY), world._generator.run.type_of(other.node_id)])
+		var hidden_layers: Dictionary = manager._regions[other.node_id]["layers"]
+		_check(hidden_layers.is_empty(), "invisible_neighbor_tiles_wait_for_arrival_prewarm")
 		var side: int = int(gate["arrival_side"])
 		var gate_y: int = int(gate["arrival_y"])
-		# 过场动画一开始就预热：材料点位与到达点周围的草丛。
+		# 真实过场在预热前锁住输入，并将非入口怪物留到后续帧生成。
+		world._transitioning = true
 		world._prewarm_map(other, side, gate_y)
 		for _frame: int in 30:
 			await process_frame
@@ -504,11 +512,20 @@ func _test_live_world() -> void:
 			"prewarm_grows_grass_at_the_arrival_point_before_the_swap"
 		)
 		# 预热过的进图不该再随整图草量增长。
+		var warm_layers: Dictionary = manager._regions[other.node_id]["layers"]
+		var warm_count: int = 0
+		for coords: Vector2i in manager._prewarm_chunks.keys():
+			if warm_layers.has(coords):
+				warm_count += 1
+		print("  prewarm terrain: seed=%d %d/%d loaded; %s" % [world._generator.world_seed, warm_count, manager._prewarm_chunks.size(), manager.get_stats()])
+		_check(warm_count == manager._prewarm_chunks.size(), "destination_viewport_chunks_are_painted_during_prewarm")
+		var apply_before: int = manager.stat_apply_usec
 		var entry_start: int = Time.get_ticks_usec()
-		world._enter_map(other.node_id)
+		world._enter_map(other.node_id, side, gate_y)
 		var entry_usec: int = Time.get_ticks_usec() - entry_start
-		print("  live map entry: %.1fms" % (entry_usec / 1000.0))
+		print("  live map entry: %.1fms terrain_delta=%.1fms" % [entry_usec / 1000.0, float(manager.stat_apply_usec - apply_before) / 1000.0])
 		_check(entry_usec < ENTRY_BUDGET_USEC, "entering_a_prewarmed_map_stays_cheap")
+		world._transitioning = false
 		await _wait_for_live_grass(world, other)
 		_check(_live_grass_cells(world, other) > 0, "the_new_map_streams_grass_around_the_player")
 		# 进出箱庭后草层仍要贴在角色之前，否则 z=0 的草会画到人身上。
