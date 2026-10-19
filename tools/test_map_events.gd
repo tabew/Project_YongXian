@@ -55,10 +55,10 @@ func _check_plans() -> void:
 				).size()
 				_check(room_grass >= 2, "event_room_has_multiple_grass_events_%d" % spec.node_id)
 			if room_kind == RoomType.Kind.COMBAT:
-				_check(
-					plan.any(func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.SPIKE_TRAP),
-					"combat_room_has_spike_trap_%d" % spec.node_id
-				)
+				var room_traps: int = plan.filter(
+					func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.SPIKE_TRAP
+				).size()
+				_check(room_traps >= 2, "combat_room_has_multiple_spike_traps_%d" % spec.node_id)
 			var reachable: Dictionary = _reachable(generator, spec)
 			var footprints: Array[Rect2i] = []
 			for entry: Dictionary in plan:
@@ -81,7 +81,7 @@ func _check_plans() -> void:
 					spike_traps += 1
 		total_event_rooms += event_rooms
 		_check(grass_events >= 15, "seed_has_dense_grass_events_%d" % seed_value)
-		_check(spike_traps >= 10, "seed_has_dense_spike_traps_%d" % seed_value)
+		_check(spike_traps >= 15, "seed_has_dense_spike_traps_%d" % seed_value)
 		print("EVENT_SAMPLE seed=%d rooms=%d grass=%d traps=%d" % [seed_value, event_rooms, grass_events, spike_traps])
 	_check(total_event_rooms > 0, "at_least_one_event_room_in_samples")
 
@@ -137,6 +137,9 @@ func _check_runtime() -> void:
 	trap._on_body_entered(world.player)
 	await create_timer(SpikeTrap.TELEGRAPH_TIME + 0.15).timeout
 	_check(world.player.health < health_before, "spike_trap_damages_player")
+	var health_after_first: float = world.player.health
+	await create_timer(SpikeTrap.DAMAGE_INTERVAL + 0.1).timeout
+	_check(world.player.health < health_after_first, "spike_trap_continuous_damage")
 	trap.queue_free()
 
 	var monster_trap := SpikeTrap.new()

@@ -45,7 +45,7 @@ static func plan(
 			trap_count = 1
 		RoomType.Kind.COMBAT:
 			grass_count = 1 if rng.randf() < 0.5 else 0
-			trap_count = 2
+			trap_count = 3
 		RoomType.Kind.REWARD:
 			grass_count = 2
 		RoomType.Kind.SHOP, RoomType.Kind.REST:
@@ -56,7 +56,7 @@ static func plan(
 	# 再给普通房间一点随机增量，让同一张图不会永远只有固定数量。
 	if rng.randf() < 0.45:
 		grass_count += 1
-	if room_kind in [RoomType.Kind.EVENT, RoomType.Kind.COMBAT] and rng.randf() < 0.5:
+	if room_kind in [RoomType.Kind.EVENT, RoomType.Kind.COMBAT] and rng.randf() < 0.6:
 		trap_count += 1
 
 	# 小地图也要留出空间，最多 5 个事件点；优先保留草丛事件。
