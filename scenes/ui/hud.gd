@@ -22,6 +22,9 @@ var _toast_tween: Tween = null
 var _pickup_label: Label = null
 var _level_label: Label = null
 var _xp_fill: ColorRect = null
+var _boss_visible: bool = false
+var _boss_mobile_layout: bool = false
+var _stats_visible_before_boss: bool = true
 
 
 func _ready() -> void:
@@ -54,6 +57,42 @@ func _ready() -> void:
 	if progress != null and progress.has_signal("experience_changed"):
 		progress.experience_changed.connect(_on_experience_changed)
 	_refresh_progress()
+	resized.connect(_layout_for_boss)
+	_layout_for_boss()
+
+
+func set_boss_visible(value: bool) -> void:
+	if _boss_visible == value:
+		return
+	_boss_visible = value
+	_layout_for_boss()
+
+
+func _layout_for_boss() -> void:
+	if not is_node_ready():
+		return
+	var mobile: bool = _boss_visible and size.x < 720.0
+	var compact: bool = _boss_visible and size.x < 1140.0 and not mobile
+	if mobile and not _boss_mobile_layout:
+		_stats_visible_before_boss = stats_label.visible
+		stats_label.visible = false
+	elif not mobile and _boss_mobile_layout:
+		stats_label.visible = _stats_visible_before_boss
+	_boss_mobile_layout = mobile
+	info_label.position.y = 272.0 if mobile else (114.0 if compact else 10.0)
+	minimap.size = Vector2(120.0, 120.0) if mobile else Vector2(164.0, 164.0)
+	minimap.position = Vector2(roundf((size.x - 120.0) * 0.5), 112.0) if mobile else Vector2(size.x - 178.0, 114.0 if compact else 14.0)
+	stats_label.position.y = 286.0 if compact else 186.0
+	($BuffBar as Control).position.y = 400.0 if mobile else (240.0 if compact else 140.0)
+	if mobile:
+		toast_label.position = Vector2(14.0, 240.0)
+		toast_label.size.x = maxf(0.0, size.x - 28.0)
+	elif compact:
+		toast_label.position = Vector2(372.0, 114.0)
+		toast_label.size.x = maxf(0.0, size.x - 562.0)
+	else:
+		toast_label.position = Vector2((size.x - 480.0) * 0.5, 114.0 if _boss_visible else 24.0)
+		toast_label.size.x = 480.0
 
 
 ## 左下角等级与经验条：贴在武器信息上方，不抢左上角信息面板的位置。
@@ -169,7 +208,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		AudioManager.play_sfx(&"ui_toggle")
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("toggle_debug"):
-		stats_label.visible = not stats_label.visible
+		if _boss_mobile_layout:
+			_stats_visible_before_boss = not _stats_visible_before_boss
+		else:
+			stats_label.visible = not stats_label.visible
 		AudioManager.play_sfx(&"ui_toggle")
 
 

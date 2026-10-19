@@ -3,16 +3,17 @@ extends Node
 
 signal health_changed(current: float, maximum: float)
 signal damaged(hit: CombatHit, actual_damage: float)
+## 致命伤害结算后、正式死亡前；阶段型敌人可在这里回满生命。
+signal depleted(hit: CombatHit)
 signal died(hit: CombatHit)
 
 @export_range(1.0, 100000.0, 1.0) var max_health: float = 100.0
 @export_range(0.0, 10000.0, 0.5) var defense: float = 0.0
 #buff 修改的受到的伤害倍率，1.0为正常
 @export_range(0.0, 10.0, 0.05) var damage_taken: float = 1.0
-##无敌帧：为真时 receive_hit 直接不结算（闪避等用）
-var invulnerable: bool = false
-
 var current_health: float = 0.0
+## 闪避无敌帧与 Boss 阶段切换都使用同一战斗伤害拦截开关。
+var invulnerable: bool = false
 
 
 func _ready() -> void:
@@ -55,9 +56,7 @@ func set_current_health(value: float) -> void:
 
 
 func receive_hit(hit: CombatHit) -> bool:
-	if hit == null or not is_alive():
-		return false
-	if invulnerable:
+	if hit == null or invulnerable or not is_alive():
 		return false
 	#先过 buff 的受伤倍率，再减防御
 	var mitigated: float = maxf(hit.damage * damage_taken - defense, 0.0)
@@ -77,5 +76,7 @@ func receive_hit(hit: CombatHit) -> bool:
 	Buffs.apply_lifesteal(hit.source, amount)
 
 	if not is_alive():
-		died.emit(hit)
+		depleted.emit(hit)
+		if not is_alive():
+			died.emit(hit)
 	return true

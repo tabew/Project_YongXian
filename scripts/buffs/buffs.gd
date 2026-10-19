@@ -146,7 +146,7 @@ static func is_absorbing(target: Node) -> bool:
 
 ##给任意实体造成一次伤害。返回实际扣掉的生命。
 ##玩家走自己的 take_damage，其它实体走生命组件。
-static func hurt_entity(target: Node, amount: float) -> float:
+static func hurt_entity(target: Node, amount: float, source: Node2D = null, weapon_id: StringName = &"") -> float:
 	if target == null or not is_instance_valid(target) or amount <= 0.0:
 		return 0.0
 
@@ -154,7 +154,7 @@ static func hurt_entity(target: Node, amount: float) -> float:
 		var player: PlayerCharacter = target as PlayerCharacter
 		var before: float = player.health
 
-		player.take_damage(amount)
+		player.take_damage(amount, source)
 		return maxf(before - player.health, 0.0)
 
 	var health: Node = target.get_node_or_null("Health")
@@ -165,6 +165,8 @@ static func hurt_entity(target: Node, amount: float) -> float:
 	var hit: CombatHit = CombatHit.new()
 
 	hit.damage = amount
+	hit.source = source
+	hit.weapon_id = weapon_id
 	if target is Node2D:
 		hit.position = (target as Node2D).global_position
 	health.call("receive_hit", hit)

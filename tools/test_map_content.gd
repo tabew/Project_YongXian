@@ -47,12 +47,14 @@ func _run() -> void:
 					rests += 1
 				RoomType.Kind.BOSS:
 					_check(content.budget_of(node_id, MapContent.BOSS) == 1, "Boss 房没有 Boss seed=%d node=%d" % [seed_value, node_id])
+					if node_id == generator.run.final_node():
+						_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "最终房间不能生成普通怪 seed=%d node=%d" % [seed_value, node_id])
 				RoomType.Kind.START:
 					_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "起点房不该刷怪 seed=%d node=%d" % [seed_value, node_id])
-		# 只有战斗 / Boss 区域有刷怪预算，其它类型一律不刷。
+		# 普通敌人只在战斗房及非终点 Boss 房刷新；终点只保留专属 Boss。
 		for spec: MapSpec in generator.map_specs():
 			var kind2: int = generator.run.type_of(spec.node_id)
-			var expects: bool = kind2 == RoomType.Kind.COMBAT or kind2 == RoomType.Kind.BOSS
+			var expects: bool = kind2 == RoomType.Kind.COMBAT or (kind2 == RoomType.Kind.BOSS and spec.node_id != generator.run.final_node())
 			_check((content.budget_of(spec.node_id, MapContent.ENEMY) > 0) == expects,
 				"刷怪预算与房间类型不符 seed=%d node=%d kind=%s" % [seed_value, spec.node_id, RoomType.name_of(kind2)])
 
