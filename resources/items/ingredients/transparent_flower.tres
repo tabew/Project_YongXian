@@ -10,6 +10,7 @@ script = ExtResource("1_data")
 alchemical_attribute = Array[ExtResource("3_attrtype")]([ExtResource("4_attr0")])
 for_use_attribute = Array[ExtResource("3_attrtype")]([ExtResource("4_attr0")])
 id = 37
+rarity = 2
 name = "透明花"
 texture = ExtResource("2_icon")
 item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

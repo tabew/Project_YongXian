@@ -11,15 +11,15 @@ const STREAM_SALT: int = 0x47524F55
 ##可以被投掷出去的材料（石块一类）：沙晶/冰晶/铁矿/岩盐/雷石
 const THROWABLE_IDS: Array[int] = [14, 28, 30, 31, 36]
 
-##每个群系在野外能捡到的材料（2 种）；海域没有可站的陆地，退回石头/木棍
+##每个群系在野外能捡到的材料（2~3 种，与材料表一致）；海域没有可站的陆地，退回海岸材料
 const BIOME_ITEMS: Dictionary = {
 	Biome.Kind.BEACH: [11, 12],
 	Biome.Kind.DESERT: [13, 14],
 	Biome.Kind.SAVANNA: [15, 16],
-	Biome.Kind.GRASSLAND: [17, 18],
+	Biome.Kind.GRASSLAND: [10, 17, 18],
 	Biome.Kind.FOREST: [19, 20],
 	Biome.Kind.TROPICAL_RAINFOREST: [21, 22, 34],
-	Biome.Kind.SWAMP: [23, 35],
+	Biome.Kind.SWAMP: [23, 35, 37],
 	Biome.Kind.TAIGA: [24, 25],
 	Biome.Kind.TUNDRA: [26, 27],
 	Biome.Kind.SNOWY_PLAINS: [28, 29],
@@ -40,11 +40,39 @@ static func is_throwable(item_id: int) -> bool:
 	return THROWABLE_IDS.has(item_id)
 
 
-##按群系随机挑一种
+##稀有度权重：普通 6、罕见 2、稀有 1，越稀有的材料在地面越少见。
+const RARITY_WEIGHT: Array[int] = [6, 2, 1]
+
+
+##按群系随机挑一种，按稀有度加权。
 static func _pick_item(source: RandomNumberGenerator, biome: int) -> int:
 	var pool: Array = items_for(biome)
+	var total: float = 0.0
+	for item_id: int in pool:
+		total += float(RARITY_WEIGHT[_rarity_of(item_id)])
+	if total <= 0.0:
+		return int(pool[0])
+	var roll: float = source.randf() * total
+	var cumulative: float = 0.0
+	for item_id: int in pool:
+		cumulative += float(RARITY_WEIGHT[_rarity_of(item_id)])
+		if roll < cumulative:
+			return int(item_id)
+	return int(pool[pool.size() - 1])
 
-	return int(pool[source.randi_range(0, pool.size() - 1)])
+
+## 材料稀有度（与材料表一致，也和各个 .tres 里的 rarity 字段对应）。
+## 这里用常量表而不是查 ItemListGlobal：后者是自动加载单例，
+## 纯脚本测试里取不到会让整个生成器编译失败。
+const RARITY: Dictionary = {
+	14: 1, 20: 1, 22: 1, 25: 1, 28: 1, 30: 1, 36: 1,   # 罕见
+	32: 2, 37: 2,                                        # 稀有
+}
+
+
+##材料的稀有度（0 普通 / 1 罕见 / 2 稀有）。
+static func _rarity_of(item_id: int) -> int:
+	return clampi(int(RARITY.get(item_id, 0)), 0, RARITY_WEIGHT.size() - 1)
 
 
 static func plan(generator: WorldGenerator, spec: MapSpec) -> Array[Dictionary]:

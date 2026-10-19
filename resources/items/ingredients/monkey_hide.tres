@@ -8,6 +8,7 @@
 
 [resource]
 script = ExtResource("1_data")
+id = 0
 name = "猴皮"
 texture = ExtResource("2_icon")
 alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr26")])

@@ -4,6 +4,12 @@ extends ItemData
 class_name IngredientData
 ##材料数据脚本
 
+## 稀有度：0 普通、1 罕见、2 稀有。与材料表一致，地面采集按它加权。
+const RARITY_COMMON: int = 0
+const RARITY_UNCOMMON: int = 1
+const RARITY_RARE: int = 2
+
+@export_range(0, 2, 1) var rarity: int = RARITY_COMMON
 @export var for_use_attribute:Array[AlchemicalData] = []
 
 
