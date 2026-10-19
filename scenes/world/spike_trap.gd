@@ -21,6 +21,8 @@ var _target: PlayerCharacter = null
 
 
 func _ready() -> void:
+	# 地刺要压过草层（草前层 z=1），否则玩家几乎看不到。
+	z_index = 2
 	add_to_group("world_traps")
 	collision_layer = 0
 	collision_mask = 1
@@ -102,6 +104,7 @@ func _draw() -> void:
 	draw_rect(Rect2(-11, -7, 22, 14), Color("1f241d", 0.22))
 	draw_rect(Rect2(-10, -6, 20, 12), base)
 	draw_rect(Rect2(-8, -4, 16, 8), dark)
+	draw_line(Vector2(-7, -5), Vector2(7, -5), Color("b8b49a"), 1.0)
 	for x: int in [-6, 0, 6]:
 		draw_circle(Vector2(float(x), 0), 2.2, Color("1b1c18"))
 	if _state == TELEGRAPH:

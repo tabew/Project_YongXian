@@ -3,8 +3,9 @@ extends RefCounted
 
 ## 第一版地图事件选点。
 ##
-## 事件房保证生成一个草丛药水事件，普通房间低概率出现；战斗房有概率生成
-## 一个地刺。所有点位只做纯数据规划，运行时由 GameWorld 实例化。
+## 每个非起点/Boss房间至少布置一个事件，事件房和战斗房更密集：
+## 事件房多个草丛药水 + 地刺，战斗房多个地刺，其余房间 1-2 个草丛事件。
+## 所有点位只做纯数据规划，运行时由 GameWorld 实例化。
 
 const GRASS_POTION: StringName = &"grass_potion"
 const SPIKE_TRAP: StringName = &"spike_trap"
@@ -36,15 +37,37 @@ static func plan(
 	var safe_points: Array[Vector2i] = _safe_points(generator, spec)
 	var reachable: Dictionary = _reachable_tiles(generator, spec)
 
-	if room_kind == RoomType.Kind.EVENT:
+	var grass_count: int = 1
+	var trap_count: int = 0
+	match room_kind:
+		RoomType.Kind.EVENT:
+			grass_count = 3
+			trap_count = 1
+		RoomType.Kind.COMBAT:
+			grass_count = 1 if rng.randf() < 0.5 else 0
+			trap_count = 2
+		RoomType.Kind.REWARD:
+			grass_count = 2
+		RoomType.Kind.SHOP, RoomType.Kind.REST:
+			grass_count = 1
+		_:
+			grass_count = 1
+
+	# 再给普通房间一点随机增量，让同一张图不会永远只有固定数量。
+	if rng.randf() < 0.45:
+		grass_count += 1
+	if room_kind in [RoomType.Kind.EVENT, RoomType.Kind.COMBAT] and rng.randf() < 0.5:
+		trap_count += 1
+
+	# 小地图也要留出空间，最多 5 个事件点；优先保留草丛事件。
+	var cap: int = clampi(int(spec.extent.x * spec.extent.y / 5000), 3, 5)
+	grass_count = mini(grass_count, cap)
+	trap_count = mini(trap_count, maxi(cap - grass_count, 0))
+
+	for _index: int in grass_count:
 		_add_event(result, occupied, GRASS_POTION, generator, spec, rng, safe_points, reachable)
-		if rng.randf() < 0.55:
-			_add_event(result, occupied, SPIKE_TRAP, generator, spec, rng, safe_points, reachable)
-	elif room_kind == RoomType.Kind.COMBAT:
-		if rng.randf() < 0.55:
-			_add_event(result, occupied, SPIKE_TRAP, generator, spec, rng, safe_points, reachable)
-	elif rng.randf() < 0.22:
-		_add_event(result, occupied, GRASS_POTION, generator, spec, rng, safe_points, reachable)
+	for _index: int in trap_count:
+		_add_event(result, occupied, SPIKE_TRAP, generator, spec, rng, safe_points, reachable)
 
 	return result
 

@@ -84,6 +84,11 @@ func interact(player: PlayerCharacter) -> bool:
 	return true
 
 
+func _ready() -> void:
+	# 草丛的前层 z=1；事件必须画在草上，否则会被草丛盖住。
+	z_index = 2
+
+
 func _item_list() -> Node:
 	return get_node_or_null("/root/ItemListGlobal")
 

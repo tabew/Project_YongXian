@@ -48,9 +48,14 @@ func _check_plans() -> void:
 			var room_kind: int = generator.run.type_of(spec.node_id)
 			if room_kind == RoomType.Kind.EVENT:
 				event_rooms += 1
+				var room_grass: int = plan.filter(
+					func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.GRASS_POTION
+				).size()
+				_check(room_grass >= 2, "event_room_has_multiple_grass_events_%d" % spec.node_id)
+			if room_kind == RoomType.Kind.COMBAT:
 				_check(
-					plan.any(func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.GRASS_POTION),
-					"event_room_has_grass_potion_%d" % spec.node_id
+					plan.any(func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.SPIKE_TRAP),
+					"combat_room_has_spike_trap_%d" % spec.node_id
 				)
 			var reachable: Dictionary = _reachable(generator, spec)
 			var footprints: Array[Rect2i] = []
@@ -73,6 +78,8 @@ func _check_plans() -> void:
 				elif entry["event_id"] == MapEventPlanner.SPIKE_TRAP:
 					spike_traps += 1
 		total_event_rooms += event_rooms
+		_check(grass_events >= 15, "seed_has_dense_grass_events_%d" % seed_value)
+		_check(spike_traps >= 10, "seed_has_dense_spike_traps_%d" % seed_value)
 		print("EVENT_SAMPLE seed=%d rooms=%d grass=%d traps=%d" % [seed_value, event_rooms, grass_events, spike_traps])
 	_check(total_event_rooms > 0, "at_least_one_event_room_in_samples")
 
