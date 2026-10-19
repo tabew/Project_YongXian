@@ -12,4 +12,4 @@ description = "无法通过治疗属性恢复生命，持续 30 秒。"
 icon = ExtResource("1_kt7do")
 is_debuff = true
 duration = 30.0
-max_level = 0
+max_level = 3

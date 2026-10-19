@@ -10,5 +10,5 @@ id = &"invisible"
 display_name = "隐身"
 description = "身体变得半透明。"
 icon = ExtResource("1_u1k5w")
-max_level = 0
+max_level = 3
 flags = Array[StringName]([&"invisible"])

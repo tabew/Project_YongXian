@@ -7,5 +7,6 @@
 script = ExtResource("1_u4gvl")
 attribute_id = 1
 name = "神圣"
+max_level = 3
 buff = ExtResource("2_blessing")
 metadata/_custom_type_script = "uid://bakux1700e72"

@@ -6,4 +6,4 @@
 script = ExtResource("1_attribute")
 attribute_id = 3
 name = "矿物"
-max_level = 0
+max_level = 3

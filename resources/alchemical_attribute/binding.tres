@@ -7,3 +7,4 @@
 script = ExtResource("1_attribute")
 attribute_id = 5
 name = "固结"
+max_level = 3

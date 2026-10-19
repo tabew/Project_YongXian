@@ -8,4 +8,5 @@ script = ExtResource("1_vulnerable")
 attribute_id = 18
 can_be_weapon_enchant = true
 name = "易伤"
-level = 3
+max_level = 3
+level = 0

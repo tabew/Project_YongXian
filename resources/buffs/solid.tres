@@ -12,6 +12,7 @@ value = -0.3
 value_per_level = -0.05
 
 [resource]
+max_level = 3
 script = ExtResource("3_3axww")
 id = &"solid"
 display_name = "固化"

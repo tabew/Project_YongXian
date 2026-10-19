@@ -12,5 +12,5 @@ description = "被冻住，无法移动和出手。"
 icon = ExtResource("1_c7tsl")
 is_debuff = true
 duration = 1.5
-max_level = 0
+max_level = 3
 flags = Array[StringName]([&"stunned"])

@@ -12,5 +12,5 @@ description = "被砸晕，无法移动和出手。"
 icon = ExtResource("1_0h6rl")
 is_debuff = true
 duration = 1.0
-max_level = 0
+max_level = 3
 flags = Array[StringName]([&"stunned"])

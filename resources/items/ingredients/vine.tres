@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_2f72t"]
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
 [ext_resource type="Resource" uid="uid://dnmf43q3qyiwl" path="res://resources/alchemical_attribute/swift.tres" id="50_attr12"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/heal.tres" id="50_attr0"]
 
 [resource]
 script = ExtResource("1_data")
@@ -12,5 +13,5 @@ for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr12")]
 id = 21
 name = "藤蔓"
 texture = ExtResource("2_icon")
-alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr12")])
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr12"), ExtResource("50_attr0")])
 item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

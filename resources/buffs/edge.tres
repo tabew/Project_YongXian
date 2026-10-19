@@ -11,6 +11,7 @@ value = 3.0
 value_per_level = 1.5
 
 [resource]
+max_level = 3
 script = ExtResource("2_voijn")
 id = &"edge"
 display_name = "锋利"
