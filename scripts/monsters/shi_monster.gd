@@ -1,7 +1,7 @@
 class_name ShiMonster
 extends BaseMonster
 
-## 史独有的低跳、吞物与合团；这些机制不进入通用怪物模板。
+## 史莱姆独有的低跳、吞物与合团；这些机制不进入通用怪物模板。
 const HOP_DURATION: float = 0.22
 const HOP_REST: float = 1.0
 const SWALLOW_RADIUS: float = 10.0
@@ -223,7 +223,7 @@ func form_group() -> bool:
 	shape.radius = GROUP_RADIUS
 	(get_node("CollisionShape2D") as CollisionShape2D).set_deferred("shape", shape)
 	(get_node("Hurtbox/CollisionShape2D") as CollisionShape2D).set_deferred("shape", shape)
-	(get_node("NameLabel") as Label).text = "团团史"
+	(get_node("NameLabel") as Label).text = "团团史莱姆"
 	(get_node("Visual/Body") as CanvasItem).queue_redraw()
 	play_monster_animation(&"Form", true)
 	return true

@@ -27,8 +27,7 @@ func _run() -> void:
 		for spec: MapSpec in world._generator.map_specs():
 			var kind: int = world._generator.run.type_of(spec.node_id)
 			var budget: int = world.monster_spawner.content.budget_of(spec.node_id,MapContent.ENEMY)
-			if kind not in [RoomType.Kind.COMBAT,RoomType.Kind.BOSS]:
-				check(budget == 0,"safe_rooms_have_no_enemy_budget")
+			check((budget == 0) if RunGraph.floor_of(spec.node_id) == 0 or kind == RoomType.Kind.EVENT else (budget > 0),"first_floor_and_event_rooms_are_monster_free")
 			if kind in [RoomType.Kind.COMBAT,RoomType.Kind.BOSS]:
 				swamp_combat += int(spec.biome_id == Biome.Kind.SWAMP)
 				rainforest_combat += int(spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST)

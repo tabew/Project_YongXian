@@ -46,11 +46,12 @@ func _plan(generator: WorldGenerator, spec: MapSpec) -> Array:
 	var span: int = maxi(generator.run.floors.size() - 1, 1)
 	var difficulty: float = clampf(float(RunGraph.floor_of(spec.node_id)) / float(span), 0.0, 1.0)
 	var result: Array = []
+	if RunGraph.floor_of(spec.node_id) > 0 and kind != RoomType.Kind.EVENT:
+		result.append(_entry(ENEMY, 3 + roundi(difficulty * 4.0), MapRng.Stream.ENEMY, spec.node_id))
 	match kind:
 		RoomType.Kind.START:
 			result.append(_entry(DECOR, 6, MapRng.Stream.DECOR, spec.node_id))
 		RoomType.Kind.COMBAT:
-			result.append(_entry(ENEMY, 3 + roundi(difficulty * 4.0), MapRng.Stream.ENEMY, spec.node_id))
 			result.append(_entry(DECOR, 4, MapRng.Stream.DECOR, spec.node_id))
 		RoomType.Kind.REWARD:
 			result.append(_entry(LOOT, 2 + roundi(difficulty * 2.0), MapRng.Stream.LOOT, spec.node_id))
@@ -63,8 +64,6 @@ func _plan(generator: WorldGenerator, spec: MapSpec) -> Array:
 			result.append(_entry(LOOT, 1, MapRng.Stream.LOOT, spec.node_id))
 		RoomType.Kind.BOSS:
 			result.append(_entry(BOSS, 1, MapRng.Stream.ENEMY, spec.node_id))
-			if spec.node_id != generator.run.final_node():
-				result.append(_entry(ENEMY, 4, MapRng.Stream.ENEMY, spec.node_id))
 	return result
 
 

@@ -1,7 +1,7 @@
 class_name ShiProximityCache
 extends RefCounted
 
-## 史的局部检索索引：同一物理帧每类分组只扫描一次，全群共享。
+## 史莱姆的局部检索索引：同一物理帧每类分组只扫描一次，全群共享。
 const CELL_SIZE: float = 64.0
 static var _tree_id: int = 0
 static var _frames: Dictionary = {}

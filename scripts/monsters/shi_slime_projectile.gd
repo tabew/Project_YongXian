@@ -1,7 +1,7 @@
 class_name ShiSlimeProjectile
 extends Node2D
 
-## 粘液弹为史专用弹体：固定出手方向、扫掠命中0.5，不参与材料拾取。
+## 粘液弹为史莱姆专用弹体：固定出手方向、扫掠命中0.5，不参与材料拾取。
 const SPEED: float = 180.0
 const DAMAGE: float = 5.0
 const LIFE_TIME: float = 2.0

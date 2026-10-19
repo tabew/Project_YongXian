@@ -1,7 +1,7 @@
 class_name GiveMonsterAttack
 extends EnemyAttack
 
-## "给"的攻击实现：6~10 格投石，6 格内跳跃近战。
+## 仙缔的攻击实现：6~10 格投石，6 格内跳跃近战。
 ##
 ## 状态转换、冷却计时与丢失视野处理都由 EnemyBrain 负责，这里只回答"能不能打"和"怎么打"。
 ## 数值集中在这里，GiveMonster 以常量别名转发，方便旧测试与旧脚本继续引用。

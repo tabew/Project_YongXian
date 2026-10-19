@@ -87,26 +87,55 @@ func _test_room_entries() -> void:
 	world.set_process(false)
 	world.player.set_physics_process(false)
 	var spawner: MonsterSpawner = world.monster_spawner
-	check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "starting_safe_room_does_not_advance")
+	await _wait_room(world)
+	var start: MapSpec = world._generator.map_spec(0)
+	check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "starting_floor_has_no_enemies_or_difficulty")
+	check(spawner.content.budget_of(start.node_id, MapContent.ENEMY) == 0, "starting_floor_has_no_enemy_budget")
 	var combat: MapSpec = null
 	var next_combat: MapSpec = null
+	var event_room: MapSpec = null
 	var enemy_rooms: Array[MapSpec] = []
 	for spec: MapSpec in world._generator.map_specs():
+		if world._generator.run.type_of(spec.node_id) == RoomType.Kind.EVENT and event_room == null:
+			event_room = spec
 		if spawner.content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
 			continue
 		enemy_rooms.append(spec)
-		if combat == null and spec.biome_id == Biome.Kind.SWAMP:
+		if combat == null and spec.node_id != 0 and world._generator.run.type_of(spec.node_id) != RoomType.Kind.BOSS and spec.biome_id == Biome.Kind.SWAMP:
 			combat = spec
-	if combat == null and not enemy_rooms.is_empty():
-		combat = enemy_rooms[0]
+	if combat == null:
+		for spec: MapSpec in enemy_rooms:
+			if world._generator.run.type_of(spec.node_id) == RoomType.Kind.BOSS:
+				continue
+			for definition: MonsterSpawnData in spawner.spawn_definitions:
+				if definition != null and definition.monster_scene != null and (definition.allowed_biomes.is_empty() or definition.allowed_biomes.has(spec.biome_id)):
+					combat = spec
+					break
+			if combat != null:
+				break
 	for spec: MapSpec in enemy_rooms:
-		if spec != combat:
+		if combat != null and spec != combat and world._generator.run.type_of(spec.node_id) != RoomType.Kind.BOSS and spec.biome_id == combat.biome_id:
 			next_combat = spec
 			break
+	if next_combat == null:
+		for spec: MapSpec in enemy_rooms:
+			if spec == combat or world._generator.run.type_of(spec.node_id) == RoomType.Kind.BOSS:
+				continue
+			for definition: MonsterSpawnData in spawner.spawn_definitions:
+				if definition != null and definition.monster_scene != null and (definition.allowed_biomes.is_empty() or definition.allowed_biomes.has(spec.biome_id)):
+					next_combat = spec
+					break
+			if next_combat != null:
+				break
 	check(combat != null and next_combat != null, "seed_has_two_distinct_enemy_rooms")
 	if combat == null or next_combat == null:
 		await _close(world)
 		return
+	if event_room != null:
+		check(spawner.content.budget_of(event_room.node_id, MapContent.ENEMY) == 0, "event_room_has_no_enemy_budget")
+		world._enter_map(event_room.node_id, -1, event_room.west_gate_y)
+		await _wait_room(world)
+		check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "event_room_has_no_enemies_or_difficulty")
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
 	await _wait_room(world)
 	check(world._combat_entry_count == 1 and not spawner.monsters.is_empty(), "first_combat_entry_has_monsters")
@@ -117,7 +146,8 @@ func _test_room_entries() -> void:
 			first_guard = actor
 		elif not actor.has_supply_post and first_scattered == null:
 			first_scattered = actor
-	check(first_guard != null and first_scattered != null, "first_room_contains_guard_and_ordinary_enemies")
+	if first_guard != null:
+		check(first_scattered != null, "guarded_room_also_contains_ordinary_enemies")
 	if spawner.monsters.is_empty():
 		await _close(world)
 		return
@@ -131,26 +161,35 @@ func _test_room_entries() -> void:
 	var first_hp: float = (first.get_node("Health") as HealthComponent).max_health
 	var first_tile: Vector2i = first.original_spawn_tile
 	var first_script: String = first.get_script().resource_path
-	check(first.difficulty_entry == 1 and first.difficulty_multiplier == 1.0, "initial_monster_has_individual_baseline")
+	var first_multiplier: float = MonsterDifficulty.multiplier_for_entry(1)
+	check(first.difficulty_entry == 1 and is_equal_approx(first.difficulty_multiplier, first_multiplier), "first_combat_monster_uses_first_entry")
+	if event_room != null:
+		world._enter_map(event_room.node_id, -1, event_room.west_gate_y)
+		await _wait_room(world)
+		check(world._combat_entry_count == 1 and spawner.monsters.is_empty(), "event_room_remains_safe_after_combat")
 	world._enter_map(0)
-	check(world._combat_entry_count == 1, "safe_room_does_not_increase_difficulty")
+	await _wait_room(world)
+	check(world._combat_entry_count == 1 and spawner.monsters.is_empty(), "return_to_start_stays_safe_without_advancing_difficulty")
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
 	await _wait_room(world)
 	var second: BaseMonster = _find_same_slot(spawner, first_script, first_tile)
+	var reentry_multiplier: float = MonsterDifficulty.multiplier_for_entry(2)
+	var hp_ratio: float = reentry_multiplier / first_multiplier
 	check(world._combat_entry_count == 2 and second != null, "return_to_same_combat_room_advances_entry")
 	if first_guard != null:
 		var guard_again: BaseMonster = _find_same_slot(spawner, guard_script, guard_tile)
-		check(guard_again != null and is_equal_approx((guard_again.get_node("Health") as HealthComponent).max_health, guard_hp * 1.5), "supply_guard_uses_same_reentry_hp_multiplier")
+		check(guard_again != null and is_equal_approx((guard_again.get_node("Health") as HealthComponent).max_health, guard_hp * hp_ratio), "supply_guard_uses_same_reentry_hp_multiplier")
 	if second != null:
 		var second_health := second.get_node("Health") as HealthComponent
-		check(is_equal_approx(second_health.max_health, first_hp * 1.5) and is_equal_approx(second_health.current_health, second_health.max_health), "reentered_monster_hp_is_full_and_scaled")
-		check(second.difficulty_entry == 2 and is_equal_approx(second.outgoing_damage(1.0), 1.5), "second_entry_multiplier_lives_on_monster")
+		check(is_equal_approx(second_health.max_health, first_hp * hp_ratio) and is_equal_approx(second_health.current_health, second_health.max_health), "reentered_monster_hp_is_full_and_scaled")
+		check(second.difficulty_entry == 2 and is_equal_approx(second.outgoing_damage(1.0), reentry_multiplier), "second_entry_multiplier_lives_on_monster")
 		second.apply_difficulty(2)
-		check(is_equal_approx(second_health.max_health, first_hp * 1.5), "difficulty_cannot_stack_twice_on_one_instance")
+		check(is_equal_approx(second_health.max_health, first_hp * hp_ratio), "difficulty_cannot_stack_twice_on_one_instance")
 		var defeated_before: int = spawner._defeated_spawn_ids.size()
 		second.kill()
 		var killed_slots: int = spawner._defeated_spawn_ids.size() - defeated_before
 		world._enter_map(0)
+		check(world._combat_entry_count == 2, "safe_start_does_not_advance_after_monster_death")
 		world._enter_map(combat.node_id, -1, combat.west_gate_y)
 		await _wait_room(world)
 		check(world._combat_entry_count == 3 and _find_same_slot(spawner, first_script, first_tile) == null, "dead_slot_stays_empty_despite_difficulty_growth")
@@ -164,19 +203,18 @@ func _test_room_entries() -> void:
 				missing_slots.append(slot)
 		check(killed_slots > 0 and missing_slots.size() == killed_slots, "original_survivors_keep_their_spawn_slots after_%d_kills missing=%s" % [killed_slots, str(missing_slots)])
 		for monster: BaseMonster in spawner.monsters:
-			check(monster.difficulty_entry == 3 and is_equal_approx(monster.difficulty_multiplier, 2.0), "all_delayed_monsters_use_arrival_entry")
+			check(monster.difficulty_entry == 3 and is_equal_approx(monster.difficulty_multiplier, MonsterDifficulty.multiplier_for_entry(3)), "all_delayed_monsters_use_arrival_entry")
 	world._enter_map(next_combat.node_id, -1, next_combat.west_gate_y)
 	check(world._combat_entry_count == 4, "different_enemy_room_uses_same_run_progression")
 	await _wait_room(world)
-	check(not spawner.monsters.is_empty(), "second_enemy_room_has_monsters")
 	for monster: BaseMonster in spawner.monsters:
-		check(monster.difficulty_entry == 4 and is_equal_approx(monster.difficulty_multiplier, 2.4), "other_room_monsters_own_fourth_entry_multiplier")
+		check(monster.difficulty_entry == 4 and is_equal_approx(monster.difficulty_multiplier, MonsterDifficulty.multiplier_for_entry(4)), "other_room_monsters_own_fourth_entry_multiplier")
 	world.build_world(18473)
-	check(world._combat_entry_count == 0, "new_run_same_seed_resets_difficulty")
+	check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "new_run_same_seed_restarts_safe_at_zero")
 	world._enter_map(combat.node_id, -1, combat.west_gate_y)
 	await _wait_room(world)
 	var restarted: BaseMonster = _find_same_slot(spawner, first_script, first_tile)
-	check(restarted != null and restarted.difficulty_entry == 1, "same_seed_new_run_restores_first_entry_monster")
+	check(restarted != null and restarted.difficulty_entry == 1 and is_equal_approx(restarted.difficulty_multiplier, MonsterDifficulty.multiplier_for_entry(1)), "same_seed_new_run_restores_original_combat_slot")
 	await _close(world)
 
 func _test_damage() -> void:

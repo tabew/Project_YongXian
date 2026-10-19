@@ -86,8 +86,10 @@ func _run() -> void:
 		var model: ItemModel = item.create_model()
 		_check(model != null and model.data.id == id, "crocodile_item_has_inventory_drag_model")
 		model.free()
+	_check(registry.get_template(7).name == "索贝克之壳", "shell_uses_new_display_name")
 	_check(registry.templates.back().id == 300, "potion_template_remains_last")
 	var f: Dictionary = _fixture()
+	_check((f.monster.get_node("NameLabel") as Label).text == "索贝克", "crocodile_uses_new_display_name")
 	_check(f.monster is BaseMonster and f.monster.brain != null and f.monster.animation_tree != null, "crocodile_uses_shared_template_ai_and_animationtree")
 	_check(f.monster.death_loot == _loot, "crocodile_scene_uses_shared_death_table")
 	var tree: AnimationNodeStateMachine = f.monster.animation_tree.tree_root
@@ -258,8 +260,8 @@ func _test_actual_world() -> void:
 	for definition: MonsterSpawnData in world.monster_spawner.spawn_definitions:
 		registered.append(definition.monster_id)
 	_check(registered.has(&"give") and registered.has(&"crocodile"), "game_registers_give_and_crocodile_in_same_spawner")
-	_check(world._generator.config.combat_biomes == PackedInt32Array([4,5,6,7,8,10,11]), "combat_biome_pool_includes_swamp_snow_and_preserves_give_habitats")
-	_check(world.monster_spawner.monsters.is_empty(), "starting_cottage_remains_safe")
+	_check(world._generator.config.combat_biomes == PackedInt32Array([3,4,5,6,7,8,9,10,11,12]), "combat_biome_pool_includes_all_supported_land_habitats")
+	_check(world.monster_spawner.content.budget_of(0, MapContent.ENEMY) == 0 and world.monster_spawner.monsters.is_empty(), "entire_starting_region_remains_safe")
 	var target: MapSpec = null
 	for spec: MapSpec in world._generator.map_specs():
 		if spec.biome_id == Biome.Kind.SWAMP and world.monster_spawner.content.budget_of(spec.node_id,MapContent.ENEMY)>0:

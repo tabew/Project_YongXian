@@ -1,12 +1,12 @@
 class_name ShiSpawnData
 extends MonsterSpawnData
 
-## 每区块一个紧凑史群，各原始名额保持独立且确定，死亡不补刷。
+## 每区块一个紧凑史莱姆群，各原始名额保持独立且确定，死亡不补刷。
 var _cached_generator: WorldGenerator = null
 var _anchors: Dictionary = {}
 
 func select_spawn_tile(generator: WorldGenerator, coords: Vector2i, rng: RandomNumberGenerator, _variant: int, active_map: MapSpec = null) -> Vector2i:
-	if active_map != null and active_map.biome_id != Biome.Kind.SWAMP:
+	if active_map != null and not allowed_biomes.has(active_map.biome_id):
 		return EnemyPathfinder.INVALID_TILE
 	if generator != _cached_generator:
 		_cached_generator = generator

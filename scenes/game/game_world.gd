@@ -185,7 +185,7 @@ func build_world(seed_value: int) -> void:
 	_generator = MapScorer.build_best(seed_value, _map_config_for_monsters())
 	GameState.world_seed = _generator.world_seed
 	MapRng.set_shared_master(GameState.world_seed)
-	# 房间类型决定内容池：只有战斗 / Boss 区域刷怪。
+	# 起始层和事件房保持安全；其余房间从第二层起按群系和地形刷普通怪。
 	monster_spawner.content = MapContent.build(_generator)
 	chunk_manager.setup(_generator, player)
 	if not chunk_manager.chunk_applied.is_connected(_on_grass_chunk_applied):
@@ -348,6 +348,13 @@ func _spawn_final_boss(spec: MapSpec) -> void:
 			for y: int in range(-2, 3):
 				for x: int in range(-2, 3):
 					occupied[entry["tile"] + Vector2i(x, y)] = true
+	for actor: BaseMonster in monster_spawner.monsters:
+		occupied[actor.original_spawn_tile] = true
+	for planned: Dictionary in monster_spawner._pending_spawns:
+		occupied[planned["tile"]] = true
+	for group: Array in monster_spawner._supply_guards_by_chunk.values():
+		for planned: Dictionary in group:
+			occupied[planned["tile"]] = true
 	var center := spec.origin + spec.extent / 2
 	for radius: int in maxi(spec.extent.x, spec.extent.y):
 		for y: int in range(-radius, radius + 1):
@@ -361,6 +368,7 @@ func _spawn_final_boss(spec: MapSpec) -> void:
 					continue
 				var boss: BaseMonster = monster_spawner.spawn_monster(FINAL_BOSS_SPAWN, tile)
 				if boss != null:
+					monster_spawner.reserve_spawn_tile(tile)
 					hud.call("set_boss_visible", true)
 					boss.tree_exited.connect(_on_boss_exited, CONNECT_ONE_SHOT)
 				return

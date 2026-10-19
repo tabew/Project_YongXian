@@ -25,4 +25,4 @@ libraries = {
 max_health = 100.0
 
 [node name="NameLabel" parent="." index="7"]
-text = "给"
+text = "仙缔"

@@ -29,6 +29,7 @@ var _monsters_by_chunk: Dictionary = {}
 var _defeated_spawn_ids: Dictionary = {}
 var _pending_spawns: Array[Dictionary] = []
 var _supply_guards_by_chunk: Dictionary = {}
+var _reserved_spawn_tiles: Dictionary = {}
 var _supply_guards_enabled: bool = false
 var _sleeping_monsters: Dictionary = {}
 var _activity_scan_remaining: float = 0.0
@@ -56,10 +57,8 @@ func setup(
 	difficulty_entry = maxi(combat_entry, 1)
 	_defer_non_gate_spawns = _active_map != null and is_processing() and (can_process() or defer_during_transition)
 	_activity_scan_remaining = 0.0
-	if _supply_guards_enabled:
-		var room_kind: int = _generator.run.type_of(_active_map.node_id)
-		if room_kind in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS] and (content == null or content.budget_of(_active_map.node_id, MapContent.ENEMY) > 0):
-			_plan_supply_guards()
+	if _supply_guards_enabled and (content == null or content.budget_of(_active_map.node_id, MapContent.ENEMY) > 0):
+		_plan_supply_guards()
 	_gate_encounter_anchors.clear()
 	if _active_map != null:
 		_gate_encounter_anchors.append(WorldGenerator.world_to_tile(_generator.entry_position(_active_map.node_id, -1, _active_map.west_gate_y)) + Vector2i(10, 0))
@@ -381,12 +380,20 @@ func _floor_index() -> int:
 	return RunGraph.floor_of(_active_map.node_id)
 
 
-## 该格所属区域是否有刷怪预算：只有战斗 / Boss 区域刷怪。
-## 未接入内容层时一律允许，行为与改造前一致。
+## 留给固定 Boss 的出生格不参与后续普通怪抽样。
+func reserve_spawn_tile(tile: Vector2i) -> void:
+	_reserved_spawn_tiles[tile] = true
+
+
+## 只允许在当前区域的合法地块刷普通怪；小屋室内保留安全出生空间。
 func allows_spawn_at(tile: Vector2i) -> bool:
+	if _reserved_spawn_tiles.has(tile):
+		return false
 	if _active_map != null:
 		var local: Vector2i = tile - _active_map.origin
 		if not _active_map.contains_local(local.x, local.y):
+			return false
+		if _active_map.cottage != null and _active_map.cottage.bounds.has_point(local):
 			return false
 	if content == null or _generator == null:
 		return true
@@ -399,6 +406,7 @@ func allows_spawn_at(tile: Vector2i) -> bool:
 func clear_monsters() -> void:
 	_pending_spawns.clear()
 	_supply_guards_by_chunk.clear()
+	_reserved_spawn_tiles.clear()
 	_sleeping_monsters.clear()
 	for monster: BaseMonster in monsters.duplicate():
 		if is_instance_valid(monster):

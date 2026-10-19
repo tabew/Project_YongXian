@@ -45,4 +45,4 @@ rotation = 1.5707963
 shape = SubResource("Body")
 
 [node name="NameLabel" parent="." index="7"]
-text = "饿"
+text = "索贝克"

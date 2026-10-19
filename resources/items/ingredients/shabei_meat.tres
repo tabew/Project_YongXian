@@ -8,6 +8,6 @@
 [resource]
 script = ExtResource("1_data")
 id = 12
-name = "啥杯肉"
+name = "糯糯肉团"
 texture = ExtResource("2_icon")
 item_scene_path = "res://scenes/items/ingredients/shabei_meat.tscn"

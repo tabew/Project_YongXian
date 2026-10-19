@@ -1,7 +1,7 @@
 class_name ShabeiMonster
 extends BaseMonster
 
-## 啥杯独有的两跳一停、原地尖叫和胆小逃离，继续复用通用AI和导航。
+## 糯糯独有的两跳一停、原地尖叫和胆小逃离，继续复用通用AI和导航。
 const HOP_DURATION: float = 0.22
 const HOP_REST: float = 1.0
 var screaming: bool = false

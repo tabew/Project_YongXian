@@ -8,6 +8,6 @@
 [resource]
 script = ExtResource("1_data")
 id = 4
-name = "给毛"
+name = "仙缔毛"
 texture = ExtResource("2_icon")
 item_scene_path = "res://scenes/items/ingredients/give_fur.tscn"

@@ -28,8 +28,9 @@ func _check_spawn_compatibility(game: Node2D) -> void:
 			var combat_count: int = 0
 			for spec: MapSpec in generator.map_specs():
 				_check(spec.biome_id == replica.map_spec(spec.node_id).biome_id, "怪物群系约束破坏同种子/变体确定性")
-				if content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
+				if generator.run.type_of(spec.node_id) not in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS]:
 					continue
+				_check(content.budget_of(spec.node_id, MapContent.ENEMY) > 0, "战斗/Boss区域缺少刷怪资格")
 				combat_count += 1
 				var tile: Vector2i = spec.origin + Vector2i(spec.center)
 				var accepted: bool = false
@@ -55,7 +56,7 @@ func _check_spawn_compatibility(game: Node2D) -> void:
 	var replica := WorldGenerator.new(generator.world_seed, generator.config, generator.variant)
 	for spec: MapSpec in generator.map_specs():
 		_check(spec.biome_id == replica.map_spec(spec.node_id).biome_id, "实际游戏与区块/小地图采样群系不一致")
-		if spawner.content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
+		if generator.run.type_of(spec.node_id) not in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS]:
 			continue
 		var tile: Vector2i = spec.origin + Vector2i(spec.center)
 		var monster: Node2D = spawner.spawn_monster(spawner.spawn_definitions[0], tile)

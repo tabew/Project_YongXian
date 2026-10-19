@@ -1,7 +1,7 @@
 class_name CrocodileMonster
 extends BaseMonster
 
-## 饿：通用巡逻/追击/攻击模板，两栖移动与咬击由专用数据和攻击实现提供。
+## 索贝克：通用巡逻/追击/攻击模板，两栖移动与咬击由专用数据和攻击实现提供。
 const LAND_SPEED_RATIO: float = 0.60
 @export_range(0.1, 1.0, 0.05) var patrol_speed_ratio: float = 0.45
 var _water_tile: Vector2i = EnemyPathfinder.INVALID_TILE

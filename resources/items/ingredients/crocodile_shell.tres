@@ -8,6 +8,6 @@
 [resource]
 script = ExtResource("1_data")
 id = 7
-name = "饿甲壳"
+name = "索贝克之壳"
 texture = ExtResource("2_icon")
 item_scene_path = "res://scenes/items/ingredients/crocodile_shell.tscn"
