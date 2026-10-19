@@ -467,18 +467,32 @@ func _setup_map_events(spec: MapSpec) -> void:
 	for entry: Dictionary in MapEventPlanner.plan(_generator, spec, reserved):
 		var event_id: StringName = entry["event_id"]
 		var tile: Vector2i = entry["tile"]
-		if event_id == MapEventPlanner.SPIKE_TRAP:
-			var trap := SpikeTrap.new()
-			trap.name = "SpikeTrap_%d_%d" % [tile.x, tile.y]
-			trap.position = WorldGenerator.tile_to_world(tile)
-			entity_root.add_child(trap)
-			continue
-		var world_event := WorldEvent.new()
-		world_event.name = "WorldEvent_%s_%d_%d" % [event_id, tile.x, tile.y]
-		world_event.bind(event_id, int(entry["seed"]))
-		world_event.position = WorldGenerator.tile_to_world(tile)
-		entity_root.add_child(world_event)
+		var event_node: Node2D = _create_event_node(event_id)
+		event_node.name = "MapEvent_%s_%d_%d" % [event_id, tile.x, tile.y]
+		event_node.position = WorldGenerator.tile_to_world(tile)
+		if event_node is WorldEvent:
+			(event_node as WorldEvent).bind(event_id, int(entry["seed"]))
+		entity_root.add_child(event_node)
 	_event_maps[spec.node_id] = true
+
+
+func _create_event_node(event_id: StringName) -> Node2D:
+	match event_id:
+		MapEventPlanner.SPIKE_TRAP:
+			return SpikeTrap.new()
+		MapEventPlanner.ALCHEMY_SPIRIT:
+			return AlchemySpiritEvent.new()
+		MapEventPlanner.SUSPICIOUS_POTION:
+			return SuspiciousPotionEvent.new()
+		MapEventPlanner.BEAR_TRAP:
+			return BearTrapEvent.new()
+		MapEventPlanner.TRIPWIRE:
+			return TripwireEvent.new()
+		MapEventPlanner.POISON_MUSHROOM:
+			return PoisonMushroomEvent.new()
+		MapEventPlanner.TRAPPED_CHEST:
+			return TrappedChestEvent.new()
+	return WorldEvent.new()
 
 
 func _setup_ground_materials(spec: MapSpec) -> void:

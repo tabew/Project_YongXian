@@ -71,17 +71,22 @@ func set_highlighted(value: bool) -> void:
 func interact(player: PlayerCharacter) -> bool:
 	if not can_interact(player):
 		return false
-	consumed = true
 	match event_id:
 		GRASS_POTION:
 			_give_grass_reward(player)
 		_:
 			_notify("这里什么也没有留下")
+	_finish()
+	return true
+
+
+## 子类完成交互后统一走这里：标记消耗、隐藏并停止绘制刷新。
+func _finish() -> void:
+	consumed = true
 	_highlighted = false
 	visible = false
 	set_process(false)
 	consumed_event.emit(self)
-	return true
 
 
 func _ready() -> void:
@@ -105,23 +110,11 @@ func _process(delta: float) -> void:
 
 
 func _give_grass_reward(player: PlayerCharacter) -> void:
-	# 第一版以药水为主，少量材料作为变化；不弹复杂选择面板。
-	if _rng.randf() < 0.78:
-		var potion: PotionData = _create_potion()
-		if potion != null:
-			player.inventory.add_item(potion.id, 1)
-			_notify("草丛里找到一瓶%s" % potion.name)
-			return
+	# 草丛以药水为主，少量材料作为变化。
+	if _rng.randf() < 0.78 and _give_potion(player, "草丛里找到一瓶"):
+		return
 	var item_id: int = MATERIAL_POOL[_rng.randi_range(0, MATERIAL_POOL.size() - 1)]
-	var item_list := _item_list()
-	if item_list == null:
-		return
-	var template := item_list.call("get_template", item_id) as ItemData
-	if template == null:
-		return
-	var amount: int = _rng.randi_range(2, 4)
-	player.inventory.add_item(item_id, amount)
-	_notify("草丛里找到 %s ×%d" % [template.name, amount])
+	_give_item(player, item_id, _rng.randi_range(2, 4), "草丛里找到")
 
 
 func _create_potion() -> PotionData:
@@ -148,6 +141,68 @@ func _create_potion() -> PotionData:
 	while not bool(item_list.call("register_instance", potion)):
 		potion.id = PotionData.next_potion_id()
 	return potion
+
+
+func _give_item(
+	player: PlayerCharacter,
+	item_id: int,
+	amount: int,
+	prefix: String = "获得"
+) -> bool:
+	var item_list := _item_list()
+	if item_list == null:
+		return false
+	var template := item_list.call("get_template", item_id) as ItemData
+	if template == null:
+		return false
+	player.inventory.add_item(item_id, amount)
+	_notify("%s %s ×%d" % [prefix, template.name, amount])
+	return true
+
+
+func _give_potion(player: PlayerCharacter, prefix: String = "获得") -> bool:
+	var potion: PotionData = _create_potion()
+	if potion == null:
+		return false
+	player.inventory.add_item(potion.id, 1)
+	_notify("%s%s" % [prefix, potion.name])
+	return true
+
+
+## 从背包里偷一瓶药水或最多两份材料；没有可偷物品时返回空字典。
+func _steal_random(player: PlayerCharacter) -> Dictionary:
+	var candidates: Array[int] = []
+	for item_id: int in player.inventory.items.keys():
+		if int(player.inventory.items[item_id]) <= 0:
+			continue
+		var data := player.inventory.get_item_template(item_id)
+		if data is PotionData or data is IngredientData:
+			candidates.append(item_id)
+	if candidates.is_empty():
+		return {}
+	var chosen: int = candidates[_rng.randi_range(0, candidates.size() - 1)]
+	var data := player.inventory.get_item_template(chosen)
+	var amount: int = 1 if data is PotionData else mini(int(player.inventory.items[chosen]), 2)
+	player.inventory.remove_item(chosen, amount)
+	return {"item_id": chosen, "amount": amount}
+
+
+func _restore_item(player: PlayerCharacter, item_id: int, amount: int) -> void:
+	if item_id < 0 or amount <= 0:
+		return
+	player.inventory.add_item(item_id, amount)
+
+
+func _item_name(item_id: int) -> String:
+	var item_list := _item_list()
+	if item_list == null:
+		return "物品"
+	var data := item_list.call("get_template", item_id) as ItemData
+	return data.name if data != null else "物品"
+
+
+func _is_damage_target(body: Node2D) -> bool:
+	return body is PlayerCharacter or body is BaseMonster
 
 
 func _draw() -> void:

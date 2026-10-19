@@ -4,11 +4,30 @@ extends RefCounted
 ## 第一版地图事件选点。
 ##
 ## 每个非起点/Boss房间至少布置一个事件，事件房和战斗房更密集：
-## 事件房多个草丛药水 + 地刺，战斗房多个地刺，其余房间 1-2 个草丛事件。
-## 所有点位只做纯数据规划，运行时由 GameWorld 实例化。
+## 事件房多个可交互事件 + 陷阱，战斗房多个陷阱，其余房间 1-2 个事件。
+## 事件和陷阱都从池中按种子抽取，所有点位只做纯数据规划。
 
 const GRASS_POTION: StringName = &"grass_potion"
+const ALCHEMY_SPIRIT: StringName = &"alchemy_spirit"
+const SUSPICIOUS_POTION: StringName = &"suspicious_potion"
+const POISON_MUSHROOM: StringName = &"poison_mushroom"
+const TRAPPED_CHEST: StringName = &"trapped_chest"
 const SPIKE_TRAP: StringName = &"spike_trap"
+const BEAR_TRAP: StringName = &"bear_trap"
+const TRIPWIRE: StringName = &"tripwire"
+
+const EVENT_POOL: Array[StringName] = [
+	GRASS_POTION,
+	ALCHEMY_SPIRIT,
+	SUSPICIOUS_POTION,
+	POISON_MUSHROOM,
+	TRAPPED_CHEST,
+]
+const TRAP_POOL: Array[StringName] = [
+	SPIKE_TRAP,
+	BEAR_TRAP,
+	TRIPWIRE,
+]
 
 const EVENT_SALT: int = 0x45564E54
 const MARGIN: int = 6
@@ -37,39 +56,43 @@ static func plan(
 	var safe_points: Array[Vector2i] = _safe_points(generator, spec)
 	var reachable: Dictionary = _reachable_tiles(generator, spec)
 
-	var grass_count: int = 1
+	var event_count: int = 1
 	var trap_count: int = 0
 	match room_kind:
 		RoomType.Kind.EVENT:
-			grass_count = 3
+			event_count = 3
 			trap_count = 1
 		RoomType.Kind.COMBAT:
-			grass_count = 1 if rng.randf() < 0.5 else 0
+			event_count = 1 if rng.randf() < 0.5 else 0
 			trap_count = 3
 		RoomType.Kind.REWARD:
-			grass_count = 2
+			event_count = 2
 		RoomType.Kind.SHOP, RoomType.Kind.REST:
-			grass_count = 1
+			event_count = 1
 		_:
-			grass_count = 1
+			event_count = 1
 
 	# 再给普通房间一点随机增量，让同一张图不会永远只有固定数量。
 	if rng.randf() < 0.45:
-		grass_count += 1
+		event_count += 1
 	if room_kind in [RoomType.Kind.EVENT, RoomType.Kind.COMBAT] and rng.randf() < 0.6:
 		trap_count += 1
 
-	# 小地图也要留出空间，最多 5 个事件点；优先保留草丛事件。
+	# 小地图也要留出空间，最多 5 个事件点；优先保留可交互事件。
 	var cap: int = clampi(int(spec.extent.x * spec.extent.y / 5000), 3, 5)
-	grass_count = mini(grass_count, cap)
-	trap_count = mini(trap_count, maxi(cap - grass_count, 0))
+	event_count = mini(event_count, cap)
+	trap_count = mini(trap_count, maxi(cap - event_count, 0))
 
-	for _index: int in grass_count:
-		_add_event(result, occupied, GRASS_POTION, generator, spec, rng, safe_points, reachable)
+	for _index: int in event_count:
+		_add_event(result, occupied, _pick(EVENT_POOL, rng), generator, spec, rng, safe_points, reachable)
 	for _index: int in trap_count:
-		_add_event(result, occupied, SPIKE_TRAP, generator, spec, rng, safe_points, reachable)
+		_add_event(result, occupied, _pick(TRAP_POOL, rng), generator, spec, rng, safe_points, reachable)
 
 	return result
+
+
+static func _pick(pool: Array[StringName], rng: RandomNumberGenerator) -> StringName:
+	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
 static func _add_event(

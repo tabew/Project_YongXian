@@ -31,12 +31,14 @@ func _run() -> void:
 
 func _check_plans() -> void:
 	var total_event_rooms: int = 0
+	var seen_event_ids: Dictionary = {}
+	var seen_trap_ids: Dictionary = {}
 	for seed_value: int in [1, 18473, 97231, 2147483646]:
 		var generator := WorldGenerator.new(seed_value)
 		var replica := WorldGenerator.new(seed_value)
 		var event_rooms: int = 0
-		var grass_events: int = 0
-		var spike_traps: int = 0
+		var event_total: int = 0
+		var trap_total: int = 0
 		for spec: MapSpec in generator.map_specs():
 			var population: Dictionary = generator.population_for(spec.node_id)
 			var reserved: Array[Rect2i] = []
@@ -48,17 +50,18 @@ func _check_plans() -> void:
 			var replica_plan: Array[Dictionary] = MapEventPlanner.plan(replica, spec, replica_reserved)
 			_check(var_to_str(plan) == var_to_str(replica_plan), "event_plan_deterministic_%d_%d" % [seed_value, spec.node_id])
 			var room_kind: int = generator.run.type_of(spec.node_id)
+			var room_events: int = plan.filter(
+				func(entry: Dictionary) -> bool: return MapEventPlanner.EVENT_POOL.has(entry["event_id"])
+			).size()
+			var room_traps: int = plan.filter(
+				func(entry: Dictionary) -> bool: return MapEventPlanner.TRAP_POOL.has(entry["event_id"])
+			).size()
 			if room_kind == RoomType.Kind.EVENT:
 				event_rooms += 1
-				var room_grass: int = plan.filter(
-					func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.GRASS_POTION
-				).size()
-				_check(room_grass >= 2, "event_room_has_multiple_grass_events_%d" % spec.node_id)
+				_check(room_events >= 2, "event_room_has_multiple_events_%d" % spec.node_id)
+				_check(room_traps >= 1, "event_room_has_trap_%d" % spec.node_id)
 			if room_kind == RoomType.Kind.COMBAT:
-				var room_traps: int = plan.filter(
-					func(entry: Dictionary) -> bool: return entry["event_id"] == MapEventPlanner.SPIKE_TRAP
-				).size()
-				_check(room_traps >= 2, "combat_room_has_multiple_spike_traps_%d" % spec.node_id)
+				_check(room_traps >= 2, "combat_room_has_multiple_traps_%d" % spec.node_id)
 			var reachable: Dictionary = _reachable(generator, spec)
 			var footprints: Array[Rect2i] = []
 			for entry: Dictionary in plan:
@@ -75,15 +78,19 @@ func _check_plans() -> void:
 				for other: Rect2i in footprints:
 					_check(not footprint.intersects(other), "events_do_not_overlap")
 				footprints.append(footprint)
-				if entry["event_id"] == MapEventPlanner.GRASS_POTION:
-					grass_events += 1
-				elif entry["event_id"] == MapEventPlanner.SPIKE_TRAP:
-					spike_traps += 1
+				if MapEventPlanner.EVENT_POOL.has(entry["event_id"]):
+					event_total += 1
+					seen_event_ids[entry["event_id"]] = true
+				elif MapEventPlanner.TRAP_POOL.has(entry["event_id"]):
+					trap_total += 1
+					seen_trap_ids[entry["event_id"]] = true
 		total_event_rooms += event_rooms
-		_check(grass_events >= 15, "seed_has_dense_grass_events_%d" % seed_value)
-		_check(spike_traps >= 15, "seed_has_dense_spike_traps_%d" % seed_value)
-		print("EVENT_SAMPLE seed=%d rooms=%d grass=%d traps=%d" % [seed_value, event_rooms, grass_events, spike_traps])
+		_check(event_total >= 15, "seed_has_dense_events_%d" % seed_value)
+		_check(trap_total >= 15, "seed_has_dense_traps_%d" % seed_value)
+		print("EVENT_SAMPLE seed=%d rooms=%d events=%d traps=%d" % [seed_value, event_rooms, event_total, trap_total])
 	_check(total_event_rooms > 0, "at_least_one_event_room_in_samples")
+	_check(seen_event_ids.size() == MapEventPlanner.EVENT_POOL.size(), "all_event_types_appear")
+	_check(seen_trap_ids.size() == MapEventPlanner.TRAP_POOL.size(), "all_trap_types_appear")
 
 
 func _check_runtime() -> void:
@@ -111,24 +118,32 @@ func _check_runtime() -> void:
 
 	world._setup_map_events(event_spec)
 	var holder: Node2D = world._map_entity_root(event_spec.node_id)
-	var world_event: WorldEvent = null
+	var generated_events: int = 0
+	var generated_traps: int = 0
 	for child: Node in holder.get_children():
-		if child is WorldEvent:
-			world_event = child as WorldEvent
-			break
-	_check(world_event != null, "runtime_event_instantiates")
-	if world_event != null:
-		world._current_node = event_spec.node_id
-		world.player.global_position = world_event.global_position
-		world._refresh_pickup()
-		_check(world._nearby_event == world_event, "runtime_event_is_targeted")
-		_check(world.hud.get_node("PickupHint").text.contains("搜索草丛"), "hud_explains_event_action")
-		var before_total: int = _inventory_total(world.player.inventory)
-		_press_e(world)
-		_check(world_event.consumed, "runtime_event_consumed")
-		_check(not world_event.visible, "runtime_event_hides_after_use")
-		_check(_inventory_total(world.player.inventory) > before_total, "runtime_event_rewards_item")
-		_check(not world_event.interact(world.player), "runtime_event_only_once")
+		if child is SpikeTrap or child is BearTrapEvent or child is TripwireEvent:
+			generated_traps += 1
+		elif child is WorldEvent:
+			generated_events += 1
+	_check(generated_events >= 2, "runtime_event_factory_spawns_events")
+	_check(generated_traps >= 1, "runtime_event_factory_spawns_traps")
+
+	# 单独放一个草丛事件，验证 E 键、HUD 与一次性奖励。
+	var start_holder: Node2D = world._map_entity_root(0)
+	var grass_event := WorldEvent.new()
+	grass_event.bind(MapEventPlanner.GRASS_POTION, 424242)
+	grass_event.position = world.player.global_position
+	start_holder.add_child(grass_event)
+	world._current_node = 0
+	world._refresh_pickup()
+	_check(world._nearby_event == grass_event, "runtime_event_is_targeted")
+	_check(world.hud.get_node("PickupHint").text.contains("搜索草丛"), "hud_explains_event_action")
+	var before_total: int = _inventory_total(world.player.inventory)
+	_press_e(world)
+	_check(grass_event.consumed, "runtime_event_consumed")
+	_check(not grass_event.visible, "runtime_event_hides_after_use")
+	_check(_inventory_total(world.player.inventory) > before_total, "runtime_event_rewards_item")
+	_check(not grass_event.interact(world.player), "runtime_event_only_once")
 
 	var health_before: float = world.player.health
 	var trap := SpikeTrap.new()
