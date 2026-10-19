@@ -8,8 +8,8 @@
 script = ExtResource("2_22h3a")
 stat = &"damage_dealt"
 mode = 1
-value = 0.25
-value_per_level = 0.1
+value = 5.0
+value_per_level = 3.0
 
 [resource]
 script = ExtResource("3_74vdw")
@@ -17,5 +17,5 @@ id = &"sharp"
 display_name = "力量"
 description = "造成的伤害提高，持续 8 秒。"
 icon = ExtResource("1_lvece")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("2_22h3a")]([SubResource("Resource_1dwbi")])

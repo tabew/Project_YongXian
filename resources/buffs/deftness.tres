@@ -16,5 +16,5 @@ id = &"deftness"
 display_name = "灵巧"
 description = "闪避次数的回复速度提高，持续 8 秒。"
 icon = ExtResource("1_xe61p")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("1_bv4l6")]([SubResource("Resource_mbi2t")])

@@ -16,5 +16,5 @@ id = &"rage"
 display_name = "暴怒"
 description = "出手的暴击率提高，持续 8 秒。"
 icon = ExtResource("1_i4he3")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("1_i3nbe")]([SubResource("Resource_c1yos")])

@@ -5,14 +5,14 @@
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_auv5n"]
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
 [ext_resource type="Resource" uid="uid://cbug2aym43gnx" path="res://resources/alchemical_attribute/holy.tres" id="50_attr1"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/woody.tres" id="50_attr4"]
+[ext_resource type="Resource" uid="uid://c6cgcep5tc0ks" path="res://resources/alchemical_attribute/woody.tres" id="50_attr4"]
 [ext_resource type="Resource" uid="uid://i57ovpqcwurd" path="res://resources/alchemical_attribute/guard.tres" id="50_attr13"]
 
 [resource]
 script = ExtResource("1_data")
+rarity = 1
 for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr13")])
 id = 25
-rarity = 1
 name = "桦树皮"
 texture = ExtResource("2_icon")
 alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr4"), ExtResource("50_attr1")])

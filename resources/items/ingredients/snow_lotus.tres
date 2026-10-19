@@ -9,9 +9,9 @@
 
 [resource]
 script = ExtResource("1_data")
+rarity = 2
 for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr38")])
 id = 32
-rarity = 2
 name = "雪莲"
 texture = ExtResource("2_icon")
 alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr38"), ExtResource("50_attr36")])

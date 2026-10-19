@@ -8,7 +8,7 @@
 script = ExtResource("3_phw4r")
 id = &"stun"
 display_name = "眩晕"
-description = "被砸晕，无法移动和出手。"
+description = "眩晕。"
 icon = ExtResource("1_0h6rl")
 is_debuff = true
 duration = 1.0

@@ -8,10 +8,10 @@
 script = ExtResource("3_vpdxd")
 id = &"poison"
 display_name = "中毒"
-description = "每秒受到伤害，持续 8 秒，比燃烧更慢但更久。"
+description = "每秒受到伤害，持续 8 秒。"
 icon = ExtResource("1_8p5ad")
 is_debuff = true
-duration = 8.0
+duration = 30.0
 tick_interval = 1.0
-damage_per_tick = 1.0
-damage_per_tick_per_level = 0.5
+damage_per_tick = 7.0
+damage_per_tick_per_level = 3.0
