@@ -1,12 +1,11 @@
-[gd_resource type="Resource" script_class="Thunder" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="Thunder" format=3 uid="uid://2dy0xi1qbsmo"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/thunder.gd" id="1_thunder"]
+[ext_resource type="Script" uid="uid://cjonw6j2y1ajr" path="res://scripts/alchemical_attribute/thunder.gd" id="1_thunder"]
 [ext_resource type="PackedScene" path="res://scenes/effects/lightning_strike.tscn" id="2_strike"]
 
 [resource]
 script = ExtResource("1_thunder")
 attribute_id = 23
-can_be_weapon_enchant = true
 name = "雷"
 max_level = 3
-strike_scene = ExtResource("2_strike")
+can_be_weapon_enchant = true

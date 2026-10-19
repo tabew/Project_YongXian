@@ -129,8 +129,12 @@ func _hit_hurtboxes(enemy_damage: float, knockback: float, hit_mask: int, source
 		hurtbox.receive_hit(hit)
 
 
-##玩家：没有受击盒也没有击退系统，直接扣血并把击退加进速度
+##玩家：没有受击盒也没有击退系统，直接扣血并把击退加进速度。
+##player_damage <= 0 表示这次爆炸完全不碰玩家（附魔爆炸用这条：既不掉血也不推人）
 func _hit_player(player_damage: float, knockback: float, edge_scale: float, falloff_power: float) -> void:
+	if player_damage <= 0.0:
+		return
+
 	var player: PlayerCharacter = null
 
 	for node: Node in get_tree().get_nodes_in_group("player"):
@@ -152,9 +156,7 @@ func _hit_player(player_damage: float, knockback: float, edge_scale: float, fall
 	var push: Vector2 = to_target.normalized() if not to_target.is_zero_approx() else Vector2.UP
 	var scale: float = _knockback_scale(to_target.length(), _shape.radius, edge_scale, falloff_power)
 	player.velocity += push * knockback * player_knockback_scale * scale
-
-	if player_damage > 0.0:
-		player.take_damage(player_damage)
+	player.take_damage(player_damage)
 
 
 ##表现：把图集铺在爆点，图集整张按爆炸直径缩放，存在时间内推帧

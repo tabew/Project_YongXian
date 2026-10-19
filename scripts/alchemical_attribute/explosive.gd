@@ -17,6 +17,19 @@ var explode:PackedScene = preload("res://scenes/effects/explode.tscn")
 @export_flags_2d_physics var hit_mask: int = 7
 
 func use_effect(object:Node = null) -> void:
+	#药水/其它路径：按属性自己的自伤数值结算
+	_detonate_at(object, player_damage_total())
+
+
+##武器附魔命中时的爆炸：只炸敌人，不结算玩家自伤。
+##近战贴脸时爆心就在自己脚下（半径 30 起步，几乎必然罩住玩家），
+##附魔还带自伤就变成"每次命中都掉血"，所以附魔这一路固定不自伤。
+func apply_weapon_enchant(target: Node, _hit: CombatHit) -> void:
+	_detonate_at(target, 0.0)
+
+
+##在 object 的位置炸一次；self_damage <= 0 表示完全不碰玩家（不扣血也不推人）
+func _detonate_at(object: Node, self_damage: float) -> void:
 
 	if object == null or not (object is Node2D):
 		return
@@ -36,7 +49,7 @@ func use_effect(object:Node = null) -> void:
 	effect.set_script(ExplodeEffect)
 	world.add_child(effect)
 	effect.global_position = point.global_position
-	effect.call("detonate", blast_radius(), enemy_damage(), player_damage_total(), knockback, point,hit_mask)
+	effect.call("detonate", blast_radius(), enemy_damage(), self_damage, knockback, point,hit_mask)
 
 ##本次爆炸的半径
 func blast_radius() -> float:
@@ -52,7 +65,7 @@ func enemy_damage() -> float:
 	return damage * effect_level * Buffs.power_scale()
 
 
-##本次爆炸对玩家的伤害
+##本次爆炸对玩家的伤害（只有药水这条路会结算；附魔走 apply_weapon_enchant，固定为 0）
 func player_damage_total() -> float:
 	var effect_level:float = sqrt(level + 1)
 	return player_damage * effect_level
@@ -60,4 +73,3 @@ func player_damage_total() -> float:
 
 func _default_polarity() -> POLARITY:
 	return POLARITY.NEGATIVE
-

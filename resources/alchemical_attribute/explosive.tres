@@ -4,6 +4,7 @@
 
 [resource]
 script = ExtResource("1_0i5uc")
+damage = 9.0
 attribute_id = 6
 name = "爆炸"
 max_level = 3

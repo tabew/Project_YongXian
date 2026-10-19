@@ -79,11 +79,11 @@ static func _enchant_line(attribute: AlchemicalData) -> String:
 	if attribute is Explosive:
 		var explosive: Explosive = attribute as Explosive
 		var edge_knockback: float = explosive.knockback * 0.3
-		return "%s：范围多目标，半径 %s，敌人伤害 %s，玩家伤害 %s；击退 %s→%s" % [
+		#附魔这一路固定不自伤（见 Explosive.apply_weapon_enchant），所以不再报"玩家伤害"
+		return "%s：范围多目标，半径 %s，敌人伤害 %s；击退 %s→%s；不会伤到自己" % [
 			label,
 			_number(explosive.blast_radius()),
 			_number(explosive.enemy_damage()),
-			_number(explosive.player_damage_total()),
 			_number(explosive.knockback),
 			_number(edge_knockback),
 		]

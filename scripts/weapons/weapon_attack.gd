@@ -129,6 +129,7 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 ## 爆炸等 need_target = false 的属性会用自己的 use_effect 再生成一次伤害判定。
 ## need_target 的属性作用到被命中的实体，其余作用到命中点；
 ## enchant_target = WIELDER 的属性(治疗/恢复)作用到持武器的人自己。
+## 两条分支都走 apply_weapon_enchant：附魔需要区别对待的属性（爆炸不自伤）在这里生效。
 func _apply_enchant_effects(hurtbox: CombatHurtbox, hit: CombatHit) -> void:
 	if definition == null or definition.enchant_attributes.is_empty():
 		return
@@ -143,7 +144,7 @@ func _apply_enchant_effects(hurtbox: CombatHurtbox, hit: CombatHit) -> void:
 		if point == null:
 			point = _make_enchant_point(hurtbox.global_position)
 		if point != null:
-			attribute.use_effect(point)
+			attribute.apply_weapon_enchant(point, hit)
 	if point != null:
 		point.queue_free()
 
