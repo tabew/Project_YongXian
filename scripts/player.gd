@@ -82,6 +82,13 @@ var _regen_remaining: float = 0.0
 var _regen_per_second: float = 0.0
 var _was_defeated: bool = false
 
+## Boss control effects are kept separate from refreshing buff durations.
+var fear_remaining: float = 0.0
+var stun_remaining: float = 0.0
+var boss_grappled: bool = false
+var boss_captured: bool = false
+var _stun_spin: float = 0.0
+
 
 func _ready() -> void:
 	health_component.died.connect(_on_health_died)
@@ -176,16 +183,88 @@ func _physics_process(delta: float) -> void:
 	if weapon_controller.is_attacking():
 		reveal_by_action()
 	_tick_progress(delta)
+	_tick_boss_status(delta)
 	if health <= 0.0:
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
 		return
+	if stun_remaining > 0.0 or boss_captured or boss_grappled:
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+		return
 	input_direction = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
+	if fear_remaining > 0.0:
+		input_direction = -input_direction
 	_apply_input(delta)
 	_integrate_movement(delta)
 	_update_facing()
+
+
+func apply_fear(seconds: float) -> void:
+	fear_remaining += maxf(seconds, 0.0)
+
+
+func apply_boss_stun(seconds: float) -> void:
+	if seconds <= 0.0 or health <= 0.0:
+		return
+	stun_remaining = maxf(stun_remaining, seconds)
+	weapon_controller.cancel_attack()
+	input_direction = Vector2.ZERO
+	velocity = Vector2.ZERO
+	queue_redraw()
+
+
+func set_boss_grappled(active: bool) -> void:
+	boss_grappled = active
+	if active:
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+
+
+func set_boss_captured(active: bool) -> void:
+	boss_captured = active
+	if active:
+		weapon_controller.cancel_attack()
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+
+
+func move_by_boss_pull(target: Vector2, distance: float) -> bool:
+	if not boss_grappled or health <= 0.0:
+		return false
+	var destination: Vector2 = global_position.move_toward(target, maxf(distance, 0.0))
+	if not can_stand_at(destination):
+		return false
+	global_position = destination
+	return true
+
+
+func _tick_boss_status(delta: float) -> void:
+	fear_remaining = maxf(fear_remaining - delta, 0.0)
+	if stun_remaining > 0.0:
+		stun_remaining = maxf(stun_remaining - delta, 0.0)
+		_stun_spin += delta * 4.0
+		queue_redraw()
+
+
+func _reset_boss_status() -> void:
+	fear_remaining = 0.0
+	stun_remaining = 0.0
+	boss_grappled = false
+	boss_captured = false
+	if is_instance_valid(sprite):
+		sprite.position.y = 0.0
+	queue_redraw()
+
+
+func _draw() -> void:
+	if stun_remaining <= 0.0:
+		return
+	var center := Vector2(0.0, -22.0)
+	draw_arc(center, 10.0, _stun_spin, _stun_spin + PI * 1.3, 28, Color(1.0, 0.8, 0.29, 0.95), 2.0)
+	draw_arc(center, 14.0, _stun_spin + PI, _stun_spin + PI * 2.2, 28, Color(0.6, 0.88, 1.0, 0.9), 2.0)
 
 
 ## 再生与连击计时。
@@ -211,6 +290,10 @@ func _tick_progress(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if stun_remaining > 0.0 or boss_captured or (boss_grappled and event.is_action_pressed("throw")):
+		if event.is_action_pressed("attack") or event.is_action_pressed("throw"):
+			get_viewport().set_input_as_handled()
+		return
 	if health > 0.0:
 		if event.is_action_pressed("attack"):
 			#选中物品左键使用
@@ -337,6 +420,7 @@ func can_stand_at(world_position: Vector2) -> bool:
 ## 由 GameWorld 调用：注入地形来源并把主角放到指定世界坐标。
 func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec = null, reset_health: bool = true) -> void:
 	weapon_controller.cancel_attack()
+	_reset_boss_status()
 	terrain_source = source
 	active_map = map_spec
 	velocity = Vector2.ZERO
@@ -548,6 +632,7 @@ func _on_health_died(_hit: CombatHit) -> void:
 	if _was_defeated:
 		return
 	_was_defeated = true
+	_reset_boss_status()
 	velocity = Vector2.ZERO
 	_play_sfx(&"player_defeat")
 	defeated.emit()

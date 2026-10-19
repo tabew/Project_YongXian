@@ -66,7 +66,7 @@ func _damage_target(object: Node) -> void:
 	if now - int(_last_damage_ms.get(id, -1000000)) < int(DAMAGE_INTERVAL * 1000.0):
 		return
 	_last_damage_ms[id] = now
-	Buffs.hurt_entity(object, amount)
+	Buffs.hurt_entity(object, amount, null, &"damage_over_time")
 
 
 func _default_polarity() -> POLARITY:

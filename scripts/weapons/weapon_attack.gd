@@ -151,7 +151,7 @@ func _apply_on_hit_effects(hurtbox: CombatHurtbox) -> void:
 ## 朝准心短距离前冲，逐格检查可站立，避免冲进不可通行地形。
 func _lunge() -> void:
 	var actor := wielder as PlayerCharacter
-	if actor == null:
+	if actor == null or actor.boss_grappled or actor.boss_captured or actor.stun_remaining > 0.0:
 		return
 	var distance: float = definition.lunge_tiles * float(WorldGenerator.TILE_SIZE)
 	var target: Vector2 = actor.global_position + aim_direction * distance

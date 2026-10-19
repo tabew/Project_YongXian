@@ -182,6 +182,8 @@ func _on_chunk_applied(coords: Vector2i) -> void:
 		return
 	var chunk_monsters: Array[BaseMonster] = []
 	_monsters_by_chunk[coords] = chunk_monsters
+	if _active_map != null and content != null and content.budget_of(_active_map.node_id, MapContent.ENEMY) <= 0:
+		return
 	var occupied: Dictionary = {}
 	if _supply_guards_enabled:
 		for planned: Dictionary in _supply_guards_by_chunk.get(coords, []):

@@ -4,6 +4,7 @@ extends Node2D
 ## 箱庭出口保留双向传送关系，切换画面使用黑屏淡入淡出。
 
 const TRAINING_DUMMY: PackedScene = preload("res://scenes/combat/training_dummy.tscn")
+const FINAL_BOSS_SPAWN: MonsterSpawnData = preload("res://resources/monsters/final_boss_spawn_data.tres")
 
 @export var spawn_training_dummy: bool = true
 ## 打开后每次生成世界都会打印完整地图报告（调试用）。
@@ -136,6 +137,9 @@ func _transition_to_map(link: Dictionary) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _transitioning:
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("pickup_item") and (player.stun_remaining > 0.0 or player.boss_captured or player.boss_grappled):
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("regenerate_world"):
@@ -304,6 +308,7 @@ func _sync_training_dummy() -> void:
 
 ## 切图重建存活实体，生成器保留本局击杀记录；旧区域怪物不会继续攻击。
 func _setup_map_monsters() -> void:
+	hud.call("set_boss_visible", false)
 	if chunk_manager.chunk_applied.is_connected(_on_monster_chunk_applied):
 		chunk_manager.chunk_applied.disconnect(_on_monster_chunk_applied)
 	# 死亡掉落会被原怪物脚本移到 spawner；保存到所属地图，避免跨图显示或攻击。
@@ -324,6 +329,42 @@ func _setup_map_monsters() -> void:
 	# 连接在 spawner 后面，同步过滤隐藏邻居预铺和边缘共享区块中的越界实体。
 	chunk_manager.chunk_applied.connect(_on_monster_chunk_applied)
 	_on_monster_chunk_applied(Vector2i.ZERO)
+	if _current_node == _generator.run.final_node():
+		_spawn_final_boss(player.active_map)
+
+
+func _spawn_final_boss(spec: MapSpec) -> void:
+	if spec == null or monster_spawner.content.budget_of(spec.node_id, MapContent.BOSS) <= 0:
+		return
+	var occupied: Dictionary = {}
+	var population: Dictionary = _generator.population_for(spec.node_id)
+	for kind: String in ["structures", "chests"]:
+		for entry: Dictionary in population.get(kind, []):
+			for y: int in range(-2, 3):
+				for x: int in range(-2, 3):
+					occupied[entry["tile"] + Vector2i(x, y)] = true
+	var center := spec.origin + spec.extent / 2
+	for radius: int in maxi(spec.extent.x, spec.extent.y):
+		for y: int in range(-radius, radius + 1):
+			for x: int in range(-radius, radius + 1):
+				if maxi(absi(x), absi(y)) != radius:
+					continue
+				var tile: Vector2i = center + Vector2i(x, y)
+				if not spec.contains_local(tile.x - spec.origin.x, tile.y - spec.origin.y):
+					continue
+				if occupied.has(tile) or not _generator.is_walkable(tile):
+					continue
+				var boss: BaseMonster = monster_spawner.spawn_monster(FINAL_BOSS_SPAWN, tile)
+				if boss != null:
+					hud.call("set_boss_visible", true)
+					boss.tree_exited.connect(_on_boss_exited, CONNECT_ONE_SHOT)
+				return
+	push_error("No walkable spawn tile for final boss in room %d" % spec.node_id)
+
+
+func _on_boss_exited() -> void:
+	if is_instance_valid(hud):
+		hud.call("set_boss_visible", false)
 
 
 func _map_entity_root(map_node_id: int) -> Node2D:
@@ -601,13 +642,14 @@ func _player_feet_offset() -> float:
 	return sprite.get_rect().end.y * absf(sprite.scale.y)
 
 
-## 过场动画期间提前准备下一张箱庭：材料点位、草丛排除区与到达点周围的草丛。
-## 黑屏结束时草已经在位，切图本身只剩很轻的工作。
+## 过场动画期间优先准备到达视口的地形、材料点位与草丛。
+## 黑屏结束时视口内容已经在位，切图本身只剩很轻的工作。
 func _prewarm_map(spec: MapSpec, side: int, gate_y: int) -> void:
 	if _generator == null or spec == null:
 		return
 	_ensure_grass_context(spec)
 	var arrival: Vector2 = _generator.entry_position(spec.node_id, side, gate_y)
+	chunk_manager.prewarm_arrival(spec.node_id, arrival)
 	_queue_grass_ring(spec, WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(arrival)))
 
 

@@ -62,11 +62,9 @@ func _run() -> void:
 	var combat: MapSpec = null
 	var boss: MapSpec = null
 	for spec: MapSpec in generator.map_specs():
-		if spawner.content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
-			continue
-		if generator.run.type_of(spec.node_id) == RoomType.Kind.BOSS:
+		if spec.node_id == generator.run.final_node():
 			boss = spec
-		elif combat == null:
+		elif combat == null and spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0:
 			combat = spec
 	check(combat != null and boss != null, "seed_has_combat_and_boss_sites")
 	if combat == null or boss == null:
@@ -179,9 +177,8 @@ func _run() -> void:
 
 	world._enter_map(boss.node_id, -1, boss.west_gate_y)
 	await wait_room(world)
-	check(occupants(spawner, true).size() == plan_signature(spawner).size() and not occupants(spawner, false).is_empty(), "boss_room_contains_guards_and_ordinary_enemies")
-	for monster: BaseMonster in occupants(spawner, true):
-		check(monster.has_supply_post, "boss_guards_own_posts")
+	check(spawner.monsters.size() == 1 and spawner.monsters[0] is FinalBoss, "final_room_contains_only_fixed_boss")
+	check(plan_signature(spawner).is_empty() and occupants(spawner, true).is_empty(), "final_room_has_no_supply_guards")
 
 	world.build_world(18473)
 	check(spawner.monsters.is_empty() and world._combat_entry_count == 0, "new_run_starts_safe_and_resets_entry_counter")

@@ -178,11 +178,17 @@ func _tick(entry: Dictionary) -> void:
 	var damage: float = buff.damage_amount(level)
 
 	if damage > 0.0:
-		if host.has_method("take_damage"):
+		if host is PlayerCharacter:
+			(host as PlayerCharacter).take_damage(damage, entry.get("source"))
+		elif host.has_method("take_damage"):
 			host.call("take_damage", damage)
 		elif health != null and health.has_method("receive_hit"):
 			var hit: CombatHit = CombatHit.new()
 			hit.damage = damage
+			hit.weapon_id = &"damage_over_time"
+			var source: Node = entry.get("source")
+			if is_instance_valid(source) and source is Node2D:
+				hit.source = source as Node2D
 			if host is Node2D:
 				hit.position = (host as Node2D).global_position
 			health.call("receive_hit", hit)
