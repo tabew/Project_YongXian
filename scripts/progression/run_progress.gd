@@ -12,10 +12,10 @@ signal cards_changed()
 ## 1 级升 2 级所需经验；之后每级按 CURVE_STEP 递增。
 const BASE_EXPERIENCE: int = 8
 const CURVE_STEP: int = 4
-## 每升一级自带的成长：生命上限、武器伤害、药水效果各 +10%。
-## 加算不叠乘：1级 +0%，2级 +10%，3级 +20%…… 和升级卡走同一套聚合，所以是
-## "等级成长 + 卡加成" 直接相加（3级 + 卡 &"sharp" 1层 = +20% + 12% = +32%）。
-const LEVEL_GROWTH_PER_LEVEL: float = 0.10
+## 每升一级自带的成长：生命上限、武器伤害、药水效果各 +7%。
+## 加算不叠乘：1级 +0%，2级 +7%，3级 +14%…… 和升级卡走同一套聚合，所以是
+## "等级成长 + 卡加成" 直接相加（3级 + 卡 &"sharp" 1层 = +14% + 12% = +26%）。
+const LEVEL_GROWTH_PER_LEVEL: float = 0.07
 ## 装瓶成功的基础炼金经验。
 const ALCHEMY_BASE_EXPERIENCE: int = 6
 ## 本局首次合成某配方的额外经验。
@@ -58,7 +58,7 @@ func experience_required() -> float:
 	return float(BASE_EXPERIENCE + CURVE_STEP * (level - 1))
 
 
-## 等级自带的成长增量：1级为 0，之后每级 +10%，加算不叠乘。
+## 等级自带的成长增量：1级为 0，之后每级 +7%，加算不叠乘。
 func level_growth() -> float:
 	return LEVEL_GROWTH_PER_LEVEL * float(maxi(level - 1, 0))
 

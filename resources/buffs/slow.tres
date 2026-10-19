@@ -8,8 +8,8 @@
 script = ExtResource("2_a2saf")
 stat = &"move_speed"
 mode = 1
-value = -0.35
-value_per_level = -0.1
+value = -0.2
+value_per_level = -0.07
 
 [resource]
 script = ExtResource("3_w0swb")
@@ -18,5 +18,5 @@ display_name = "迟缓"
 description = "移动速度下降，持续 5 秒。"
 icon = ExtResource("1_op4cw")
 is_debuff = true
-duration = 5.0
+duration = 60.0
 modifiers = Array[ExtResource("2_a2saf")]([SubResource("Resource_7mqbh")])

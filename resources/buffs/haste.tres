@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://bfus6hb44ubks"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/haste.png" id="1_0swr2"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_hcqjk"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_0swr2"]
+[ext_resource type="Texture2D" uid="uid://cmgpfwcymriki" path="res://assets/ui/buffs/haste.png" id="1_0swr2"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_hcqjk"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_0swr2"]
 
 [sub_resource type="Resource" id="Resource_ayudd"]
 script = ExtResource("1_hcqjk")
@@ -11,10 +11,9 @@ value = 0.2
 value_per_level = 0.08
 
 [resource]
-max_level = 3
 script = ExtResource("2_0swr2")
 id = &"haste"
 display_name = "急速"
-description = "出手速度提高（前摇/持续/后摇一起加快），持续 6 秒。"
+description = "武器攻速速度提高，持续 6 秒。"
 icon = ExtResource("1_0swr2")
 modifiers = Array[ExtResource("1_hcqjk")]([SubResource("Resource_ayudd")])

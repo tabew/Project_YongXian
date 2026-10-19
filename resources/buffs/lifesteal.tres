@@ -16,5 +16,5 @@ id = &"lifesteal"
 display_name = "吸血"
 description = "造成伤害时按比例回复生命，持续 8 秒。"
 icon = ExtResource("1_uhn1b")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("1_4f7jg")]([SubResource("Resource_jmhuo")])

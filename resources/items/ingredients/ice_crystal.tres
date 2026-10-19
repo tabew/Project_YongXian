@@ -4,15 +4,15 @@
 [ext_resource type="Texture2D" uid="uid://msb3kyuluhbc" path="res://assets/items/ingredients/ice_crystal.png" id="2_icon"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_m6sps"]
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/mineral.tres" id="50_attr3"]
+[ext_resource type="Resource" uid="uid://mtigqq4ncrjf" path="res://resources/alchemical_attribute/mineral.tres" id="50_attr3"]
 [ext_resource type="Resource" uid="uid://clue3wk0joahh" path="res://resources/alchemical_attribute/slow.tres" id="50_attr11"]
 [ext_resource type="Resource" path="res://resources/alchemical_attribute/ice.tres" id="50_attr36"]
 
 [resource]
 script = ExtResource("1_data")
+rarity = 1
 for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr11")])
 id = 28
-rarity = 1
 name = "冰晶"
 texture = ExtResource("2_icon")
 alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr36"), ExtResource("50_attr3")])

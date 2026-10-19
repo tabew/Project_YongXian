@@ -176,19 +176,19 @@ func _test_level_growth() -> void:
 	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.0), "level 1 keeps the base potion multiplier")
 
 	_progress.level = 2
-	_check(is_equal_approx(_progress.level_growth(), 0.10), "level 2 adds ten percent")
-	_check(is_equal_approx(_progress.max_health_mult(), 1.10), "level 2 raises max health by ten percent")
-	_check(is_equal_approx(_progress.damage_mult(), 1.10), "level 2 raises weapon damage by ten percent")
-	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.10), "level 2 raises potion power by ten percent")
+	_check(is_equal_approx(_progress.level_growth(), 0.07), "level 2 adds seven percent")
+	_check(is_equal_approx(_progress.max_health_mult(), 1.07), "level 2 raises max health by seven percent")
+	_check(is_equal_approx(_progress.damage_mult(), 1.07), "level 2 raises weapon damage by seven percent")
+	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.07), "level 2 raises potion power by seven percent")
 
 	_progress.level = 3
-	_check(is_equal_approx(_progress.max_health_mult(), 1.20), "level 3 grows additively instead of compounding")
-	_check(is_equal_approx(_progress.damage_mult(), 1.20), "level 3 damage is additive too")
-	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.20), "level 3 potion power is additive too")
+	_check(is_equal_approx(_progress.max_health_mult(), 1.14), "level 3 grows additively instead of compounding")
+	_check(is_equal_approx(_progress.damage_mult(), 1.14), "level 3 damage is additive too")
+	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.14), "level 3 potion power is additive too")
 
-	# 等级成长和升级卡走同一套加算：3级 +20% 再叠一张利刃 +12% = +32%
+	# 等级成长和升级卡走同一套加算：3级 +14% 再叠一张利刃 +12% = +26%
 	_take(&"sharp")
-	_check(is_equal_approx(_progress.damage_mult(), 1.32), "card bonuses add onto the level growth instead of multiplying")
+	_check(is_equal_approx(_progress.damage_mult(), 1.26), "card bonuses add onto the level growth instead of multiplying")
 
 	# 出手结算真的读这条倍率（武器伤害就在这里生效）
 	_make_player()
@@ -199,25 +199,25 @@ func _test_level_growth() -> void:
 			demo_hurtbox = child as CombatHurtbox
 	_check(demo_hurtbox != null, "the demo target carries a hurtbox")
 	if demo_hurtbox != null:
-		_check(is_equal_approx(_player.outgoing_damage_multiplier(demo_hurtbox), 1.32),
+		_check(is_equal_approx(_player.outgoing_damage_multiplier(demo_hurtbox), 1.26),
 			"outgoing hits use the level growth multiplier")
 
-	# 生命上限：基础 100 × 1.2 + 体质固定值 15×2；卡的固定值不被等级放大
+	# 生命上限：基础 100 × 1.14 + 体质固定值 15×2；卡的固定值不被等级放大
 	_take(&"constitution", 2)
 	_make_player()
-	_check(is_equal_approx(_player.max_health, 150.0), "level 3 plus two constitution cards gives 150 max health")
-	_check(is_equal_approx(_player.health_component.max_health, 150.0), "the health component follows the level growth")
+	_check(is_equal_approx(_player.max_health, 144.0), "level 3 plus two constitution cards gives 144 max health")
+	_check(is_equal_approx(_player.health_component.max_health, 144.0), "the health component follows the level growth")
 
 	# 升级那一刻就应该把上限补进生命组件（UpgradeManager 走的就是 apply_progress）
 	_progress.level = 4
 	_player.apply_progress(false)
-	_check(is_equal_approx(_player.max_health, 160.0), "level 4 raises max health to 160")
-	_check(is_equal_approx(_player.health, 160.0), "new max health tops up current health immediately")
+	_check(is_equal_approx(_player.max_health, 151.0), "level 4 raises max health to 151")
+	_check(is_equal_approx(_player.health, 151.0), "new max health tops up current health immediately")
 
-	# 药水效果：等级成长进的是 player.heal() 读的那条倍率（+30%）
+	# 药水效果：等级成长进的是 player.heal() 读的那条倍率（4级 +21%）
 	_player.health = 100.0
 	var healed: float = _player.heal(10.0)
-	_check(is_equal_approx(healed, 13.0), "level 4 heals thirty percent more from potions")
+	_check(is_equal_approx(healed, 12.1), "level 4 heals twenty-one percent more from potions")
 
 	_progress.reset()
 	_make_player()
@@ -665,6 +665,10 @@ func _test_upgrade_flow() -> void:
 	_check(panel.visible, "a level up opens the choice panel")
 	_check(paused, "the panel pauses the tree")
 	_check(panel._cards.size() == 3, "the panel shows three choices")
+	# 副标题要把"升级本身就变强"讲清楚，而且步长不能写死
+	var per_level: int = roundi(_progress.level_growth_per_level() * 100.0)
+	_check(panel._subtitle.text.contains("等级 2") and panel._subtitle.text.contains("每级 +%d%%" % per_level),
+		"the panel subtitle states the per level growth")
 
 	var chosen: StringName = panel._cards[0].id
 	panel._on_card_pressed(chosen)

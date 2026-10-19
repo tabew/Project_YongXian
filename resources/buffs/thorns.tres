@@ -8,7 +8,7 @@
 script = ExtResource("2_1uvhn")
 id = &"thorns"
 display_name = "荆棘"
-description = "受到伤害时把一部分弹回攻击者，持续 10 秒。"
+description = "受到伤害时把一部分弹回攻击者，持续90秒。"
 icon = ExtResource("1_1uvhn")
-duration = 10.0
+duration = 90.0
 flags = Array[StringName]([&"thorns"])

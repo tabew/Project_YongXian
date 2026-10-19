@@ -6,8 +6,8 @@
 
 [sub_resource type="Resource" id="Resource_1wun4"]
 script = ExtResource("2_2p4an")
-value = 1.0
-value_per_level = 2.0
+value = 7.0
+value_per_level = 3.0
 
 [resource]
 script = ExtResource("3_qp1io")
@@ -15,5 +15,5 @@ id = &"defense_up"
 display_name = "护体"
 description = "受到的伤害减少，持续 8 秒。"
 icon = ExtResource("1_xtyoq")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("2_2p4an")]([SubResource("Resource_1wun4")])

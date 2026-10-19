@@ -145,7 +145,7 @@ func _ready() -> void:
 
 	apply_progress(true)
 
-## 生命上限：等级自带的成长(每级 +10%，加算)只乘基础生命，
+## 生命上限：等级自带的成长(每级 +7%，加算)只乘基础生命，
 ## 升级卡的固定值(体质 +15 / 孤注 -25)在上层直接加减，不被等级放大。
 var max_health: float:
 	get:
@@ -894,7 +894,7 @@ func _progress_value(key: String) -> float:
 	return 0.0
 
 
-## 等级自带的生命上限倍率（1级 = 1.0，之后每级 +10%，加算不叠乘）。
+## 等级自带的生命上限倍率（1级 = 1.0，之后每级 +7%，加算不叠乘）。
 ## 取不到成长单例时按 1.0，保证单跑玩家场景时生命上限还是 100。
 func _level_growth_mult() -> float:
 	var progress: Node = _run_progress()

@@ -8,7 +8,7 @@
 script = ExtResource("2_hcaog")
 stat = &"damage_taken"
 mode = 1
-value = -0.25
+value = -0.05
 value_per_level = -0.05
 
 [resource]
@@ -17,7 +17,8 @@ id = &"holy"
 display_name = "圣佑"
 description = "受到伤害减少，并缓慢回复生命，持续 6 秒。"
 icon = ExtResource("1_ntq0o")
+duration = 90.0
 tick_interval = 1.0
-heal_per_tick = 0.5
-heal_per_tick_per_level = 0.25
+heal_per_tick = 5.0
+heal_per_tick_per_level = 2.0
 modifiers = Array[ExtResource("2_hcaog")]([SubResource("Resource_5idjl")])

@@ -18,4 +18,5 @@ display_name = "易伤"
 description = "受到的伤害增加，持续 6 秒。"
 icon = ExtResource("1_8qp5t")
 is_debuff = true
+duration = 60.0
 modifiers = Array[ExtResource("1_uible")]([SubResource("Resource_hsfsg")])

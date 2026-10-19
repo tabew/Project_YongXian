@@ -16,5 +16,5 @@ id = &"fortify"
 display_name = "强身"
 description = "最大生命临时提高，持续 8 秒。"
 icon = ExtResource("1_5nk30")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("1_u4svq")]([SubResource("Resource_718hs")])

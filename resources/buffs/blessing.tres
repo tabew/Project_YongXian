@@ -17,5 +17,5 @@ id = &"blessing"
 display_name = "祝福"
 description = "受到的回复量提高，持续 8 秒。"
 icon = ExtResource("1_nqw37")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("2_lof31")]([SubResource("Resource_sig01")])

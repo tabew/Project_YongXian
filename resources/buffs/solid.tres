@@ -8,8 +8,8 @@
 script = ExtResource("2_ep34e")
 stat = &"damage_taken"
 mode = 1
-value = -0.3
-value_per_level = -0.05
+value = -0.07
+value_per_level = -0.03
 
 [resource]
 script = ExtResource("3_3axww")
@@ -17,5 +17,5 @@ id = &"solid"
 display_name = "固化"
 description = "受到的伤害减少，持续 8 秒。"
 icon = ExtResource("1_o2jum")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("2_ep34e")]([SubResource("Resource_6q0qk")])

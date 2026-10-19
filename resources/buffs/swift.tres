@@ -8,8 +8,8 @@
 script = ExtResource("2_1xjq2")
 stat = &"move_speed"
 mode = 1
-value = 0.3
-value_per_level = 0.1
+value = 0.2
+value_per_level = 0.05
 
 [resource]
 script = ExtResource("3_5stg7")
@@ -17,5 +17,5 @@ id = &"swift"
 display_name = "迅捷"
 description = "移动速度提高，持续 8 秒。"
 icon = ExtResource("1_3w7yg")
-duration = 8.0
+duration = 90.0
 modifiers = Array[ExtResource("2_1xjq2")]([SubResource("Resource_xpjyu")])

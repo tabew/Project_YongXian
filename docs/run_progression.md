@@ -10,17 +10,17 @@
 
 | 属性 | 每级 | 读取点 |
 | --- | --- | --- |
-| 最大生命值 | +10%（基础生命 × 倍率） | `RunProgress.max_health_mult()` → `PlayerCharacter.max_health` |
-| 武器伤害 | +10% | `RunProgress.damage_mult()` → `PlayerCharacter.outgoing_damage_multiplier()` |
-| 药水效果 | +10% | `RunProgress.alchemy_power_mult()` → 见下节覆盖范围 |
+| 最大生命值 | +7%（基础生命 × 倍率） | `RunProgress.max_health_mult()` → `PlayerCharacter.max_health` |
+| 武器伤害 | +7% | `RunProgress.damage_mult()` → `PlayerCharacter.outgoing_damage_multiplier()` |
+| 药水效果 | +7% | `RunProgress.alchemy_power_mult()` → 见下节覆盖范围 |
 
-**加算，不叠乘**：倍率 = `1 + 0.10 × (等级 - 1)`，所以 1 级 100 生命 → 2 级 110 → 3 级 120（不是 121）。和升级卡走同一套聚合，等于直接相加：3 级 + 一张“利刃”（+12%）= 武器伤害 +32%。
+**加算，不叠乘**：倍率 = `1 + 0.07 × (等级 - 1)`，所以 1 级 100 生命 → 2 级 107 → 3 级 114（不是 114.49）。和升级卡走同一套聚合，等于直接相加：3 级 + 一张“利刃”（+12%）= 武器伤害 +26%。
 
 步长写在 `RunProgress.LEVEL_GROWTH_PER_LEVEL`，等级增量统一由 `RunProgress.level_growth()` 给出。
 
 两个细节：
 
-- **升级卡的固定值不被等级放大**：`PlayerCharacter.max_health` 是 `基础生命 × 等级倍率 + 体质/孤注的固定加减`，所以 3 级 + 两张体质 = 120 + 30 = 150。
+- **升级卡的固定值不被等级放大**：`PlayerCharacter.max_health` 是 `基础生命 × 等级倍率 + 体质/孤注的固定加减`，所以 3 级 + 两张体质 = 114 + 30 = 144。
 - **升级那一刻就把上限落到生命组件上**（`UpgradeManager._on_level_up()` 调 `apply_progress()`），多出来的上限补进当前生命；抽卡之前血条就已经变长。
 
 ### 药水效果强度的覆盖范围

@@ -19,10 +19,11 @@ const THORNS_ID: int = 16
 const THUNDER_ID: int = 23
 const ICE_ID: int = 36
 
-## 测试用的药水强度：1.5（= 等级 6 的成长，或其它来源叠到 +50%）
+## 手动设进上下文用的药水强度（和等级无关，纯粹验证读取点）
 const POWER: float = 1.5
-## 等级成长到 1.5 倍需要 6 级（1 + 0.1 × 5）
-const LEVEL_FOR_POWER: int = 6
+## 端到端那一段用的等级：期望值从 RunProgress.level_growth() 现算，
+## 这样改等级成长步长不用跟着改测试
+const LEVEL_FOR_POWER: int = 8
 
 var _checks: int = 0
 var _failures: int = 0
@@ -162,9 +163,13 @@ func _run() -> void:
 	var base_move: float = _player._move_speed()
 	_check(is_equal_approx(base_move, _player.max_speed), "没有 buff 时移速就是基准值")
 
+	#百分比从资源里读，别在测试里写死——平衡一调测试就得跟着改
+	var slow_amount: float = SLOW_BUFF.modifiers[0].amount(1)
+	_check(slow_amount < 0.0, "迟缓是负的移速修改(%s)" % str(slow_amount))
+
 	Buffs.apply(_player, SLOW_BUFF, 1)
 	var plain_move: float = _player._move_speed()
-	_check(is_equal_approx(plain_move, base_move * (1.0 - 0.45)), "1级迟缓把移速减掉 45%")
+	_check(is_equal_approx(plain_move, base_move * (1.0 + slow_amount)), "1级迟缓按自身数值减移速")
 	Buffs.clear(_player)
 	await process_frame
 
@@ -172,7 +177,7 @@ func _run() -> void:
 	Buffs.apply(_player, SLOW_BUFF, 1)
 	Buffs.reset_power_scale()
 	var strong_move: float = _player._move_speed()
-	_check(is_equal_approx(strong_move, base_move * (1.0 - 0.45 * POWER)),
+	_check(is_equal_approx(strong_move, base_move * (1.0 + slow_amount * POWER)),
 		"迟缓的百分比乘上了药水强度(%s → %s)" % [str(plain_move), str(strong_move)])
 	_check(strong_move < plain_move, "药水越强减速越狠")
 	Buffs.clear(_player)
@@ -215,7 +220,10 @@ func _run() -> void:
 
 	#////////////////////////// 端到端：等级 6 喝一瓶爆炸药水
 	_progress.level = LEVEL_FOR_POWER
-	_check(is_equal_approx(_player.potion_power_mult(), POWER), "6级玩家的药水强度是 1.5")
+	var level_power: float = 1.0 + _progress.level_growth()
+	_check(level_power > 1.0, "等级成长确实带来了药水强度(%s)" % str(level_power))
+	_check(is_equal_approx(_player.potion_power_mult(), level_power),
+		"%d级玩家的药水强度是 %s" % [LEVEL_FOR_POWER, str(level_power)])
 
 	_player.global_position = Vector2.ZERO
 	_player.health = _player.max_health
@@ -228,7 +236,8 @@ func _run() -> void:
 	_check(potion.left_use(_player) == 1, "药水可以喝下")
 	var victim_damage: float = victim.max_health - victim.current_health
 	var self_damage: float = health_before - _player.health
-	_check(is_equal_approx(victim_damage, base_enemy * POWER), "喝下 6 级药水，爆炸伤害 = 基础 × 1.5(%s)" % str(victim_damage))
+	_check(is_equal_approx(victim_damage, base_enemy * level_power),
+		"喝下 %d 级药水，爆炸伤害 = 基础 × %s(%s)" % [LEVEL_FOR_POWER, str(level_power), str(victim_damage)])
 	_check(is_equal_approx(self_damage, base_self), "自己的自伤还是原值(%s)" % str(self_damage))
 	_check(is_equal_approx(Buffs.power_scale(), 1.0), "结算完威力倍率复位，不会漏到后面的攻击上")
 
@@ -244,7 +253,7 @@ func _run() -> void:
 	_check(is_equal_approx(burst.power_scale, POWER), "范围圈记下了出手时的药水强度")
 	Buffs.clear(_player)
 	burst._apply_attributes(_player, false)
-	_check(is_equal_approx(_player._move_speed(), base_move * (1.0 - 0.45 * POWER)),
+	_check(is_equal_approx(_player._move_speed(), base_move * (1.0 + slow_amount * POWER)),
 		"投掷落点的范围圈按药水强度结算")
 	Buffs.clear(_player)
 	burst.queue_free()
@@ -262,7 +271,7 @@ func _run() -> void:
 					flight = sub as PotionProjectile
 	_check(flight != null, "投掷生成了弹道")
 	if flight != null:
-		_check(is_equal_approx(float(flight.get("_power")), POWER), "投掷时把药水强度定在出手那一刻")
+		_check(is_equal_approx(float(flight.get("_power")), level_power), "投掷时把药水强度定在出手那一刻")
 		flight.get_parent().queue_free()
 	await process_frame
 

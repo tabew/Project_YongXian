@@ -8,6 +8,7 @@
 script = ExtResource("3_i6j4a")
 id = &"invisible"
 display_name = "隐身"
-description = "身体变得半透明。"
+description = "隐身。"
 icon = ExtResource("1_u1k5w")
+duration = 30.0
 flags = Array[StringName]([&"invisible"])
