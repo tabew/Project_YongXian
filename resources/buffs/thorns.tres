@@ -1,11 +1,10 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://28hvcj88hkhi"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/thorns.png" id="1_1uvhn"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_k7fch"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_1uvhn"]
+[ext_resource type="Texture2D" uid="uid://bqfo12xivpiyi" path="res://assets/ui/buffs/thorns.png" id="1_1uvhn"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_k7fch"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_1uvhn"]
 
 [resource]
-max_level = 3
 script = ExtResource("2_1uvhn")
 id = &"thorns"
 display_name = "荆棘"

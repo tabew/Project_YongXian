@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cecr1qq1x7vuk"]
 
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_2euee"]
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/absorb.png" id="1_vn3tl"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_vn3tl"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_2euee"]
+[ext_resource type="Texture2D" uid="uid://dfsfq2r2l53jr" path="res://assets/ui/buffs/absorb.png" id="1_vn3tl"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_vn3tl"]
 
 [resource]
 script = ExtResource("2_vn3tl")
@@ -11,5 +11,4 @@ display_name = "吸收"
 description = "受到的伤害转为等量回复，持续 4 秒。"
 icon = ExtResource("1_vn3tl")
 duration = 4.0
-max_level = 3
 flags = Array[StringName]([&"damage_absorb"])

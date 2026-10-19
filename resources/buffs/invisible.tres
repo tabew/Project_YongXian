@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cix3oqdg36nag"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/invisible.png" id="1_u1k5w"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="2_2wpyc"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_i6j4a"]
+[ext_resource type="Texture2D" uid="uid://c3w5rayfri5q4" path="res://assets/ui/buffs/invisible.png" id="1_u1k5w"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="2_2wpyc"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_i6j4a"]
 
 [resource]
 script = ExtResource("3_i6j4a")
@@ -10,5 +10,4 @@ id = &"invisible"
 display_name = "隐身"
 description = "身体变得半透明。"
 icon = ExtResource("1_u1k5w")
-max_level = 3
 flags = Array[StringName]([&"invisible"])

@@ -36,9 +36,13 @@ enum EnchantTarget
 @export var level:int = 0;
 
 ##判断属性是否可以与之反应：查反应表
+##同名属性只有等级相同、且都没到等级上限时才能相加升一级
 func can_interact_with(attribute:AlchemicalData) ->bool:
 	if attribute == null:
 		return false
+
+	if attribute_id == attribute.attribute_id:
+		return can_upgrade_level(attribute)
 
 	return AlchemyReactions.has_reaction(attribute_id,attribute.attribute_id)
 
@@ -52,6 +56,10 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 		return result
 
 	var other:AlchemicalData = attribute[0]
+
+	#同名属性只有同级才能升级，不同级或已到上限都不反应
+	if attribute_id == other.attribute_id and not can_upgrade_level(other):
+		return result
 	var reaction:Dictionary = AlchemyReactions.lookup(attribute_id,other.attribute_id)
 
 	if reaction.is_empty():
@@ -73,6 +81,9 @@ func interact(attribute:Array[AlchemicalData],which:int = 1) ->Array[AlchemicalD
 		var produced:AlchemicalData = _create_attribute(int(entry[0]),produced_level)
 
 		if produced != null:
+			#产物等级不超过该属性自己的上限（上限为 0 表示无等级概念）
+			if produced.max_level > 0:
+				produced.level = mini(produced.level, produced.max_level)
 			result.append(produced)
 	return result
 

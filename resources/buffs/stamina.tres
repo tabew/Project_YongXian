@@ -17,5 +17,4 @@ display_name = "耐力"
 description = "闪避次数上限 +1（每级再 +1），多出来的次数立刻可用，持续 8 秒。"
 icon = ExtResource("1_08l8d")
 duration = 8.0
-max_level = 3
 modifiers = Array[ExtResource("1_wo16c")]([SubResource("Resource_bkatv")])

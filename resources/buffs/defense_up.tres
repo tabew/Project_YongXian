@@ -10,7 +10,6 @@ value = 1.0
 value_per_level = 2.0
 
 [resource]
-max_level = 3
 script = ExtResource("3_qp1io")
 id = &"defense_up"
 display_name = "护体"

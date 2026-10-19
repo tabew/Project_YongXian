@@ -5,7 +5,6 @@
 [ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="3_vpdxd"]
 
 [resource]
-max_level = 3
 script = ExtResource("3_vpdxd")
 id = &"poison"
 display_name = "中毒"

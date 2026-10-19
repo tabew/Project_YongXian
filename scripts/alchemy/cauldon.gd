@@ -99,7 +99,7 @@ func _get_attributes(body: Node2D) -> void:
 		for i in ingredient_data.alchemical_attribute.size():
 			var attr: AlchemicalData = ingredient_data.alchemical_attribute[i].duplicate()
 			attr.level = ingredient_data.alchemical_attribute[i].level
-			attributes.append(normalize_level(attr))
+			attributes.append(attr)
 
 			attributes_text.add_text(attr)
 
@@ -320,11 +320,3 @@ func create_from_attributes() -> PotionData:
 		potion.id = PotionData.next_potion_id()
 
 	return potion
-
-##等级归一化
-func normalize_level(attribute:AlchemicalData)->AlchemicalData:
-	if attribute.max_level>0:
-		if attribute.level == 0:
-			attribute.level = 1
-
-	return attribute

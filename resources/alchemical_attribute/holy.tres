@@ -1,12 +1,11 @@
-[gd_resource type="Resource" script_class="Holy" load_steps=3 format=3 uid="uid://cbug2aym43gnx"]
+[gd_resource type="Resource" script_class="Holy" format=3 uid="uid://cbug2aym43gnx"]
 
 [ext_resource type="Script" uid="uid://bakux1700e72" path="res://scripts/alchemical_attribute/holy.gd" id="1_u4gvl"]
-[ext_resource type="Resource" path="res://resources/buffs/blessing.tres" id="2_blessing"]
+[ext_resource type="Resource" uid="uid://dblpl0hj5mt1x" path="res://resources/buffs/blessing.tres" id="2_blessing"]
 
 [resource]
 script = ExtResource("1_u4gvl")
 attribute_id = 1
 name = "神圣"
 max_level = 3
-buff = ExtResource("2_blessing")
 metadata/_custom_type_script = "uid://bakux1700e72"
