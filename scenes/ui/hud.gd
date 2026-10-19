@@ -198,6 +198,15 @@ func show_alchemy_station(station: WorldStructure) -> void:
 		_pickup_label.text = "E · 使用炼金台"
 
 
+## 站在地图事件旁边的提示。
+func show_event(world_event: WorldEvent) -> void:
+	if _pickup_label == null:
+		return
+	_pickup_label.visible = world_event != null
+	if _pickup_label.visible:
+		_pickup_label.text = world_event.prompt_text()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
