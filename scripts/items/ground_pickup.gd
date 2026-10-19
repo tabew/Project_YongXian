@@ -62,7 +62,7 @@ func is_available_for_pickup() -> bool:
 
 
 func can_be_thrown() -> bool:
-	return is_available_for_pickup() and data.id == GroundMaterials.STONE_ID and is_inside_tree() and is_visible_in_tree() and can_process()
+	return is_available_for_pickup() and GroundMaterials.is_throwable(data.id) and is_inside_tree() and is_visible_in_tree() and can_process()
 
 
 ## 使用现有地面石头作为弹体，落地后仍是同一份材料；目标位置在出手时固定。
@@ -194,7 +194,7 @@ func _terrain_block_fraction(from: Vector2, to: Vector2) -> float:
 
 
 func _update_throwable_group() -> void:
-	var available: bool = is_available_for_pickup() and data.id == GroundMaterials.STONE_ID
+	var available: bool = is_available_for_pickup() and data != null and GroundMaterials.is_throwable(data.id)
 	if available:
 		add_to_group("throwable_stones")
 	elif is_in_group("throwable_stones"):

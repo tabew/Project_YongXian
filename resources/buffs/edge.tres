@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuffData" format=3]
+
+[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_12ln7"]
+[ext_resource type="Texture2D" path="res://assets/ui/buffs/edge.png" id="1_voijn"]
+[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_voijn"]
+
+[sub_resource type="Resource" id="Resource_jfr3w"]
+script = ExtResource("1_12ln7")
+stat = &"damage_add"
+value = 3.0
+value_per_level = 1.5
+
+[resource]
+max_level = 3
+script = ExtResource("2_voijn")
+id = &"edge"
+display_name = "锋利"
+description = "武器伤害提高 3 点（每级 +1.5），持续 6 秒。"
+icon = ExtResource("1_voijn")
+modifiers = Array[ExtResource("1_12ln7")]([SubResource("Resource_jfr3w")])

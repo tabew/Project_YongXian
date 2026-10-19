@@ -6,5 +6,4 @@
 script = ExtResource("1_attribute")
 attribute_id = 4
 name = "木质"
-max_level = 0
-can_be_interacted_attribute = Array[int]([3])
+max_level = 3

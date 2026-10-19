@@ -8,4 +8,4 @@ script = ExtResource("2_v0wd7")
 attribute_id = 14
 name = "力量"
 max_level = 3
-can_be_interacted_attribute = Array[int]([10, 12, 14])
+level = 0

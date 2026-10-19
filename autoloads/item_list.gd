@@ -6,9 +6,6 @@ extends Node
 ##模板清单
 #用资源引用(preload)而不是字符串路径：字符串路径不被导出器跟踪，
 @export var templates: Array[ItemData] = [
-	preload("res://resources/items/ingredients/herb.tres"),
-	preload("res://resources/items/ingredients/stone.tres"),
-	preload("res://resources/items/ingredients/stick.tres"),
 	preload("res://resources/items/ingredients/give_fur.tres"),
 	preload("res://resources/items/ingredients/monkey_hide.tres"),
 	preload("res://resources/items/ingredients/crocodile_eye.tres"),
@@ -25,6 +22,33 @@ extends Node
 	preload("res://resources/items/weapons/thunder_yoyo.tres"),
 	preload("res://resources/items/weapons/hive_yoyo.tres"),
 	preload("res://resources/items/ingredients/bomb.tres"),
+	preload("res://resources/items/ingredients/shell.tres"),
+	preload("res://resources/items/ingredients/driftwood.tres"),
+	preload("res://resources/items/ingredients/cactus_spine.tres"),
+	preload("res://resources/items/ingredients/desert_crystal.tres"),
+	preload("res://resources/items/ingredients/dry_grass.tres"),
+	preload("res://resources/items/ingredients/hard_nut.tres"),
+	preload("res://resources/items/ingredients/wildflower.tres"),
+	preload("res://resources/items/ingredients/wheat.tres"),
+	preload("res://resources/items/ingredients/mushroom.tres"),
+	preload("res://resources/items/ingredients/pinecone.tres"),
+	preload("res://resources/items/ingredients/vine.tres"),
+	preload("res://resources/items/ingredients/fern_leaf.tres"),
+	preload("res://resources/items/ingredients/peat.tres"),
+	preload("res://resources/items/ingredients/resin.tres"),
+	preload("res://resources/items/ingredients/birch_bark.tres"),
+	preload("res://resources/items/ingredients/moss.tres"),
+	preload("res://resources/items/ingredients/frozen_berry.tres"),
+	preload("res://resources/items/ingredients/ice_crystal.tres"),
+	preload("res://resources/items/ingredients/snow_moss.tres"),
+	preload("res://resources/items/ingredients/iron_ore.tres"),
+	preload("res://resources/items/ingredients/rock_salt.tres"),
+	preload("res://resources/items/ingredients/snow_lotus.tres"),
+	preload("res://resources/items/ingredients/glacier_shard.tres"),
+	preload("res://resources/items/ingredients/acid_fruit.tres"),
+	preload("res://resources/items/ingredients/corrosive_moss.tres"),
+	preload("res://resources/items/ingredients/thunder_stone.tres"),
+	preload("res://resources/items/ingredients/transparent_flower.tres"),
 	#药水模板始终保持在最后一个
 	preload("res://resources/items/potions/potion_model.tres")
 ]
@@ -67,6 +91,9 @@ func has_runtime_instance(id: int) -> bool:
 
 const POTION_ID_STRAT:int = 300
 
+##附魔武器的运行时实例从这个 id 起发号(见 WeaponData.next_instance_id)
+const WEAPON_INSTANCE_ID_START:int = 400
+
 func _ready() -> void:
 	_build_table()
 
@@ -76,7 +103,7 @@ func has_template(id: int) -> bool:
 	if runtime_instances.has(id):
 		return true
 
-	if id>=POTION_ID_STRAT:
+	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
 		return true
 
 	return table.has(id)
@@ -89,7 +116,8 @@ func get_template(id: int) -> ItemData:
 		return runtime_instances[id]
 
 
-	if id >=POTION_ID_STRAT:
+	#药水区间回退到药水模板；附魔武器区间必须自己登记过，否则视为无效 id
+	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
 		return table[POTION_ID_STRAT]
 
 	if !table.has(id):

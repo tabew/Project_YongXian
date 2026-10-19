@@ -11,5 +11,5 @@ display_name = "吸收"
 description = "受到的伤害转为等量回复，持续 4 秒。"
 icon = ExtResource("1_vn3tl")
 duration = 4.0
-max_level = 0
+max_level = 3
 flags = Array[StringName]([&"damage_absorb"])

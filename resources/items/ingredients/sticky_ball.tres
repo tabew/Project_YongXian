@@ -1,19 +1,17 @@
 [gd_resource type="Resource" format=3 uid="uid://ch0c5582bdtty"]
 
 [ext_resource type="Texture2D" uid="uid://bh0p0f2dej48m" path="res://assets/items/ingredients/sticky_ball.svg" id="2_icon"]
-[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="3_attribute"]
-[ext_resource type="Resource" uid="uid://clue3wk0joahh" path="res://resources/alchemical_attribute/slow.tres" id="4_slow"]
-[ext_resource type="Resource" uid="uid://bnjkauj6quf5t" path="res://resources/alchemical_attribute/binding.tres" id="5_binding"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="5_jwgjw"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/weakness.tres" id="6_weakness"]
 [ext_resource type="Script" uid="uid://5w7fr1ns5q7c" path="res://scripts/items/ingredients/sticky_ball.gd" id="7_sticky"]
-[ext_resource type="Resource" path="res://resources/alchemical_attribute/linger.tres" id="8_linger"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://clue3wk0joahh" path="res://resources/alchemical_attribute/slow.tres" id="50_attr11"]
+[ext_resource type="Resource" uid="uid://ctcep8dtvvm4b" path="res://resources/alchemical_attribute/linger.tres" id="50_attr22"]
 
 [resource]
 script = ExtResource("7_sticky")
-for_use_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("8_linger")])
-id = 10
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr11")])
+id = 7
 name = "粘性球"
 texture = ExtResource("2_icon")
-alchemical_attribute = Array[ExtResource("3_attribute")]([ExtResource("4_slow"), ExtResource("5_binding"), ExtResource("6_weakness"), ExtResource("8_linger")])
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr11"), ExtResource("50_attr22")])
 item_scene_path = "res://scenes/items/ingredients/sticky_ball.tscn"

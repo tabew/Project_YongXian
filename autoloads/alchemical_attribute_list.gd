@@ -31,6 +31,21 @@ enum ATTRIBUTE
 	THUNDER = 23,
 	RAGE = 24,
 	AGILITY = 25,
+	DEFTNESS = 26,
+	SHARPNESS = 27,
+	HASTE = 28,
+	REND = 29,
+	WATER = 30,
+	WIND = 31,
+	FLESH = 32,
+	ACID = 33,
+	SALT = 34,
+	HERBAL = 35,
+	ICE = 36,
+	HEAVY = 37,
+	SANCTUARY = 38,
+	EXTEND = 39,
+	STAMINA = 40,
 }
 
 
@@ -60,12 +75,25 @@ enum ATTRIBUTE
 	preload("res://resources/alchemical_attribute/lifesteal.tres"),
 	preload("res://resources/alchemical_attribute/fortify.tres"),
 	preload("res://resources/alchemical_attribute/absorb.tres"),
-	# ===== AI 修改开始 (滞留) =====
 	preload("res://resources/alchemical_attribute/linger.tres"),
-	# ===== AI 修改结束 =====
 	preload("res://resources/alchemical_attribute/thunder.tres"),
 	preload("res://resources/alchemical_attribute/rage.tres"),
-	preload("res://resources/alchemical_attribute/agility.tres")
+	preload("res://resources/alchemical_attribute/agility.tres"),
+	preload("res://resources/alchemical_attribute/deftness.tres"),
+	preload("res://resources/alchemical_attribute/sharpness.tres"),
+	preload("res://resources/alchemical_attribute/haste.tres"),
+	preload("res://resources/alchemical_attribute/rend.tres"),
+	preload("res://resources/alchemical_attribute/water.tres"),
+	preload("res://resources/alchemical_attribute/wind.tres"),
+	preload("res://resources/alchemical_attribute/flesh.tres"),
+	preload("res://resources/alchemical_attribute/acid.tres"),
+	preload("res://resources/alchemical_attribute/salt.tres"),
+	preload("res://resources/alchemical_attribute/herbal.tres"),
+	preload("res://resources/alchemical_attribute/ice.tres"),
+	preload("res://resources/alchemical_attribute/heavy.tres"),
+	preload("res://resources/alchemical_attribute/sanctuary.tres"),
+	preload("res://resources/alchemical_attribute/extend.tres"),
+	preload("res://resources/alchemical_attribute/stamina.tres")
 ]
 
 ##id -> 模板

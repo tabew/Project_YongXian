@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="3_gxtow"]
 
 [resource]
+max_level = 3
 script = ExtResource("3_gxtow")
 id = &"burn"
 display_name = "燃烧"

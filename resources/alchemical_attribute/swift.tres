@@ -8,4 +8,3 @@ script = ExtResource("1_swift")
 attribute_id = 12
 name = "迅捷"
 max_level = 3
-can_be_interacted_attribute = Array[int]([12])

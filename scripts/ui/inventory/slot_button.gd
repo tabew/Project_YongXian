@@ -4,6 +4,7 @@ extends Button
 
 class_name SlotButton
 
+const ITEM_TOOLTIP_SCRIPT = preload("res://scripts/ui/inventory/item_tooltip.gd")
 signal take_item_signal(item_id:int, num:int)
 signal put_item_signal(item_id:int, num:int)
 
@@ -18,6 +19,9 @@ signal select_item_signal(pos:int)
 
 ##shift+左键快捷移动：把本格的整堆物品挪到另一边的容器(背包<->快捷栏)
 signal quick_move_signal(item_id:int, num:int)
+
+##把药水拖到本格的武器上：请求宿主用药水附魔(weapon_item_id 是本格武器的 id)
+signal enchant_item_signal(weapon_item_id:int, potion_item_id:int)
 
 ##自己在快捷栏里的格子位置，不是快捷栏格子则为-1
 var handy_slot:int = -1
@@ -54,9 +58,11 @@ func  slot_insert(SI:SlotItem)->void:
 	slot_item = SI
 	center_container.add_child(slot_item)
 	slot_item.slot_item_update()
+	tooltip_text = ITEM_TOOLTIP_SCRIPT.build(slot_item.item as ItemData)
 
 ##清掉本格显示
 func clear_slot() -> void:
+	tooltip_text = ""
 	if slot_item == null:
 		return
 
@@ -193,6 +199,10 @@ func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if  not (data is Dictionary):
 		return false
 
+	#药水拖到武器上=附魔：只有等级够(能顶替旧附魔)才收，不够就让拖拽直接失败、药水自己回原格
+	if _is_enchant_target() and _is_potion(int(data.get("item_id",-1))):
+		return _can_enchant_with(int(data.get("item_id",-1)))
+
 	#物品栏特殊判断
 	if slot_item == null:
 		return data.get("item_id") != null
@@ -210,8 +220,15 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	if !(data is Dictionary):
 		return
 
+	var payload_id:int = int(data.get("item_id",-1))
+
+	#药水拖到武器上=附魔：药水在拖起时已经从背包扣掉了，这里只发请求
+	if _is_enchant_target() and _is_potion(payload_id):
+		enchant_item_signal.emit(slot_item.item_id,payload_id)
+		return
+
 	if slot_item == null:
-		put_item_by_id(int(data.get("item_id",-1)),int(data.get("count",1)))
+		put_item_by_id(payload_id,int(data.get("count",1)))
 		return
 
 	if is_handy_button and slot_item.item_id != data.get("item_id"):
@@ -278,3 +295,47 @@ func set_count(num:int) -> void:
 		return
 	slot_item.count = num
 	slot_item.slot_item_update()
+	tooltip_text = ITEM_TOOLTIP_SCRIPT.build(slot_item.item as ItemData)
+
+
+#//////////////////////附魔
+##本格是不是"可以附魔的武器"
+func _is_enchant_target() -> bool:
+	return slot_item != null and slot_item.item is WeaponData
+
+##只有药水能当附魔材料
+func _is_potion(item_id:int) -> bool:
+	return _template_of(item_id) is PotionData
+
+##本格武器吃不吃得下这瓶药水：任意一条属性等级更高才收
+func _can_enchant_with(potion_item_id:int) -> bool:
+	var weapon_item:WeaponData = slot_item.item as WeaponData
+	var potion:PotionData = _template_of(potion_item_id) as PotionData
+
+	if weapon_item == null or weapon_item.weapon == null or potion == null:
+		return false
+
+	for attribute:AlchemicalData in potion.alchemical_attribute:
+		if weapon_item.weapon.can_enchant_with(attribute):
+			return true
+
+	return false
+
+##取物品注册表模板。用运行期查找而不是全局标识符，方便 --script 测试
+func _template_of(item_id:int) -> ItemData:
+	var loop:MainLoop = Engine.get_main_loop()
+
+	if !(loop is SceneTree):
+		return null
+
+	var tree:SceneTree = loop as SceneTree
+
+	if tree.root == null:
+		return null
+
+	var registry:Node = tree.root.get_node_or_null("ItemListGlobal")
+
+	if registry == null or item_id < 0 or !registry.has_template(item_id):
+		return null
+
+	return registry.get_template(item_id) as ItemData

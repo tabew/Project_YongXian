@@ -12,6 +12,7 @@ value = 0.25
 value_per_level = 0.1
 
 [resource]
+max_level = 3
 script = ExtResource("2_8qp5t")
 id = &"vulnerable"
 display_name = "易伤"

@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://b156kbas52xen" path="res://scripts/weapons/weapon_controller.gd" id="3_weapons"]
 [ext_resource type="Script" uid="uid://b7xxr10los2xu" path="res://scripts/combat/health_component.gd" id="4_health"]
 [ext_resource type="Script" uid="uid://ds5nf5huvk0pl" path="res://scripts/buffs/buff_holder.gd" id="5_buffs"]
+[ext_resource type="Script" uid="uid://bm7f5hkybjaat" path="res://scripts/ui/dodge_charges_bar.gd" id="6_dodge"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(10, 8)
@@ -22,6 +23,70 @@ tracks/0/keys = {
 "transitions": PackedFloat32Array(1),
 "update": 1,
 "values": [0]
+}
+
+[sub_resource type="Animation" id="Animation_e605p"]
+resource_name = "die_down"
+step = 0.1666
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1666, 0.3332, 0.49980003, 0.6664, 0.833),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [48, 49, 50, 51, 52, 53]
+}
+
+[sub_resource type="Animation" id="Animation_cyajl"]
+resource_name = "die_left"
+step = 0.1666
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1666, 0.3332, 0.49980003, 0.6664, 0.833),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [60, 61, 62, 63, 64, 65]
+}
+
+[sub_resource type="Animation" id="Animation_fh65b"]
+resource_name = "die_right"
+step = 0.1666
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1666, 0.3332, 0.49980003, 0.6664, 0.833),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [66, 67, 68, 69, 70, 71]
+}
+
+[sub_resource type="Animation" id="Animation_ey0fj"]
+resource_name = "die_up"
+step = 0.1666
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1666, 0.3332, 0.49980003, 0.6664, 0.833),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [54, 55, 56, 57, 58, 59]
 }
 
 [sub_resource type="Animation" id="Animation_t8yk2"]
@@ -163,6 +228,10 @@ tracks/0/keys = {
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_e605p"]
 _data = {
 &"RESET": SubResource("Animation_wwvfn"),
+&"die_down": SubResource("Animation_e605p"),
+&"die_left": SubResource("Animation_cyajl"),
+&"die_right": SubResource("Animation_fh65b"),
+&"die_up": SubResource("Animation_ey0fj"),
 &"stand_down": SubResource("Animation_t8yk2"),
 &"stand_left": SubResource("Animation_m5ugi"),
 &"stand_right": SubResource("Animation_3vq1g"),
@@ -172,6 +241,33 @@ _data = {
 &"walk_right": SubResource("Animation_8egkn"),
 &"walk_up": SubResource("Animation_sia57")
 }
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_mr2x2"]
+animation = &"die_down"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_vrrwq"]
+animation = &"die_up"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_shvm5"]
+animation = &"die_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_fmmik"]
+animation = &"die_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_vbjuv"]
+blend_mode = 1
+blend_point_0/node = SubResource("AnimationNodeAnimation_mr2x2")
+blend_point_0/pos = Vector2(0, 1)
+blend_point_0/name = &"die_down"
+blend_point_1/node = SubResource("AnimationNodeAnimation_vrrwq")
+blend_point_1/pos = Vector2(0, -1)
+blend_point_1/name = &"die_up"
+blend_point_2/node = SubResource("AnimationNodeAnimation_shvm5")
+blend_point_2/pos = Vector2(-0.90000004, 0)
+blend_point_2/name = &"die_left"
+blend_point_3/node = SubResource("AnimationNodeAnimation_fmmik")
+blend_point_3/pos = Vector2(0.90000004, 0)
+blend_point_3/name = &"die_right"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cyajl"]
 animation = &"stand_down"
@@ -238,17 +334,35 @@ advance_expression = "input_direction.length_squared() > 0"
 advance_mode = 2
 advance_expression = "input_direction.length_squared() == 0"
 
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_wx2rq"]
+advance_mode = 2
+advance_expression = "_was_defeated"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_7yuli"]
+advance_mode = 2
+advance_expression = "_was_defeated"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_wwvfn"]
+advance_mode = 2
+advance_expression = "not _was_defeated"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_t8yk2"]
+advance_mode = 2
+advance_expression = "not _was_defeated"
+
 [sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_vbjuv"]
+states/Die/node = SubResource("AnimationNodeBlendSpace2D_vbjuv")
+states/Die/position = Vector2(712.4, 99.3792)
 states/Stand/node = SubResource("AnimationNodeBlendSpace2D_mr2x2")
 states/Stand/position = Vector2(473.72797, 98.56799)
 states/Start/position = Vector2(122.4, 100.159996)
 states/Walk/node = SubResource("AnimationNodeBlendSpace2D_vrrwq")
 states/Walk/position = Vector2(473.75998, -14.200007)
-transitions = ["Start", "Stand", SubResource("AnimationNodeStateMachineTransition_shvm5"), "Stand", "Walk", SubResource("AnimationNodeStateMachineTransition_fmmik"), "Walk", "Stand", SubResource("AnimationNodeStateMachineTransition_68xwl")]
+transitions = ["Start", "Stand", SubResource("AnimationNodeStateMachineTransition_shvm5"), "Stand", "Walk", SubResource("AnimationNodeStateMachineTransition_fmmik"), "Walk", "Stand", SubResource("AnimationNodeStateMachineTransition_68xwl"), "Stand", "Die", SubResource("AnimationNodeStateMachineTransition_wx2rq"), "Walk", "Die", SubResource("AnimationNodeStateMachineTransition_7yuli"), "Die", "Stand", SubResource("AnimationNodeStateMachineTransition_wwvfn"), "Die", "Walk", SubResource("AnimationNodeStateMachineTransition_t8yk2")]
 graph_offset = Vector2(-244, -24)
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_530h6"]
-graph_offset = Vector2(-332, -20.8)
+graph_offset = Vector2(-337.3091, 24.472717)
 nodes/StateMachine/node = SubResource("AnimationNodeStateMachine_vbjuv")
 nodes/StateMachine/position = Vector2(-128, 96)
 node_connections = [&"output", 0, &"StateMachine"]
@@ -260,7 +374,7 @@ animation_tree = NodePath("AnimationTree")
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=756166247]
 texture = ExtResource("2_68xwl")
 hframes = 6
-vframes = 8
+vframes = 12
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=743862640]
 position = Vector2(0, 6)
@@ -280,6 +394,12 @@ position_smoothing_speed = 8.0
 [node name="Buffs" type="Node" parent="." unique_id=1816534401]
 script = ExtResource("5_buffs")
 
+[node name="DodgeCharges" type="Node2D" parent="." unique_id=647214518]
+z_index = 1
+position = Vector2(0, 15)
+script = ExtResource("6_dodge")
+offset = Vector2(0, 15)
+
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1601883228]
 libraries/ = SubResource("AnimationLibrary_e605p")
 
@@ -287,5 +407,6 @@ libraries/ = SubResource("AnimationLibrary_e605p")
 tree_root = SubResource("AnimationNodeBlendTree_530h6")
 advance_expression_base_node = NodePath("..")
 anim_player = NodePath("../AnimationPlayer")
+parameters/StateMachine/Die/blend_position = Vector2(0, 0)
 parameters/StateMachine/Stand/blend_position = Vector2(-0.12529409, 0.007299185)
 parameters/StateMachine/Walk/blend_position = Vector2(0.06647062, 0.0018017292)

@@ -26,29 +26,8 @@ func zone_interval() -> float:
 	return strike_interval
 
 
-func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	if attribute.is_empty():
-		return result
-
-	for i in attribute.size():
-		match attribute[i].attribute_id:
-			AlchemicalAttributeList.ATTRIBUTE.THUNDER:
-				if !can_upgrade_level(attribute[i]):
-					continue
-
-				if which == 2:
-					result.append(self)
-					result.append(attribute[i])
-				else:
-					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.THUNDER, level + 1))
-
-		break
-	return result
-
-
 ##就地落一道雷。object 是落点
+
 func use_effect(object: Node = null) -> void:
 	if object == null or not is_instance_valid(object) or not (object is Node2D):
 		return

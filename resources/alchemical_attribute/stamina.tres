@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Stamina" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/alchemical_attribute/stamina.gd" id="1_stamina"]
+[ext_resource type="Resource" path="res://resources/buffs/stamina.tres" id="2_stamina"]
+
+[resource]
+script = ExtResource("1_stamina")
+attribute_id = 40
+name = "耐力"
+max_level = 2
+buff = ExtResource("2_stamina")

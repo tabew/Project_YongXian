@@ -76,11 +76,15 @@ func critical_chance_total() -> float:
 	return clampf(chance, 0.0, 1.0)
 
 
-## 出手速度倍率
+## 出手速度倍率：持有者的攻速加成 + 武器附魔直接加的攻速（急速）
 func speed_multiplier() -> float:
+	var bonus: float = 0.0
+
 	if wielder != null and is_instance_valid(wielder) and wielder.has_method("read_stat"):
-		return 1.0 + maxf(float(wielder.call("read_stat", &"attack_speed")), 0.0)
-	return 1.0
+		bonus += maxf(float(wielder.call("read_stat", &"attack_speed")), 0.0)
+	if definition != null:
+		bonus += definition.enchant_attack_speed()
+	return 1.0 + bonus
 
 
 func _try_hit(hurtbox: CombatHurtbox) -> void:
@@ -103,18 +107,61 @@ func _land_hit(hurtbox: CombatHurtbox, damage_scale: float = 1.0) -> void:
 	var multiplier: float = 1.0
 	if wielder != null and wielder.has_method("outgoing_damage_multiplier"):
 		multiplier = float(wielder.call("outgoing_damage_multiplier", hurtbox))
-	#buff 的攻击力倍率：玩家/怪物实现了 read_stat 才生效
+	#buff / 附魔的加成：固定加值加在基础伤害上，倍率乘在后面
+	var flat_add: float = 0.0
 	if wielder != null and wielder.has_method("read_stat"):
+		flat_add = maxf(float(wielder.call("read_stat", &"damage_add")), 0.0)
 		multiplier *= maxf(float(wielder.call("read_stat", &"damage_dealt")), 0.0)
-	hit.damage = definition.damage * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
+	hit.damage = (definition.damage + flat_add + definition.enchant_damage()) * damage_scale * multiplier * (definition.critical_multiplier if hit.critical else 1.0)
 	hit.position = hurtbox.global_position
 	var direction: Vector2 = (hurtbox.global_position - wielder.global_position).normalized()
 	if direction.is_zero_approx():
 		direction = aim_direction
 	hit.knockback = direction * definition.knockback
 	if hurtbox.receive_hit(hit):
+		_apply_enchant_effects(hurtbox, hit)
 		hit_landed.emit(hit, hurtbox)
 		_apply_on_hit_effects(hurtbox)
+
+
+## 武器附魔：命中后把武器上的炼金属性逐个作用出去。
+## 附魔效果在武器命中结算之后单独触发，不并入 hit.damage；
+## 爆炸等 need_target = false 的属性会用自己的 use_effect 再生成一次伤害判定。
+## need_target 的属性作用到被命中的实体，其余作用到命中点；
+## enchant_target = WIELDER 的属性(治疗/恢复)作用到持武器的人自己。
+func _apply_enchant_effects(hurtbox: CombatHurtbox, hit: CombatHit) -> void:
+	if definition == null or definition.enchant_attributes.is_empty():
+		return
+	var point: Node2D = null
+	for attribute: AlchemicalData in definition.enchant_attributes:
+		if attribute == null:
+			continue
+		if attribute.need_target:
+			var target: Node = wielder if attribute.enchant_target == AlchemicalData.EnchantTarget.WIELDER else hurtbox.get_parent()
+			attribute.apply_weapon_enchant(target, hit)
+			continue
+		if point == null:
+			point = _make_enchant_point(hurtbox.global_position)
+		if point != null:
+			attribute.use_effect(point)
+	if point != null:
+		point.queue_free()
+
+
+## 不需要目标的属性(如爆炸)要求传进去的 Node2D 在世界里，用它的位置当作用点。
+## 借一个临时标记点，不挂到怪物身上：怪死了会把挂在它下面的特效一起带走。
+func _make_enchant_point(at: Vector2) -> Node2D:
+	var world: Node = null
+	if is_instance_valid(wielder):
+		world = wielder.get_parent()
+	if world == null:
+		world = get_parent()
+	if world == null:
+		return null
+	var marker := Node2D.new()
+	world.add_child(marker)
+	marker.global_position = at
+	return marker
 
 
 ## Drain batches so friendly or duplicate hurtboxes cannot hide targets in a crowd.
@@ -151,7 +198,7 @@ func _apply_on_hit_effects(hurtbox: CombatHurtbox) -> void:
 ## 朝准心短距离前冲，逐格检查可站立，避免冲进不可通行地形。
 func _lunge() -> void:
 	var actor := wielder as PlayerCharacter
-	if actor == null:
+	if actor == null or actor.boss_grappled or actor.boss_captured or actor.stun_remaining > 0.0:
 		return
 	var distance: float = definition.lunge_tiles * float(WorldGenerator.TILE_SIZE)
 	var target: Vector2 = actor.global_position + aim_direction * distance

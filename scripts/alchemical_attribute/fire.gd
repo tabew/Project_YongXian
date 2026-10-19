@@ -5,31 +5,8 @@ extends AlchemicalData
 @export var buff: BuffData = preload("res://resources/buffs/burn.tres")
 
 
-func interact(attribute: Array[AlchemicalData], which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	if attribute.is_empty():
-		return result
-
-	#单属性反应一定优先是第一个，多属性反应才需要单独遍历数组内其它属性
-	for i in attribute.size():
-		match attribute[i].attribute_id:
-			AlchemicalAttributeList.ATTRIBUTE.FIRE:
-				if !can_upgrade_level(attribute[i]):
-					continue
-
-				if which == 2:
-					result.append(self)
-					result.append(attribute[i])
-				else:
-					result.append(AlchemicalAttributeList.create(AlchemicalAttributeList.ATTRIBUTE.FIRE, level + 1))
-
-		#除了升级会continue外，其它情况直接break
-		break
-	return result
-
-
 ##每次结算对目标造成的伤害
+
 @export_range(0.0, 100.0, 0.5) var damage: float = 3.0
 ##每级追加的伤害
 @export_range(0.0, 100.0, 0.5) var damage_per_level: float = 1.5
@@ -66,7 +43,7 @@ func _damage_target(object: Node) -> void:
 	if now - int(_last_damage_ms.get(id, -1000000)) < int(DAMAGE_INTERVAL * 1000.0):
 		return
 	_last_damage_ms[id] = now
-	Buffs.hurt_entity(object, amount)
+	Buffs.hurt_entity(object, amount, null, &"damage_over_time")
 
 
 func _default_polarity() -> POLARITY:

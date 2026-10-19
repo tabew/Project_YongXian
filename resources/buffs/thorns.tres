@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_1uvhn"]
 
 [resource]
+max_level = 3
 script = ExtResource("2_1uvhn")
 id = &"thorns"
 display_name = "荆棘"

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="IngredientData" format=3 uid="uid://bpr4r8owvwemf"]
+
+[ext_resource type="Script" uid="uid://64jcv2bm81fk" path="res://scripts/items/ingredients/ingredient_data.gd" id="1_data"]
+[ext_resource type="Texture2D" uid="uid://da5rms32lanvn" path="res://assets/items/ingredients/vine.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_2f72t"]
+[ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://dnmf43q3qyiwl" path="res://resources/alchemical_attribute/swift.tres" id="50_attr12"]
+[ext_resource type="Resource" path="res://resources/alchemical_attribute/heal.tres" id="50_attr0"]
+
+[resource]
+script = ExtResource("1_data")
+for_use_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr12")])
+id = 21
+name = "藤蔓"
+texture = ExtResource("2_icon")
+alchemical_attribute = Array[ExtResource("49_attrtype")]([ExtResource("50_attr12"), ExtResource("50_attr0")])
+item_scene_path = "res://scenes/items/ingredients/ingredient_ground.tscn"

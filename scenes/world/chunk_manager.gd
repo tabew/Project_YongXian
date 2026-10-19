@@ -2,8 +2,8 @@ class_name ChunkManager
 extends Node2D
 
 ## 箱庭区块加载器：每张地图拥有独立 root 和裁剪到矩形边界的图层。
-## 只显示当前地图，隐藏预铺所有直连邻居；区块数据按世界坐标共享同种子缓存。
-## 首次进入同步铺好相机视口，其余整图生成与铺图按每帧预算分摊。
+## 只显示当前地图，直连邻图先生成缓存、过场再铺到达视口；区块数据按世界坐标共享同种子缓存。
+## 首次进入同步铺好相机视口，其余当前地图的铺图按每帧预算分摊。
 ## 每个区块一个 TileMapLayer，本地格子坐标和节点偏移保持图层四叉树较小。
 
 signal chunk_applied(coords: Vector2i)
@@ -19,7 +19,7 @@ const NO_CHUNK: Vector2i = Vector2i(2147483647, 2147483647)
 @export_group("每帧预算")
 ## 每帧最多提交几个区块去生成。
 @export var generations_per_frame: int = 4
-## 每帧最多把几个区块铺进 TileMapLayer（主线程开销的大头，实测约 0.28 ms/块）。
+## 每帧最多把几个区块铺进 TileMapLayer（主线程开销的大头）。
 @export var applications_per_frame: int = 4
 
 @export_group("缓存")
@@ -35,6 +35,7 @@ const RENDER_RADIUS: int = 3
 const RETAIN_RADIUS: int = 4
 const MAX_GENERATOR_POOL: int = 16
 const MAX_LAYER_POOL: int = 512
+const APPLY_BUDGET_USEC: int = 2500
 const TERRAIN_SOURCE_ID: int = 0
 const ROAD_SOURCE_ID: int = 1
 const TILE_ATLAS_COLUMN: int = 0
@@ -52,6 +53,8 @@ var _config: MapConfig = null
 var _epoch: int = 0
 var _spec: MapSpec = null
 var _focus_chunk: Vector2i = Vector2i.ZERO
+var _prewarm_map_id: int = -1
+var _prewarm_chunks: Dictionary = {}
 
 ## _layers 始终引用当前地图的 dictionary，供小地图和测试读取。
 var _layers: Dictionary = {}
@@ -110,6 +113,8 @@ func setup(generator: WorldGenerator, focus: Node2D) -> void:
 	focus_node = focus
 	_spec = null
 	_focus_chunk = Vector2i.ZERO
+	_prewarm_map_id = -1
+	_prewarm_chunks.clear()
 	_reset_stats()
 	version += 1
 
@@ -126,7 +131,7 @@ func load_map(map_node_id: int) -> void:
 	_gate_windows.clear()
 	_prewarm_windows.clear()
 	_desired[map_node_id] = true
-	# gate_links 包含入口与出口，所有直接邻居都隐藏预加载。
+	# gate_links 包含入口与出口，先生成直连邻图的数据，过场再铺入口视口。
 	for link: Dictionary in _generator.gate_links(map_node_id):
 		var target: int = int(link["target"])
 		if _generator.map_spec(target) != null:
@@ -143,6 +148,8 @@ func load_map(map_node_id: int) -> void:
 	_reap_tasks()
 	_drain_results()
 	prepare_visible()
+	_prewarm_map_id = -1
+	_prewarm_chunks.clear()
 	_rebuild_queue()
 	version += 1
 
@@ -226,7 +233,7 @@ func _build_gate_windows(map_id: int) -> Array[Rect2i]:
 	return windows
 
 
-## 门附近的预加载窗口（邻图只排这一小块，进图时门口已经铺好）。
+## 门附近的数据预加载窗口；邻图只在过场时铺到达视口。
 func _gate_chunk_bounds(spec: MapSpec, gate_tile: Vector2i) -> Rect2i:
 	var coords: Vector2i = WorldGenerator.tile_to_chunk(gate_tile)
 	var grow: Vector2i = Vector2i.ONE * 2
@@ -236,6 +243,37 @@ func _gate_chunk_bounds(spec: MapSpec, gate_tile: Vector2i) -> Rect2i:
 			- WorldGenerator.tile_to_chunk(spec.origin) + Vector2i.ONE * 2
 	)
 	return Rect2i(coords - grow, grow * 2 + Vector2i.ONE).intersection(bounds)
+
+
+## 过场时先生成并铺好目标入口的视口，避免把缺块留给切图当帧。
+func prewarm_arrival(map_node_id: int, at: Vector2) -> void:
+	if not _desired.has(map_node_id) or not _regions.has(map_node_id) or map_node_id == _spec.node_id:
+		return
+	_prewarm_map_id = map_node_id
+	_prewarm_chunks.clear()
+	var center: Vector2i = WorldGenerator.tile_to_chunk(WorldGenerator.world_to_tile(at))
+	var chunks: Array[Vector2i] = _regions[map_node_id]["chunks"]
+	var layers: Dictionary = _regions[map_node_id]["layers"]
+	var queued: Array[Vector2i] = []
+	for y: int in range(-1, 2):
+		for x: int in range(-1, 2):
+			var coords: Vector2i = center + Vector2i(x, y)
+			if not chunks.has(coords):
+				continue
+			_prewarm_chunks[coords] = true
+			if layers.has(coords):
+				continue
+			var data: ChunkData = _available_chunk(coords)
+			if data != null:
+				_enqueue_application(map_node_id, data)
+			elif not _in_flight.has(coords) and _queue.has(coords):
+				_queue.erase(coords)
+				queued.append(coords)
+	queued.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return (a - center).length_squared() > (b - center).length_squared()
+	)
+	for coords: Vector2i in queued:
+		_queue.push_front(coords)
 
 
 ## 同步补齐当前相机视口。若该坐标已在线程中生成，等待它而不重复生成。
@@ -385,7 +423,12 @@ func _process(_delta: float) -> void:
 	_drain_results()
 	# 移动或改变 zoom 后也补齐视口，其余区块继续使用后台预算。
 	prepare_visible()
-	_rebuild_queue()
+	# 玩家跨区块时才重排视口外的后台任务。
+	var focus: Vector2i = WorldGenerator.tile_to_chunk(
+		WorldGenerator.world_to_tile(focus_node.global_position)
+	)
+	if focus != _focus_chunk:
+		_rebuild_queue()
 	_dispatch()
 	_apply_results()
 
@@ -499,6 +542,10 @@ func _sort_queue() -> void:
 		var b_current: bool = _current_needs(b)
 		if a_current != b_current:
 			return a_current
+		var a_prewarm: bool = _prewarm_chunks.has(a)
+		var b_prewarm: bool = _prewarm_chunks.has(b)
+		if a_prewarm != b_prewarm:
+			return a_prewarm
 		var ax: int = a.x - center.x
 		var ay: int = a.y - center.y
 		var bx: int = b.x - center.x
@@ -579,11 +626,21 @@ func _apply_results() -> void:
 			return a_current
 		var a_data: ChunkData = a["data"]
 		var b_data: ChunkData = b["data"]
+		var a_prewarm: bool = int(a["map_id"]) == _prewarm_map_id and _prewarm_chunks.has(a_data.coords)
+		var b_prewarm: bool = int(b["map_id"]) == _prewarm_map_id and _prewarm_chunks.has(b_data.coords)
+		if a_prewarm != b_prewarm:
+			return a_prewarm
 		return (a_data.coords - center).length_squared() < (b_data.coords - center).length_squared()
 	)
 	var applied: int = 0
 	var started: int = Time.get_ticks_usec()
 	while applied < applications_per_frame and not _apply_queue.is_empty():
+		var next: Dictionary = _apply_queue[0]
+		var next_id: int = next["map_id"]
+		var next_data: ChunkData = next["data"]
+		# 不可见邻图保留数据，只有过场到达视口需要提前铺图。
+		if next_id != current_id and (next_id != _prewarm_map_id or not _prewarm_chunks.has(next_data.coords)):
+			break
 		var entry: Dictionary = _apply_queue.pop_front()
 		var data: ChunkData = entry["data"]
 		var map_id: int = entry["map_id"]
@@ -596,6 +653,8 @@ func _apply_results() -> void:
 			continue
 		_paint_chunk(data, map_id)
 		applied += 1
+		if Time.get_ticks_usec() - started >= APPLY_BUDGET_USEC:
+			break
 	stat_apply_usec += Time.get_ticks_usec() - started
 
 

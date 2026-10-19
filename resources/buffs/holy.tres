@@ -12,6 +12,7 @@ value = -0.25
 value_per_level = -0.05
 
 [resource]
+max_level = 3
 script = ExtResource("3_xuspy")
 id = &"holy"
 display_name = "圣佑"

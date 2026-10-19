@@ -183,6 +183,7 @@ godot --headless --path . --script res://tools/test_pyramid_world.gd
 godot --headless --path . --script res://tools/test_transitions_materials.gd
 godot --headless --path . --script res://tools/test_inventory_material_compatibility.gd
 godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
+godot --headless --path . --script res://tools/test_weapon_enchant.gd
 godot --headless --path . --script res://tools/test_bomb_material.gd
 godot --headless --path . --script res://tools/test_cottage_biomes.gd
 godot --headless --path . --script res://tools/test_continuous_world.gd

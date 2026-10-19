@@ -1,4 +1,3 @@
-# ===== AI 新增文件 (buff 的独立规则：时长、等级换算、定时效果、属性修改) =====
 class_name BuffData
 extends Resource
 

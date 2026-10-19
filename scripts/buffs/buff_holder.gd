@@ -46,17 +46,19 @@ func _ready() -> void:
 ##施加一个 buff：同一个 id 只保留一份，取最高级
 ##新等级更高 → 升级并刷新时长；同级 → 只刷新时长；更低 → 什么都不做（返回 false）
 ##等级从 0 级开始：0 级就是基础数值，每高一级 +value_per_level
-func apply(buff: BuffData, level: int = 0, source: Node = null) -> bool:
+##duration_scale：时长倍率（药水的"延时"属性用，1.0 表示原时长）
+func apply(buff: BuffData, level: int = 0, source: Node = null, duration_scale: float = 1.0) -> bool:
 	if buff == null or buff.id == &"":
 		return false
 	var wanted: int = clampi(level, 0, maxi(buff.max_level, 1))
+	var seconds: float = buff.duration * maxf(duration_scale, 0.1)
 	var entry: Dictionary = _find(buff.id)
 
 	if not entry.is_empty():
 		if wanted < int(entry["level"]):
 			return false
 		entry["level"] = wanted
-		entry["remaining"] = buff.duration
+		entry["remaining"] = seconds
 		entry["source"] = source
 		_recompute_all()
 		buff_upgraded.emit(buff)
@@ -66,7 +68,7 @@ func apply(buff: BuffData, level: int = 0, source: Node = null) -> bool:
 	_active.append({
 		"buff": buff,
 		"level": wanted,
-		"remaining": buff.duration,
+		"remaining": seconds,
 		"tick": buff.tick_interval,
 		"source": source,
 	})
@@ -178,11 +180,17 @@ func _tick(entry: Dictionary) -> void:
 	var damage: float = buff.damage_amount(level)
 
 	if damage > 0.0:
-		if host.has_method("take_damage"):
+		if host is PlayerCharacter:
+			(host as PlayerCharacter).take_damage(damage, entry.get("source"))
+		elif host.has_method("take_damage"):
 			host.call("take_damage", damage)
 		elif health != null and health.has_method("receive_hit"):
 			var hit: CombatHit = CombatHit.new()
 			hit.damage = damage
+			hit.weapon_id = &"damage_over_time"
+			var source: Node = entry.get("source")
+			if is_instance_valid(source) and source is Node2D:
+				hit.source = source as Node2D
 			if host is Node2D:
 				hit.position = (host as Node2D).global_position
 			health.call("receive_hit", hit)

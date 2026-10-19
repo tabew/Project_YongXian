@@ -89,7 +89,7 @@ func _check_plans() -> void:
 				_check(reachable.has(chest["tile"]), "chest_is_reachable")
 				for entry: Dictionary in chest["loot"]:
 					_check(reachable.has(entry["tile"]), "chest_drop_is_reachable")
-					_check(entry["amount"] > 0 and entry["item_id"] in WorldPopulation.LOOT_POOL, "chest_has_valid_loot")
+					_check(entry["amount"] > 0 and entry["item_id"] in WorldPopulation._loot_pool(spec), "chest_has_valid_loot")
 			for entry: Dictionary in population["drops"]:
 				drop_total += 1
 				_check(reachable.has(entry["tile"]), "scattered_loot_is_reachable")

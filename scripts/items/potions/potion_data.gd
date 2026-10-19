@@ -46,13 +46,28 @@ func left_use(player:PlayerCharacter) -> int:
 		if attribute != null and attribute.has_method("exempts_user") and attribute.exempts_user():
 			exempt = true
 
+	#整瓶药的时长倍率（延时属性叠加），只影响这次施加的 buff
+	var scale: float = duration_scale()
+
 	for attribute: AlchemicalData in alchemical_attribute:
 		if attribute == null or not attribute.has_method("use_effect"):
 			continue
 		if exempt and attribute.is_negative_effect():
 			continue
+		Buffs.set_next_duration_scale(scale)
 		attribute.use_effect(player)
+	Buffs.reset_duration_scale()
 	return 1
+
+
+##整瓶药的时长倍率：延时属性按乘法叠加（没有延时就是 1.0）
+func duration_scale() -> float:
+	var scale: float = 1.0
+
+	for attribute: AlchemicalData in alchemical_attribute:
+		if attribute != null and attribute.has_method("duration_scale_total"):
+			scale *= maxf(float(attribute.call("duration_scale_total")), 0.1)
+	return scale
 
 ##投掷药水，朝准心抛出去，撞到受击盒或地形才碎
 ##飞行由 PotionProjectile 每物理帧推进(刚体保持冻结，不依赖世界有没有物理地板)

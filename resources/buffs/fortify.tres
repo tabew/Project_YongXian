@@ -11,6 +11,7 @@ value = 3.0
 value_per_level = 1.0
 
 [resource]
+max_level = 3
 script = ExtResource("2_5nk30")
 id = &"fortify"
 display_name = "强身"

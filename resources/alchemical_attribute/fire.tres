@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_fire")
 attribute_id = 7
+can_be_weapon_enchant = true
 name = "火"
 max_level = 3
-can_be_interacted_attribute = Array[int]([4, 7])
 buff = ExtResource("2_burn")

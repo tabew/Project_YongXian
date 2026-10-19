@@ -6,13 +6,6 @@ extends AlchemicalData
 
 @export var buff: BuffData = preload("res://resources/buffs/absorb.tres")
 
-
-func interact(_attribute: Array[AlchemicalData], _which: int = 1) -> Array[AlchemicalData]:
-	var result: Array[AlchemicalData] = []
-
-	return result
-
-
 func use_effect(object: Node = null) -> void:
 	if buff == null:
 		return

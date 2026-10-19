@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://cpcyekmk2b4jn"]
 
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_lotwu"]
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/agility.png" id="1_u6rnx"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_u6rnx"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_lotwu"]
+[ext_resource type="Texture2D" uid="uid://2u0jughyjl0" path="res://assets/ui/buffs/agility.png" id="1_u6rnx"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_u6rnx"]
 
 [sub_resource type="Resource" id="Resource_srcfh"]
 script = ExtResource("1_lotwu")
@@ -11,6 +11,7 @@ value = 0.2
 value_per_level = 0.08
 
 [resource]
+max_level = 3
 script = ExtResource("2_u6rnx")
 id = &"agility"
 display_name = "敏捷"

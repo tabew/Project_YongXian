@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://bl88m473qw5s6"]
 
 [ext_resource type="Script" uid="uid://beik12il45io6" path="res://scripts/ui/inventory/slot_item.gd" id="1_4u4ee"]
-[ext_resource type="Texture2D" uid="uid://cpme3kgbjvlf0" path="res://assets/items/ingredients/herb.png" id="2_p0qky"]
 
 [node name="SlotItem" type="Control" unique_id=1964065137]
 layout_mode = 3
@@ -23,7 +22,6 @@ offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_p0qky")
 stretch_mode = 5
 
 [node name="AmountLabel" type="Label" parent="." unique_id=650801863]
@@ -38,3 +36,17 @@ theme_override_constants/outline_size = 3
 theme_override_font_sizes/font_size = 20
 text = "95"
 horizontal_alignment = 2
+
+[node name="EnchantLabel" type="Label" parent="." unique_id=1204456789]
+layout_mode = 0
+offset_left = 2.0
+offset_top = -2.0
+offset_right = 42.0
+offset_bottom = 16.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 10
+text = "附魔"
+visible = false

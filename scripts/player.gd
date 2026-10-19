@@ -65,8 +65,47 @@ var damage_dealt: float = 1.0
 var lifesteal: float = 0.0
 ##暴击率加成：0 表示不加成，暴怒 buff 会提高它（武器结算时叠加）
 var crit_chance: float = 0.0
+##武器伤害的固定加值：锋利附魔会提高它（武器结算时加在基础伤害上）
+var damage_add: float = 0.0
+##受到的回复量倍率：1.0 表示正常，祝福 buff 会提高它
+var healing_received: float = 1.0
 ##攻击速度加成：0 表示正常，敏捷 buff 会提高它（出手阶段按 1+它 加快）
 var attack_speed: float = 0.0
+
+##闪避可用次数上限
+@export var dodge_max_charges: int = 2
+##恢复一次可用次数要多少秒（灵巧会缩短它）
+@export var dodge_recharge_seconds: float = 3.0
+##闪避位移速度(像素/秒)
+@export var dodge_speed: float = 560.0
+##闪避位移持续多久(秒)
+@export var dodge_seconds: float = 0.18
+##闪避的无敌帧时长(秒)
+@export var dodge_invulnerable_seconds: float = 0.5
+
+##当前可用闪避次数
+var dodge_charges: int = 0
+##充能进度：攒满 dodge_recharge_seconds 回一次
+var _dodge_recharge: float = 0.0
+##剩余闪避位移时间
+var _dodge_left: float = 0.0
+##剩余无敌帧时间
+var _invulnerable_left: float = 0.0
+##本次闪避方向
+var _dodge_direction: Vector2 = Vector2.DOWN
+##闪避充能速度加成：灵巧 buff 写回，速度 = 1 + 它
+var dodge_recovery: float = 0.0
+
+##闪避时要不要留残影
+@export var dodge_afterimage_enabled: bool = true
+##残影生成间隔(秒)
+@export var dodge_afterimage_interval: float = 0.035
+##残影淡出时长(秒)
+@export var dodge_afterimage_fade: float = 0.22
+##残影颜色（会再乘上角色自身的透明度）
+@export var dodge_afterimage_tint: Color = Color(0.60, 0.85, 1.0, 0.55)
+##残影生成计时
+var _afterimage_timer: float = 0.0
 
 # 上一个查过的格子。主角一帧最多查两次，缓存一下省掉重复的噪声计算
 var _cached_tile: Vector2i = Vector2i(2147483647, 2147483647)
@@ -82,12 +121,20 @@ var _regen_remaining: float = 0.0
 var _regen_per_second: float = 0.0
 var _was_defeated: bool = false
 
+## Boss control effects are kept separate from refreshing buff durations.
+var fear_remaining: float = 0.0
+var stun_remaining: float = 0.0
+var boss_grappled: bool = false
+var boss_captured: bool = false
+var _stun_spin: float = 0.0
+
 
 func _ready() -> void:
 	health_component.died.connect(_on_health_died)
 	health_component.health_changed.connect(_on_health_changed)
 	health_component.max_health = max_health
 	health_component.current_health = max_health
+	dodge_charges = dodge_max_charges
 
 	# 直接实例化 player.tscn 的场景（测试、编辑器单跑）可能没有背包，
 	# 缺背包时跳过装备初始化，但成长仍然要应用。
@@ -160,11 +207,11 @@ func rebuild_weapon() -> void:
 	weapon_controller.equip(base)
 
 
-## 当前选中格对应的基础武器定义（原始 .tres，未被升级卡污染）。
+## 当前选中格对应的基础武器定义（模板或附魔实例，未被升级卡叠改）。
 func _base_weapon() -> WeaponDefinition:
-	if inventory == null or handy_item < 200 or handy_item >= 300:
+	if inventory == null:
 		return null
-	var data: ItemData = inventory.get_item_data.get(handy_item)
+	var data: ItemData = inventory.get_item_template(handy_item)
 	if data == null or not (data is WeaponData):
 		return null
 	return (data as WeaponData).weapon
@@ -176,16 +223,109 @@ func _physics_process(delta: float) -> void:
 	if weapon_controller.is_attacking():
 		reveal_by_action()
 	_tick_progress(delta)
+	_tick_dodge(delta)
+	_tick_boss_status(delta)
 	if health <= 0.0:
 		velocity = Vector2.ZERO
 		weapon_controller.cancel_attack()
 		return
+	if stunned or stun_remaining > 0.0 or boss_captured or boss_grappled:
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+		if stunned or stun_remaining > 0.0 or boss_captured:
+			weapon_controller.cancel_attack()
+		return
 	input_direction = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
+	if is_dodging():
+		velocity = _dodge_direction * dodge_speed
+		_integrate_movement(delta)
+		_update_facing()
+		return
+	if fear_remaining > 0.0:
+		input_direction = -input_direction
 	_apply_input(delta)
 	_integrate_movement(delta)
 	_update_facing()
+
+
+func apply_fear(seconds: float) -> void:
+	fear_remaining += maxf(seconds, 0.0)
+
+
+func apply_boss_stun(seconds: float) -> void:
+	if seconds <= 0.0 or health <= 0.0:
+		return
+	_interrupt_dodge_for_boss()
+	stun_remaining = maxf(stun_remaining, seconds)
+	weapon_controller.cancel_attack()
+	input_direction = Vector2.ZERO
+	velocity = Vector2.ZERO
+	queue_redraw()
+
+
+func set_boss_grappled(active: bool) -> void:
+	boss_grappled = active
+	if active:
+		_interrupt_dodge_for_boss()
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+
+
+func set_boss_captured(active: bool) -> void:
+	boss_captured = active
+	if active:
+		_interrupt_dodge_for_boss()
+		weapon_controller.cancel_attack()
+		input_direction = Vector2.ZERO
+		velocity = Vector2.ZERO
+
+
+func _interrupt_dodge_for_boss() -> void:
+	if _dodge_left <= 0.0 and _invulnerable_left <= 0.0:
+		return
+	_dodge_left = 0.0
+	_invulnerable_left = 0.0
+	if is_instance_valid(health_component):
+		health_component.invulnerable = false
+
+
+func move_by_boss_pull(target: Vector2, distance: float) -> bool:
+	if not boss_grappled or health <= 0.0:
+		return false
+	var destination: Vector2 = global_position.move_toward(target, maxf(distance, 0.0))
+	if not can_stand_at(destination):
+		return false
+	global_position = destination
+	return true
+
+
+func _tick_boss_status(delta: float) -> void:
+	fear_remaining = maxf(fear_remaining - delta, 0.0)
+	if stun_remaining > 0.0:
+		stun_remaining = maxf(stun_remaining - delta, 0.0)
+		_stun_spin += delta * 4.0
+		queue_redraw()
+
+
+func _reset_boss_status() -> void:
+	_interrupt_dodge_for_boss()
+	fear_remaining = 0.0
+	stun_remaining = 0.0
+	boss_grappled = false
+	boss_captured = false
+	if is_instance_valid(sprite):
+		sprite.position.y = 0.0
+	queue_redraw()
+
+
+func _draw() -> void:
+	if stun_remaining <= 0.0:
+		return
+	var center := Vector2(0.0, -22.0)
+	draw_arc(center, 10.0, _stun_spin, _stun_spin + PI * 1.3, 28, Color(1.0, 0.8, 0.29, 0.95), 2.0)
+	draw_arc(center, 14.0, _stun_spin + PI, _stun_spin + PI * 2.2, 28, Color(0.6, 0.88, 1.0, 0.9), 2.0)
 
 
 ## 再生与连击计时。
@@ -211,6 +351,10 @@ func _tick_progress(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if stunned or stun_remaining > 0.0 or boss_captured or (boss_grappled and event.is_action_pressed("throw")):
+		if event.is_action_pressed("attack") or event.is_action_pressed("throw"):
+			get_viewport().set_input_as_handled()
+		return
 	if health > 0.0:
 		if event.is_action_pressed("attack"):
 			#选中物品左键使用
@@ -233,15 +377,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		
+		elif event.is_action_pressed("dodge"):
+			if is_ui_blocking():
+				return
+
+			if try_dodge(input_direction):
+				get_viewport().set_input_as_handled()
+			return
 
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())
 
-	if handy_item >=200&&handy_item<300:
+	#附魔过的武器是运行时实例(id 400+)，这里按类型判断，不再靠 id 段
+	var data:ItemData = inventory.get_item_template(handy_item)
+
+	if data is WeaponData:
 		rebuild_weapon()
 	else:
 		weapon_controller.equip(null)
 
+
+##背包变化后同步手上这把：选中格换成了别的物品（拖拽、附魔把武器换成实例、用完）
+##就重新装备。只在格子里的 id 真的变了才动作，避免捡个材料也把正在挥的攻击打断。
+func _sync_handy_item() ->void:
+	if inventory.get_handy_slot_id(inventory.get_selected_handy()) != handy_item:
+		handy_item_changed()
 
 ##ui是否挡着世界操作
 func is_ui_blocking() -> bool:
@@ -274,6 +434,7 @@ func _notification(what: int) -> void:
 func _update_blend_position(directionVector:Vector2):
 	animation_tree.set("parameters/StateMachine/Stand/blend_position",directionVector);
 	animation_tree.set("parameters/StateMachine/Walk/blend_position",directionVector);
+	animation_tree.set("parameters/StateMachine/Die/blend_position",directionVector);
 
 
 ## 有输入时朝目标速度加速，松手后按摩擦力减速到 0。
@@ -285,6 +446,108 @@ func _apply_input(delta: float) -> void:
 		_update_blend_position(input_direction)
 	else:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+
+
+##是否在闪避位移中
+func is_dodging() -> bool:
+	return _dodge_left > 0.0
+
+
+##是否处于无敌帧
+func is_invulnerable() -> bool:
+	return _invulnerable_left > 0.0
+
+
+##还有没有可用闪避次数
+func can_dodge() -> bool:
+	return health > 0.0 and dodge_charges > 0 and not stunned and stun_remaining <= 0.0 and not boss_grappled and not boss_captured
+
+
+##可用次数比例（0~1），给以后做 HUD 用
+func dodge_charges_ratio() -> float:
+	return float(dodge_charges) / float(maxi(dodge_max_charges, 1))
+
+
+##当前充能进度（0~1）：满次数时为 1，给闪避次数 UI 画恢复弧用
+func dodge_recharge_ratio() -> float:
+	if dodge_charges >= dodge_max_charges:
+		return 1.0
+	return clampf(_dodge_recharge / maxf(dodge_recharge_seconds, 0.01), 0.0, 1.0)
+
+
+##闪避充能速度加成：灵巧 buff 写回 dodge_recovery
+func dodge_recovery_speed() -> float:
+	return 1.0 + maxf(dodge_recovery, 0.0)
+
+
+##尝试闪避：有次数就朝 direction（没输入时用当前输入/上次朝向）位移，并进入无敌帧
+func try_dodge(direction: Vector2 = Vector2.ZERO) -> bool:
+	if not can_dodge():
+		return false
+
+	var dir: Vector2 = direction
+
+	if dir.is_zero_approx():
+		dir = input_direction
+	if dir.is_zero_approx():
+		dir = _dodge_direction
+	if dir.is_zero_approx():
+		dir = Vector2.DOWN
+
+	_dodge_direction = dir.normalized()
+	_dodge_left = maxf(dodge_seconds, 0.01)
+	_invulnerable_left = maxf(dodge_invulnerable_seconds, _dodge_left)
+	dodge_charges = maxi(dodge_charges - 1, 0)
+	if is_instance_valid(health_component):
+		health_component.invulnerable = true
+	velocity = _dodge_direction * dodge_speed
+
+	return true
+
+
+##闪避计时：无敌帧、位移时间、以及可用次数的充能
+func _tick_dodge(delta: float) -> void:
+	if _invulnerable_left > 0.0:
+		_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
+		if _invulnerable_left <= 0.0 and is_instance_valid(health_component):
+			health_component.invulnerable = false
+	if _dodge_left > 0.0:
+		_dodge_left = maxf(_dodge_left - delta, 0.0)
+		if dodge_afterimage_enabled:
+			_afterimage_timer -= delta
+			if _afterimage_timer <= 0.0:
+				_afterimage_timer = maxf(dodge_afterimage_interval, 0.01)
+				_spawn_afterimage()
+	if dodge_charges < dodge_max_charges:
+		_dodge_recharge += delta * dodge_recovery_speed()
+		while _dodge_recharge >= dodge_recharge_seconds and dodge_charges < dodge_max_charges:
+			_dodge_recharge -= maxf(dodge_recharge_seconds, 0.01)
+			dodge_charges += 1
+		if dodge_charges >= dodge_max_charges:
+			_dodge_recharge = 0.0
+
+
+##闪避残影：复制角色当前帧留一张影子，稍后淡出
+func _spawn_afterimage() -> void:
+	if sprite == null or not is_instance_valid(sprite) or get_parent() == null:
+		return
+
+	var ghost: DodgeAfterimage = DodgeAfterimage.new()
+
+	ghost.texture = sprite.texture
+	ghost.hframes = sprite.hframes
+	ghost.vframes = sprite.vframes
+	ghost.frame = sprite.frame
+	ghost.flip_h = sprite.flip_h
+	ghost.offset = sprite.offset
+	ghost.scale = sprite.scale
+	#和角色同层：设成 -1 会被画到地面 tile 底下，完全看不见
+	ghost.z_index = sprite.z_index
+	ghost.modulate = Color(dodge_afterimage_tint.r, dodge_afterimage_tint.g,
+			dodge_afterimage_tint.b, dodge_afterimage_tint.a * clampf(modulate.a, 0.0, 1.0))
+	get_parent().add_child(ghost)
+	ghost.global_position = sprite.global_position
+	ghost.fade(dodge_afterimage_fade)
 
 #武器动画修改
 func _update_facing() -> void:
@@ -337,6 +600,7 @@ func can_stand_at(world_position: Vector2) -> bool:
 ## 由 GameWorld 调用：注入地形来源并把主角放到指定世界坐标。
 func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec = null, reset_health: bool = true) -> void:
 	weapon_controller.cancel_attack()
+	_reset_boss_status()
 	terrain_source = source
 	active_map = map_spec
 	velocity = Vector2.ZERO
@@ -365,8 +629,16 @@ func read_stat(stat: StringName) -> float:
 			return lifesteal
 		&"crit_chance":
 			return crit_chance
+		&"damage_add":
+			return damage_add
+		&"healing_received":
+			return healing_received
 		&"attack_speed":
 			return attack_speed
+		&"dodge_recovery":
+			return dodge_recovery
+		&"dodge_max_charges":
+			return float(dodge_max_charges)
 		&"max_health":
 			return base_max_health
 	return 0.0
@@ -390,8 +662,21 @@ func apply_stat(stat: StringName, value: float) -> void:
 			lifesteal = value
 		&"crit_chance":
 			crit_chance = value
+		&"damage_add":
+			damage_add = value
+		&"healing_received":
+			healing_received = value
 		&"attack_speed":
 			attack_speed = value
+		&"dodge_recovery":
+			dodge_recovery = value
+		&"dodge_max_charges":
+			#闪避次数上限：上限提高时立刻补上多出来的次数，上限回落时把当前次数压回上限
+			var new_max: int = maxi(int(round(value)), 1)
+			if new_max > dodge_max_charges:
+				dodge_charges += new_max - dodge_max_charges
+			dodge_max_charges = new_max
+			dodge_charges = clampi(dodge_charges, 0, dodge_max_charges)
 		&"max_health":
 			#临时上限：只抬高容器，不回血；上限变小时把当前生命压回上限
 			base_max_health = maxf(value, 1.0)
@@ -403,10 +688,15 @@ func apply_stat(stat: StringName, value: float) -> void:
 
 ##当前是否处于隐身状态
 var invisible: bool = false
+##是否被硬控（冰冻/眩晕）
+var stunned: bool = false
 
 
-##BuffHolder 通知标记类效果（目前只有隐身使用）
+##BuffHolder 通知标记类效果（隐身、硬控）
 func set_buff_flag(flag: StringName, active: bool) -> void:
+	if flag == Buffs.FLAG_STUNNED:
+		stunned = active
+		return
 	if flag != Buffs.FLAG_INVISIBLE:
 		return
 	invisible = active
@@ -429,6 +719,8 @@ func reveal_by_action() -> void:
 ## source 是攻击者（可为空），供吸血、荆棘这类需要追溯来源的结算使用。
 func take_damage(amount: float, source: Node = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
+		return
+	if is_invulnerable():
 		return
 	var scaled: float = _incoming_damage(amount)
 	if scaled <= 0.0:
@@ -548,6 +840,7 @@ func _on_health_died(_hit: CombatHit) -> void:
 	if _was_defeated:
 		return
 	_was_defeated = true
+	_reset_boss_status()
 	velocity = Vector2.ZERO
 	_play_sfx(&"player_defeat")
 	defeated.emit()
