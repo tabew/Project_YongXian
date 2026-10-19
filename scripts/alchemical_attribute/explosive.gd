@@ -45,9 +45,11 @@ func blast_radius() -> float:
 
 
 ##本次爆炸对敌人的伤害
+##吃药水强度（Buffs.power_scale）：药水砸碎时由药水设置，武器附魔/其它路径读到的都是 1.0。
+##半径与"对玩家自己的自伤"不放大——高级炸弹药水不该把自己炸得更惨。
 func enemy_damage() -> float:
 	var effect_level:float = sqrt(level + 1)
-	return damage * effect_level
+	return damage * effect_level * Buffs.power_scale()
 
 
 ##本次爆炸对玩家的伤害

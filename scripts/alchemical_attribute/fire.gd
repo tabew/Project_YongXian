@@ -17,9 +17,9 @@ const DAMAGE_INTERVAL: float = 0.5
 var _last_damage_ms: Dictionary = {}
 
 
-##本次结算的伤害（0 级 = damage，逐级提高）
+##本次结算的伤害（0 级 = damage，逐级提高；吃药水强度）
 func damage_total() -> float:
-	return damage + damage_per_level * float(maxi(level, 0))
+	return (damage + damage_per_level * float(maxi(level, 0))) * Buffs.power_scale()
 
 
 func use_effect(object: Node = null) -> void:

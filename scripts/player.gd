@@ -145,10 +145,11 @@ func _ready() -> void:
 
 	apply_progress(true)
 
-## 升级卡聚合后的生命上限。
+## 生命上限：等级自带的成长(每级 +10%，加算)只乘基础生命，
+## 升级卡的固定值(体质 +15 / 孤注 -25)在上层直接加减，不被等级放大。
 var max_health: float:
 	get:
-		return maxf(base_max_health + _progress_value("max_health_add"), 1.0)
+		return maxf(base_max_health * _level_growth_mult() + _progress_value("max_health_add"), 1.0)
 	set(value):
 		base_max_health = value
 
@@ -179,7 +180,10 @@ func pickup_radius_tiles() -> float:
 
 ## 由 GameWorld 在绑定时与选卡后调用：把升级卡重新落到玩家身上。
 ## fill 为真时回满生命（新一局 / 新世界）。
-func apply_progress(fill: bool = false) -> void:
+## rebuild 为假时只同步生命与减伤，不重造武器：升级本身不改武器定义
+## （等级成长是在命中结算时读倍率的），而重造会 cancel_attack()，
+## 一刀砍到一半升级就白砍了。
+func apply_progress(fill: bool = false, rebuild: bool = true) -> void:
 	var previous_max: float = health_component.max_health
 	health_component.max_health = max_health
 	health_component.defense = defense
@@ -190,7 +194,8 @@ func apply_progress(fill: bool = false) -> void:
 		var delta: float = health_component.max_health - previous_max
 		health_component.set_current_health(health_component.current_health + maxf(delta, 0.0))
 	health_component.health_changed.emit(health_component.current_health, health_component.max_health)
-	rebuild_weapon()
+	if rebuild:
+		rebuild_weapon()
 
 
 ## 用升级卡重造当前武器。必须在副本上叠卡，直接改会写回 .tres 并跨局残留。
@@ -777,6 +782,14 @@ func potion_range_mult() -> float:
 	return progress.potion_range_mult() if progress != null else 1.0
 
 
+## 药水效果强度倍率（等级成长 + 药材学）。
+## 药水结算时把它设进 Buffs.set_next_power_scale()，具体覆盖范围见 docs/run_progression.md。
+## 治疗量不用它重复乘：PlayerCharacter.heal() 里已经乘过一次。
+func potion_power_mult() -> float:
+	var progress: Node = _run_progress()
+	return progress.alchemy_power_mult() if progress != null else 1.0
+
+
 ## 药水是否被“苦行”禁用。
 func potions_blocked() -> bool:
 	var progress: Node = _run_progress()
@@ -879,3 +892,12 @@ func _progress_value(key: String) -> float:
 		UpgradePool.KEY_PICKUP_ADD:
 			return progress.pickup_radius_add()
 	return 0.0
+
+
+## 等级自带的生命上限倍率（1级 = 1.0，之后每级 +10%，加算不叠乘）。
+## 取不到成长单例时按 1.0，保证单跑玩家场景时生命上限还是 100。
+func _level_growth_mult() -> float:
+	var progress: Node = _run_progress()
+	if progress == null:
+		return 1.0
+	return float(progress.max_health_mult())

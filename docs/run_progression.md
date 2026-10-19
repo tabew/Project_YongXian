@@ -4,6 +4,60 @@
 
 灵感系统与贤者之石都不参与这条线，两者互不影响。
 
+## 等级自带成长
+
+**升级本身就给数值**，不是只有选卡才变强。每升一级：
+
+| 属性 | 每级 | 读取点 |
+| --- | --- | --- |
+| 最大生命值 | +10%（基础生命 × 倍率） | `RunProgress.max_health_mult()` → `PlayerCharacter.max_health` |
+| 武器伤害 | +10% | `RunProgress.damage_mult()` → `PlayerCharacter.outgoing_damage_multiplier()` |
+| 药水效果 | +10% | `RunProgress.alchemy_power_mult()` → 见下节覆盖范围 |
+
+**加算，不叠乘**：倍率 = `1 + 0.10 × (等级 - 1)`，所以 1 级 100 生命 → 2 级 110 → 3 级 120（不是 121）。和升级卡走同一套聚合，等于直接相加：3 级 + 一张“利刃”（+12%）= 武器伤害 +32%。
+
+步长写在 `RunProgress.LEVEL_GROWTH_PER_LEVEL`，等级增量统一由 `RunProgress.level_growth()` 给出。
+
+两个细节：
+
+- **升级卡的固定值不被等级放大**：`PlayerCharacter.max_health` 是 `基础生命 × 等级倍率 + 体质/孤注的固定加减`，所以 3 级 + 两张体质 = 120 + 30 = 150。
+- **升级那一刻就把上限落到生命组件上**（`UpgradeManager._on_level_up()` 调 `apply_progress()`），多出来的上限补进当前生命；抽卡之前血条就已经变长。
+
+### 药水效果强度的覆盖范围
+
+药水强度 = `alchemy_power_mult()`（等级成长 + 药材学）。药水在结算时通过
+`Buffs.set_next_power_scale()` 把它注入，结算完复位；**只有药水会设置它**，
+所以武器附魔、怪物攻击、地图事件这些路径读到的都是 `1.0`，行为与以前完全一致。
+
+会随药水强度变强的：
+
+| 效果 | 读取点 |
+| --- | --- |
+| 爆炸对**敌人**的伤害 | `Explosive.enemy_damage()` |
+| 落雷伤害 | `Thunder.damage_total()` |
+| 火焰伤害（直接结算 + 灼烧 buff 每跳） | `Fire.damage_total()` / `BuffHolder._tick()` |
+| 冰冻值累积（冻得更快）+ 碎裂伤害 | `Ice.freeze_value()` / `Ice.shatter_damage_total()` |
+| 中毒等 buff 的每跳伤害 | `BuffHolder._tick()` |
+| buff 的属性修改幅度：迟缓 / 易伤 / 虚弱 / 护体 / 迅捷 / 力量 / 怒气 / 敏捷 / 巧手 / 圣佑 / 吸血 / 庇护 … | `BuffHolder._compute()`（倍率记在 buff 自己身上，之后每跳都吃） |
+| 荆棘反伤比例 | `BuffHolder._on_host_damaged()` |
+| 治疗量（治疗药水、持续回复的立刻回血、回复 buff 的每跳） | `PlayerCharacter.heal()`，**只乘一次** |
+
+有意不覆盖的：
+
+| 不覆盖 | 原因 |
+| --- | --- |
+| 效果持续时间 | 那是「延时」属性（`Extend`）的职责，时长与强度分成两个维度 |
+| 爆炸 / 落雷的半径 | 范围是形状，不随强度膨胀 |
+| 爆炸对玩家自己的自伤 | 高级炸弹药水不该把自己炸得更惨（`Explosive.player_damage_total()` 不乘） |
+| 纯标记类：隐身、伤害吸收、眩晕/冰冻这个“控住”本身 | 没有数值可放缩 |
+| 概率类：沉重的眩晕概率 | 附魔专属，概率被放大容易变成必中 |
+| 净化 | 没有数值 |
+| 附魔专属属性（裂伤 / 沉重） | 只走武器命中路径，不吃药水强度 |
+| 纯反应材料（矿物 / 木质 / 水 / 风 / 盐 …） | 没有 `use_effect`，只参与反应 |
+
+**兜底**：`BuffHolder._compute()` 把百分比修改限到 -90%、叠乘因子限到 0.05。
+药水强度会放大修改幅度，不兜底的话高强度下减速会叠成“负速度”（人往后走）、减伤会叠成“越打回血”。
+
 ## 经验与等级曲线
 
 ```text

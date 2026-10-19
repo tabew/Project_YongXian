@@ -21,6 +21,12 @@ signal changed()
 ##属性被写回（调试用）
 signal stats_changed()
 
+##百分比修改的下限：药水强度会把幅度一起放大，减速/减伤叠到 -100% 以下会变成
+##负速度（人往后走）或负伤害，所以在算的时候兜一下底
+const MIN_PERCENT: float = -0.9
+##叠乘因子的下限，同理（不会真的用到 0 或负数）
+const MIN_MULTIPLIER: float = 0.05
+
 var _active: Array[Dictionary] = []
 var _base: Dictionary = {}
 var _written: Dictionary = {}
@@ -47,11 +53,16 @@ func _ready() -> void:
 ##新等级更高 → 升级并刷新时长；同级 → 只刷新时长；更低 → 什么都不做（返回 false）
 ##等级从 0 级开始：0 级就是基础数值，每高一级 +value_per_level
 ##duration_scale：时长倍率（药水的"延时"属性用，1.0 表示原时长）
-func apply(buff: BuffData, level: int = 0, source: Node = null, duration_scale: float = 1.0) -> bool:
+##power_scale：威力倍率（药水的"效果强度"用，1.0 表示原数值）。记在 buff 自己身上，
+##             所以之后每一跳定时伤害、每一条属性修改都按它放大；治疗不吃它
+##             （治疗已经由 PlayerCharacter.heal() 乘过药水强度，重复乘会双算）
+func apply(buff: BuffData, level: int = 0, source: Node = null, duration_scale: float = 1.0,
+		power_scale: float = 1.0) -> bool:
 	if buff == null or buff.id == &"":
 		return false
 	var wanted: int = clampi(level, 0, maxi(buff.max_level, 1))
 	var seconds: float = buff.duration * maxf(duration_scale, 0.1)
+	var power: float = maxf(power_scale, 0.0)
 	var entry: Dictionary = _find(buff.id)
 
 	if not entry.is_empty():
@@ -60,6 +71,8 @@ func apply(buff: BuffData, level: int = 0, source: Node = null, duration_scale: 
 		entry["level"] = wanted
 		entry["remaining"] = seconds
 		entry["source"] = source
+		#同一 id 只会留一份：威力取大的，别让后一瓶弱药水把强药水的效果顶回去
+		entry["power"] = maxf(float(entry.get("power", 1.0)), power)
 		_recompute_all()
 		buff_upgraded.emit(buff)
 		changed.emit()
@@ -71,6 +84,7 @@ func apply(buff: BuffData, level: int = 0, source: Node = null, duration_scale: 
 		"remaining": seconds,
 		"tick": buff.tick_interval,
 		"source": source,
+		"power": power,
 	})
 	set_physics_process(true)
 	_recompute_all()
@@ -177,7 +191,8 @@ func _tick(entry: Dictionary) -> void:
 	var buff: BuffData = entry["buff"]
 	var level: int = int(entry["level"])
 	var health: Node = host.get_node_or_null("Health")
-	var damage: float = buff.damage_amount(level)
+	#定时伤害吃药水强度；定时回血不吃（回血走 player.heal()，那里已经乘过药水强度）
+	var damage: float = buff.damage_amount(level) * _entry_power(entry)
 
 	if damage > 0.0:
 		if host is PlayerCharacter:
@@ -314,8 +329,8 @@ func _on_host_damaged(hit: CombatHit, amount: float) -> void:
 	if depth >= Buffs.THORNS_MAX_DEPTH:
 		return
 	var level: int = maxi(int(_flags.get(Buffs.FLAG_THORNS, 1)), 1)
-	#按实际吃到的伤害反弹（防御挡掉的部分不算）
-	var back: float = maxf(amount, 0.0) * Buffs.THORNS_RATIO_PER_LEVEL * float(level)
+	#按实际吃到的伤害反弹（防御挡掉的部分不算），药水施加的荆棘按威力放大
+	var back: float = maxf(amount, 0.0) * Buffs.THORNS_RATIO_PER_LEVEL * float(level) * _flag_power(Buffs.FLAG_THORNS)
 	if back <= 0.0:
 		return
 	var reflect: CombatHit = CombatHit.new()
@@ -381,18 +396,35 @@ func _compute(stat: StringName, base_value: float) -> float:
 	for entry in _active:
 		var buff: BuffData = entry["buff"]
 		var level: int = int(entry["level"])
+		var power: float = _entry_power(entry)
 		for modifier: StatModifier in buff.modifiers:
 			if modifier == null or modifier.stat != stat:
 				continue
-			var amount: float = modifier.amount(level)
+			#药水施加的 buff 按威力放大修改幅度（减速更狠、护体更硬…），非药水 buff 是 1.0
+			var amount: float = modifier.amount(level) * power
 			match modifier.mode:
 				StatModifier.Mode.FLAT:
 					flat += amount
 				StatModifier.Mode.PERCENT_ADD:
 					percent += amount
 				StatModifier.Mode.MULTIPLY:
-					multiplier *= 1.0 + amount
-	return (base_value + flat) * (1.0 + percent) * multiplier
+					multiplier *= maxf(1.0 + amount, MIN_MULTIPLIER)
+	return (base_value + flat) * (1.0 + maxf(percent, MIN_PERCENT)) * multiplier
+
+
+##这一份 buff 的威力倍率（药水施加时写进来的，默认 1.0）
+func _entry_power(entry: Dictionary) -> float:
+	return maxf(float(entry.get("power", 1.0)), 0.0)
+
+
+##某个标记类效果（例如荆棘）当前的威力倍率：取持有该标记的最强一份
+func _flag_power(flag: StringName) -> float:
+	var power: float = 1.0
+	for entry in _active:
+		var buff: BuffData = entry["buff"]
+		if buff != null and buff.flags.has(flag):
+			power = maxf(power, _entry_power(entry))
+	return power
 
 
 func _find(id: StringName) -> Dictionary:

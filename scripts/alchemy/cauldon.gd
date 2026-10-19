@@ -23,6 +23,9 @@ var has_started:bool = false
 ##药水默认模板的id，配置在 resources/items/potions/potion_model.tres
 const BASE_TEMPLATE_ID:int = 300
 
+##药水id登记重试上限：正常一次就登记成功，连续撞id说明注册表已经乱了，别死循环
+const POTION_ID_RETRY_LIMIT:int = 256
+
 func _ready() -> void:
 
 	player = get_tree().get_first_node_in_group("player") as PlayerCharacter
@@ -102,9 +105,11 @@ func _get_attributes(body: Node2D) -> void:
 
 		body.queue_free()
 
-		#材料本来就不在表里，unregister_instance 对它们是空操作
-		if ingredient_data != null:
-			ItemListGlobal.unregister_instance(ingredient_data.id)
+		#投进来的东西已经从背包扣掉了：确认背包/快捷栏都不要了才注销它的运行时id。
+		#药水是独一无二的实例，不能像以前那样无条件注销——那瓶药要是玩家身上还有另一份，
+		#id 没了就只能退回通用模板，看起来像"这瓶药水不见了"
+		if ingredient_data != null and inventory != null:
+			inventory.release_runtime_instance_if_gone(ingredient_data.id)
 
 		# 投了新料
 		has_started = false
@@ -200,6 +205,7 @@ func finish_transform() -> PotionData:
 
 	inventory.add_item(potion.id,1)
 	_grant_alchemy_rewards(potion)
+	_notify("装瓶完成：%s" % _potion_label(potion))
 
 	#装完就清锅：药水已经在背包里了，锅里不该还留着能再装一次的东西
 	attributes.clear()
@@ -249,6 +255,21 @@ func _recipe_key(potion:PotionData) -> String:
 	return "-".join(parts)
 
 
+## 装瓶提示用的名字：没有单独给每瓶药起名，就按瓶子里的属性念一遍，玩家能对上号
+func _potion_label(potion:PotionData) -> String:
+	var parts: PackedStringArray = []
+	for attribute:AlchemicalData in potion.alchemical_attribute:
+		if attribute == null:
+			continue
+		if attribute.level > 0:
+			parts.append("%s%d" % [attribute.name,attribute.level])
+		else:
+			parts.append(attribute.name)
+	if parts.is_empty():
+		return "空瓶"
+	return "%s药水" % "·".join(parts)
+
+
 ##把坩埚里反应完的属性装成一瓶药水
 func create_from_attributes() -> PotionData:
 
@@ -289,7 +310,13 @@ func create_from_attributes() -> PotionData:
 
 	potion.id = PotionData.next_potion_id()
 
+	#撞id就往后取：连续撞满上限说明注册表出问题了，宁可失败也不要死循环卡住游戏
+	var retry:int = 0
 	while not ItemListGlobal.register_instance(potion):
+		retry += 1
+		if retry > POTION_ID_RETRY_LIMIT:
+			push_error("Cauldon: 药水 id 连续登记失败，装瓶取消")
+			return null
 		potion.id = PotionData.next_potion_id()
 
 	return potion

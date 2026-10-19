@@ -80,13 +80,26 @@ func show_choices(cards: Array[UpgradeCard], level: int) -> void:
 		visible = false
 		get_tree().paused = false
 		return
-	_subtitle.text = "等级 %d　·　选择一项加成" % level
+	_subtitle.text = _subtitle_text(level)
 	for index: int in cards.size():
 		_row.add_child(_make_card_button(cards[index], index))
 	visible = true
 	get_tree().paused = true
 	await get_tree().process_frame
 	_recenter()
+
+
+## 副标题：等级、等级自带的成长（每级 +X%，加算），再提示选卡。
+## 这一行是玩家唯一能看见"升级本身就变强"的地方，别删。
+func _subtitle_text(level: int) -> String:
+	var progress: Node = get_node_or_null("/root/RunProgress")
+	if progress == null:
+		return "等级 %d　·　选择一项加成" % level
+	var per_level: int = roundi(float(progress.level_growth_per_level()) * 100.0)
+	var total: int = roundi(float(progress.level_growth()) * 100.0)
+	return "等级 %d　·　生命 / 伤害 / 药水效果 +%d%%（每级 +%d%%）　·　选择一项加成" % [
+		level, total, per_level
+	]
 
 
 func _clear_row() -> void:

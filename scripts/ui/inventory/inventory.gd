@@ -143,7 +143,7 @@ func left_use_handy_slot(player:PlayerCharacter) -> void:
     if consume > 0:
         remove_handy_slot(pos,consume)
         if item_id>=300:
-           _drop_runtime_instance_if_gone(item_id)
+           release_runtime_instance_if_gone(item_id)
 
     return
 
@@ -170,12 +170,14 @@ func right_use_handy_slot(player:PlayerCharacter) -> void:
     if consume > 0:
         remove_handy_slot(pos,consume)
         if item_id>=300:
-           _drop_runtime_instance_if_gone(item_id)
+           release_runtime_instance_if_gone(item_id)
 
     return
 #//////////////////////////////
 
-func _drop_runtime_instance_if_gone(item_id:int) ->void:
+##注销一个"真没人要了"的运行时实例(药水/附魔武器)：背包和快捷栏都还有就不动它。
+##药水是独一无二的实例，id 登记没了就只能退回通用模板，所以必须是"确认用完"才注销。
+func release_runtime_instance_if_gone(item_id:int) ->void:
 
     var registry:Node = get_registry_node()
 
@@ -421,7 +423,7 @@ func _finish_enchant(instance:WeaponData,applied:Array[String],potion_item_id:in
 
     get_item_data[instance.id] = instance
 
-    _drop_runtime_instance_if_gone(potion_item_id)
+    release_runtime_instance_if_gone(potion_item_id)
 
     inventory_update.emit()
     #武器的定义变了：玩家的手持武器是装备时的副本，必须重新装备一次附魔才会立刻生效
