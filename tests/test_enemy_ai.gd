@@ -59,24 +59,29 @@ func _test_state_flow() -> void:
 	# 视野比攻击距离更远，才能验证"离开攻击距离但仍然可见"。
 	config.vision_distance_tiles = 16.0
 
+	_check_aggro_ui(monster, false, "spawned_monster_ui_starts_hidden")
 	await _await_frames(4)
 	_check(monster.get_ai_state() == EnemyState.State.PATROL, "starts_in_patrol")
 	_check(not monster.has_player_aggro(), "unseen_player_does_not_start_pursuit")
+	_check_aggro_ui(monster, false, "patrol_keeps_monster_ui_hidden")
 	_check(board.patrol_anchor.is_equal_approx(spawn_position), "patrol_anchor_starts_at_spawn")
 
 	_player.global_position = WorldGenerator.tile_to_world(Vector2i(0, 8))
 	await _await_frames(3)
 	_check(monster.get_ai_state() == EnemyState.State.CHASE, "sight_switches_patrol_to_chase")
 	_check(board.can_see_target, "chase_has_confirmed_sight")
+	_check_aggro_ui(monster, true, "chase_reveals_monster_ui")
 
 	_player.global_position = WorldGenerator.tile_to_world(Vector2i(0, 4))
 	await _await_frames(3)
 	_check(monster.get_ai_state() == EnemyState.State.ATTACK, "attack_range_switches_chase_to_attack")
 	_check(monster.get_attack().has_intent(), "attack_state_marks_intent")
+	_check_aggro_ui(monster, true, "attack_keeps_monster_ui_visible")
 
 	_player.global_position = WorldGenerator.tile_to_world(Vector2i(0, 13))
 	await _await_frames(3)
 	_check(monster.get_ai_state() == EnemyState.State.CHASE, "leaving_range_returns_to_chase")
+	_check_aggro_ui(monster, true, "return_to_chase_keeps_monster_ui_visible")
 
 	# 丢失视野超过宽限：以当前位置为锚点回到 Patrol，而不是回出生点。
 	config.lose_sight_grace = 0.2
@@ -93,6 +98,7 @@ func _test_state_flow() -> void:
 	_check(anchor.is_equal_approx(transition_position), "anchor_is_position_when_sight_was_lost")
 	_check(anchor.distance_to(spawn_position) > TILE, "anchor_is_not_the_spawn_point")
 	_check(not monster.has_player_aggro() and board.target == null, "target_cleared_after_losing_sight")
+	_check_aggro_ui(monster, false, "losing_aggro_hides_monster_ui")
 	_check(not board.has_last_known_position, "last_known_position_cleared")
 
 	# 之后围绕新锚点巡逻，仍然不会走回出生点。
@@ -129,6 +135,7 @@ func _test_search_flow() -> void:
 	EventBus.noise_reported.emit(noise_position, TILE * 3.0, null)
 	await _await_frames(2)
 	_check(monster.get_ai_state() == EnemyState.State.SEARCH, "noise_switches_patrol_to_search")
+	_check_aggro_ui(monster, false, "search_without_aggro_keeps_monster_ui_hidden")
 	_check(board.search_center.is_equal_approx(noise_position), "search_center_follows_the_noise")
 
 	var anchor := Vector2.ZERO
@@ -150,6 +157,7 @@ func _test_search_flow() -> void:
 	_player.global_position = monster.global_position + Vector2(TILE * 12.0, 0.0)
 	await _await_frames(3)
 	_check(monster.get_ai_state() == EnemyState.State.CHASE, "sight_during_search_switches_to_chase")
+	_check_aggro_ui(monster, true, "search_to_chase_reveals_monster_ui")
 	_remove(monster)
 
 
@@ -172,8 +180,13 @@ func _test_monster_isolation() -> void:
 	await _await_frames(4)
 	_check(first.get_ai_state() == EnemyState.State.CHASE, "only_the_seeing_monster_chases")
 	_check(second.get_ai_state() == EnemyState.State.PATROL, "the_other_monster_keeps_patrolling")
+	_check_aggro_ui(first, true, "only_chasing_monster_shows_ui")
+	_check_aggro_ui(second, false, "unalerted_neighbor_keeps_ui_hidden")
 	_check(first.get_blackboard().patrol_anchor.is_equal_approx(first_anchor), "chasing_keeps_its_own_anchor")
 	_check(second.get_blackboard().patrol_anchor.is_equal_approx(second_anchor), "other_anchor_untouched")
+	first.clear_player_aggro()
+	_check(not first.has_player_aggro(), "forced_aggro_clear_stops_chase_immediately")
+	_check_aggro_ui(first, false, "forced_aggro_clear_hides_monster_ui_immediately")
 	_remove(first)
 	_remove(second)
 
@@ -228,6 +241,8 @@ func _test_search_on_lost_sight() -> void:
 	for _frame: int in 400:
 		await get_tree().physics_frame
 		if monster.get_ai_state() == EnemyState.State.SEARCH:
+			if not saw_search:
+				_check_aggro_ui(monster, false, "losing_sight_into_search_hides_monster_ui")
 			saw_search = true
 		elif saw_search and monster.get_ai_state() == EnemyState.State.PATROL:
 			returned_to_patrol = true
@@ -476,6 +491,11 @@ func _check(condition: bool, description: String) -> void:
 	if not condition:
 		_passed = false
 		push_error(description)
+
+
+func _check_aggro_ui(monster: BaseMonster, expected: bool, description: String) -> void:
+	var name_label := monster.get_node("NameLabel") as Label
+	_check(name_label.visible == expected and monster.health_bar.visible == expected, description)
 
 
 func _remove(node: Variant) -> void:

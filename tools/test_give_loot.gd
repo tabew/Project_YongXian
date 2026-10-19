@@ -29,14 +29,16 @@ func _loot(parent: Node) -> Array[GroundPickup]:
 func _run() -> void:
 	var items: Node = root.get_node("ItemListGlobal")
 	# 阈值两侧与端点必须覆盖整个抽样范围，没有空掉落或双掉落区间。
-	_check(GiveMonster.death_loot_for_roll(0.0).id == 4, "zero_roll_is_fur")
-	_check(GiveMonster.death_loot_for_roll(0.699999).id == 4, "fur_interval_ends_below_70_percent")
-	_check(GiveMonster.death_loot_for_roll(0.70).id == 3, "hide_interval_starts_at_70_percent")
-	_check(GiveMonster.death_loot_for_roll(1.0).id == 3, "maximum_roll_still_drops_hide")
-	for item_id: int in [4, 3]:
+	_check(GiveMonster.death_loot_for_roll(0.0).id == 1, "zero_roll_is_fur")
+	_check(GiveMonster.death_loot_for_roll(0.699999).id == 1, "fur_interval_ends_below_70_percent")
+	_check(GiveMonster.death_loot_for_roll(0.70).id == 0, "hide_interval_starts_at_70_percent")
+	_check(GiveMonster.death_loot_for_roll(1.0).id == 0, "maximum_roll_still_drops_hide")
+	for item_id: int in [1, 0]:
 		var data: IngredientData = items.create(item_id) as IngredientData
 		_check(data != null and data.id == item_id and data.texture != null, "registered_loot_has_data_and_icon")
 		if data != null:
+			if item_id == 1:
+				_check(data.name == "仙缔毛", "fur_uses_new_display_name")
 			var model: ItemModel = data.create_model()
 			_check(model != null and model.data.id == item_id, "registered_loot_has_inventory_drag_model")
 			if model != null:
@@ -53,8 +55,8 @@ func _run() -> void:
 	world.monster_spawner.process_mode = Node.PROCESS_MODE_DISABLED
 	world.get_node("GameHUD/BagUi").hide()
 	world.get_node("GameHUD/Alchemy").hide()
-	var allowed: Array[int] = [Biome.Kind.SAVANNA, Biome.Kind.GRASSLAND, Biome.Kind.FOREST, Biome.Kind.TROPICAL_RAINFOREST]
-	_check(GIVE_DATA.allowed_biomes == allowed, "give_keeps_exact_four_requested_biomes")
+	var allowed: Array[int] = [Biome.Kind.DESERT, Biome.Kind.SAVANNA, Biome.Kind.GRASSLAND, Biome.Kind.FOREST, Biome.Kind.TROPICAL_RAINFOREST]
+	_check(GIVE_DATA.allowed_biomes == allowed, "give_adds_desert_and_preserves_original_habitats")
 	var pool: Array[int] = []
 	for definition: MonsterSpawnData in world.monster_spawner.spawn_definitions:
 		for biome_id: int in definition.allowed_biomes:
@@ -63,14 +65,15 @@ func _run() -> void:
 	pool.sort()
 	_check(world._generator.config.combat_biomes == PackedInt32Array(pool), "game_uses_all_registered_monster_habitats")
 	for spec: MapSpec in world._generator.map_specs():
-		if world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0:
+		if world._generator.run.type_of(spec.node_id) in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS]:
 			_check(spec.biome_id in pool, "actual_combat_region_supports_registered_monster_pool")
 		for entry: Dictionary in GroundMaterials.plan(world._generator, spec):
-			_check(entry["item_id"] not in [4, 3], "exclusive_death_loot_never_spawns_as_ground_material")
+			_check(entry["item_id"] not in [1, 0], "exclusive_death_loot_never_spawns_as_ground_material")
 
 	var original_position: Vector2 = world.player.global_position
 	var original_tile: Vector2i = WorldGenerator.world_to_tile(original_position)
 	var monster := world.monster_spawner.spawn_monster(GIVE_DATA, original_tile) as GiveMonster
+	_check((monster.get_node("NameLabel") as Label).text == "仙缔", "monkey_uses_new_display_name")
 	monster.global_position = original_position
 	_check(_loot(world.monster_spawner).is_empty(), "alive_monster_drops_nothing")
 	monster.take_damage(99)
@@ -84,7 +87,7 @@ func _run() -> void:
 		quit(1)
 		return
 	var drop: GroundPickup = pickups[0]
-	_check(drop.data.id in [4, 3] and drop.amount == 1, "drop_is_one_requested_material")
+	_check(drop.data.id in [1, 0] and drop.amount == 1, "drop_is_one_requested_material")
 	_check(drop.global_position.is_equal_approx(original_position), "drop_uses_death_position")
 	monster.kill()
 	_check(_loot(world.monster_spawner).size() == 1, "repeated_kill_does_not_duplicate_loot")
@@ -127,11 +130,34 @@ func _run() -> void:
 	var fur_count: int = 0
 	var hide_count: int = 0
 	for pickup: GroundPickup in _loot(holder):
-		fur_count += int(pickup.data.id == 4)
-		hide_count += int(pickup.data.id == 3)
+		fur_count += int(pickup.data.id == 1)
+		hide_count += int(pickup.data.id == 0)
 	_check(fur_count + hide_count == 100 and fur_count > 0 and hide_count > 0, "seeded_deaths_cover_both_exclusive_outcomes")
 	print("GIVE_LOOT_SAMPLE fur=%d hide=%d total=%d" % [fur_count, hide_count, fur_count + hide_count])
 	holder.queue_free()
+	var desert_spawned: bool = false
+	for seed_value: int in [24681357, 18473, 777, 42, 309598543]:
+		world.build_world(seed_value)
+		for spec: MapSpec in world._generator.map_specs():
+			if spec.biome_id != Biome.Kind.DESERT or world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) <= 0:
+				continue
+			world._enter_map(spec.node_id, -1, spec.west_gate_y)
+			for frame: int in 240:
+				if world.chunk_manager.map_ready():
+					break
+				await process_frame
+			for candidate: BaseMonster in world.monster_spawner.monsters:
+				if not candidate is GiveMonster:
+					continue
+				var tile: Vector2i = candidate.original_spawn_tile
+				var local: Vector2i = tile - spec.origin
+				_check(spec.contains_local(local.x, local.y) and GIVE_DATA.can_spawn_at(world._generator, tile), "desert_monkey_uses_walkable_room_habitat")
+				desert_spawned = true
+			if desert_spawned:
+				break
+		if desert_spawned:
+			break
+	_check(desert_spawned, "real_desert_room_spawns_give")
 	world.queue_free()
 	await process_frame
 	await process_frame

@@ -21,4 +21,4 @@ tree_root = ExtResource("5_tree")
 [node name="Health" parent="." index="3"]
 max_health = 80.0
 [node name="NameLabel" parent="." index="7"]
-text = "啥杯"
+text = "糯糯"

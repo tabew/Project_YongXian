@@ -7,6 +7,21 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 
+func bosses_in(spawner: MonsterSpawner) -> Array[FinalBoss]:
+	var bosses: Array[FinalBoss] = []
+	for monster: BaseMonster in spawner.monsters:
+		if monster is FinalBoss:
+			bosses.append(monster as FinalBoss)
+	return bosses
+
+
+func pause_ordinary_monsters(spawner: MonsterSpawner) -> void:
+	spawner.set_process(false)
+	for monster: BaseMonster in spawner.monsters:
+		if not monster is FinalBoss:
+			monster.process_mode = Node.PROCESS_MODE_DISABLED
+
+
 func _sample(label: String) -> void:
 	var worst_ms: float = 0.0
 	var slow_frames: int = 0
@@ -71,12 +86,26 @@ func _run() -> void:
 	world.player.set_physics_process(false)
 	var spec: MapSpec = world._generator.map_spec(world._generator.run.final_node())
 	world._enter_map(spec.node_id, -1, spec.west_gate_y)
-	var boss := world.monster_spawner.monsters[0] as FinalBoss
+	var spawner := world.monster_spawner as MonsterSpawner
+	var bosses: Array[FinalBoss] = bosses_in(spawner)
+	if bosses.size() != 1:
+		push_error("Expected exactly one fixed Boss in visibility test")
+		quit(1)
+		return
+	var boss: FinalBoss = bosses[0]
 	boss.set_physics_process(false)
 	for frame: int in 900:
-		if world.chunk_manager.map_ready() and world.monster_spawner.get_pending_spawn_count() == 0:
+		for monster: BaseMonster in spawner.monsters:
+			if not monster is FinalBoss:
+				monster.process_mode = Node.PROCESS_MODE_DISABLED
+		if world.chunk_manager.map_ready() and spawner.get_pending_spawn_count() == 0:
 			break
 		await process_frame
+	if bosses_in(spawner).size() != 1 or spawner.monsters.size() <= 1:
+		push_error("Expected ordinary monsters alongside the fixed Boss")
+		quit(1)
+		return
+	pause_ordinary_monsters(spawner)
 	print("BOSS_VIS_ROOM: extent=%s entry_distance=%.1f" % [spec.extent, world.player.global_position.distance_to(boss.global_position)])
 	var entry_health_rect: Rect2 = boss.boss_hud.health_bar.get_global_rect()
 	await _sample("entry")

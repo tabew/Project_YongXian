@@ -73,21 +73,23 @@ func _run() -> void:
 	_scene = load("res://scenes/monsters/crocodile_monster.tscn") as PackedScene
 	_definition = load("res://resources/monsters/crocodile_spawn_data.tres") as CrocodileSpawnData
 	_loot = load("res://resources/monsters/crocodile_loot_table.tres") as MonsterLootTable
-	for entry: Array in [[0.0,6], [0.099999,6], [0.10,7], [0.699999,7], [0.70,8], [1.0,8]]:
+	for entry: Array in [[0.0,3], [0.099999,3], [0.10,4], [0.699999,4], [0.70,5], [1.0,5]]:
 		_check(_loot.choose_for_roll(entry[0]).id == entry[1], "loot_threshold_%s" % entry[0])
-	var counts: Dictionary = {6:0, 7:0, 8:0}
+	var counts: Dictionary = {3:0, 4:0, 5:0}
 	for index: int in 1000:
 		counts[_loot.choose_for_roll((index + 0.5) / 1000.0).id] += 1
-	_check(counts == {6:100,7:600,8:300}, "one_roll_covers_all_requested_loot_intervals")
+	_check(counts == {3:100,4:600,5:300}, "one_roll_covers_all_requested_loot_intervals")
 	var registry: Node = root.get_node("ItemListGlobal")
-	for id: int in [6,7,8]:
+	for id: int in [3,4,5]:
 		var item: IngredientData = registry.create(id)
 		_check(item != null and item.texture != null and item.id == id, "crocodile_item_registered_with_icon")
 		var model: ItemModel = item.create_model()
 		_check(model != null and model.data.id == id, "crocodile_item_has_inventory_drag_model")
 		model.free()
+	_check(registry.get_template(4).name == "索贝克之壳", "shell_uses_new_display_name")
 	_check(registry.templates.back().id == 300, "potion_template_remains_last")
 	var f: Dictionary = _fixture()
+	_check((f.monster.get_node("NameLabel") as Label).text == "索贝克", "crocodile_uses_new_display_name")
 	_check(f.monster is BaseMonster and f.monster.brain != null and f.monster.animation_tree != null, "crocodile_uses_shared_template_ai_and_animationtree")
 	_check(f.monster.death_loot == _loot, "crocodile_scene_uses_shared_death_table")
 	var tree: AnimationNodeStateMachine = f.monster.animation_tree.tree_root
@@ -189,7 +191,7 @@ func _run() -> void:
 	f.monster.take_damage(1000)
 	_check(_drops(f.holder).size() == 1, "lethal_damage_drops_exactly_one_item")
 	var drop: GroundPickup = _drops(f.holder)[0]
-	_check(drop.data.id in [6,7,8] and drop.amount == 1, "crocodile_death_uses_its_three_item_table")
+	_check(drop.data.id in [3,4,5] and drop.amount == 1, "crocodile_death_uses_its_three_item_table")
 	_check(f.generator.is_walkable(WorldGenerator.world_to_tile(drop.global_position)), "underwater_death_loot_lands_on_collectible_shore")
 	f.monster.kill()
 	_check(_drops(f.holder).size() == 1, "duplicate_death_does_not_duplicate_drop")
@@ -258,8 +260,8 @@ func _test_actual_world() -> void:
 	for definition: MonsterSpawnData in world.monster_spawner.spawn_definitions:
 		registered.append(definition.monster_id)
 	_check(registered.has(&"give") and registered.has(&"crocodile"), "game_registers_give_and_crocodile_in_same_spawner")
-	_check(world._generator.config.combat_biomes == PackedInt32Array([4,5,6,7,8,10,11]), "combat_biome_pool_includes_swamp_snow_and_preserves_give_habitats")
-	_check(world.monster_spawner.monsters.is_empty(), "starting_cottage_remains_safe")
+	_check(world._generator.config.combat_biomes == PackedInt32Array([3,4,5,6,7,8,9,10,11,12]), "combat_biome_pool_includes_all_supported_land_habitats")
+	_check(world.monster_spawner.content.budget_of(0, MapContent.ENEMY) == 0 and world.monster_spawner.monsters.is_empty(), "entire_starting_region_remains_safe")
 	var target: MapSpec = null
 	for spec: MapSpec in world._generator.map_specs():
 		if spec.biome_id == Biome.Kind.SWAMP and world.monster_spawner.content.budget_of(spec.node_id,MapContent.ENEMY)>0:
@@ -299,14 +301,14 @@ func _test_actual_world() -> void:
 		var tile: Vector2i = victim.original_spawn_tile
 		victim.kill()
 		var drops: Array[GroundPickup] = _drops(world.monster_spawner)
-		_check(drops.size() == 1 and drops[0].data.id in [6,7,8], "actual_swamp_death_is_single_configured_drop")
+		_check(drops.size() == 1 and drops[0].data.id in [3,4,5], "actual_swamp_death_is_single_configured_drop")
 		world._enter_map(0)
 		world._enter_map(target.node_id)
 		for frame: int in 240:
 			if world.chunk_manager.map_ready():
 				break
 			await process_frame
-		_check(world.monster_spawner.monsters.size() == count-1, "actual_swamp_return_does_not_replace_dead_crocodile")
+		_check(world.monster_spawner._defeated_spawn_ids.has("crocodile:%d:%d" % [tile.x, tile.y]), "actual_swamp_return_keeps_defeated_crocodile_id")
 		for actor: BaseMonster in world.monster_spawner.monsters:
 			_check(actor.original_spawn_tile != tile, "actual_swamp_dead_identity_stays_absent")
 		if not drops.is_empty():

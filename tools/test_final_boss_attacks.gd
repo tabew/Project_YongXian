@@ -17,10 +17,28 @@ func check(condition: bool, label: String) -> void:
 
 func wait_room(world: Node2D) -> void:
 	for frame: int in 900:
+		for monster: BaseMonster in world.monster_spawner.monsters:
+			if not monster is FinalBoss:
+				monster.process_mode = Node.PROCESS_MODE_DISABLED
 		if world.chunk_manager.map_ready() and world.monster_spawner.get_pending_spawn_count() == 0:
 			return
 		await process_frame
 	check(false, "boss_room_loaded")
+
+
+func bosses_in(spawner: MonsterSpawner) -> Array[FinalBoss]:
+	var bosses: Array[FinalBoss] = []
+	for monster: BaseMonster in spawner.monsters:
+		if monster is FinalBoss:
+			bosses.append(monster as FinalBoss)
+	return bosses
+
+
+func pause_ordinary_monsters(spawner: MonsterSpawner) -> void:
+	spawner.set_process(false)
+	for monster: BaseMonster in spawner.monsters:
+		if not monster is FinalBoss:
+			monster.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 func hit_boss(boss: FinalBoss, amount: float, from_player: bool = true) -> void:
@@ -43,10 +61,17 @@ func _run() -> void:
 	player.set_physics_process(false)
 	var spec: MapSpec = world._generator.map_spec(world._generator.run.final_node())
 	world._enter_map(spec.node_id, -1, spec.west_gate_y)
-	var boss := world.monster_spawner.monsters[0] as FinalBoss
+	var spawner := world.monster_spawner as MonsterSpawner
+	var bosses: Array[FinalBoss] = bosses_in(spawner)
+	if bosses.size() != 1:
+		push_error("Expected exactly one fixed Boss in attack test")
+		quit(1)
+		return
+	var boss: FinalBoss = bosses[0]
 	boss.set_physics_process(false)
-	boss.brain = null
 	await wait_room(world)
+	check(bosses_in(spawner).size() == 1 and spawner.monsters.size() > 1, "ordinary_monsters_coexist_with_one_fixed_boss")
+	pause_ordinary_monsters(spawner)
 	check(boss.phase == 1 and boss.attack_state == FinalBoss.AttackState.WAIT, "boss_starts_in_first_attack_state")
 
 	boss._start_normal_attack()

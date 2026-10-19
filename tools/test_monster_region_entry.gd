@@ -63,7 +63,8 @@ func _run() -> void:
 	world.set_process(false)
 	world.player.set_physics_process(false)
 	world.player.damage_taken = 0.0
-	_check(world.monster_spawner.monsters.is_empty(), "initial_cottage_remains_safe")
+	await _wait_map(world)
+	_check(world.monster_spawner.content.budget_of(0, MapContent.ENEMY) == 0 and world.monster_spawner.monsters.is_empty(), "initial_region_remains_monster_free")
 	var link: Dictionary = _rainforest_gate(world)
 	_check(not link.is_empty(), "combat_fixture_has_second_layer_rainforest_gate")
 	if link.is_empty():
@@ -79,8 +80,7 @@ func _run() -> void:
 	_check(count_before > 0, "rainforest_combat_region_generates_give")
 	_check(world.monster_spawner._active_map == world.player.active_map, "spawner_tracks_actual_active_region")
 	for actor: BaseMonster in world.monster_spawner.monsters:
-		var tile: Vector2i = WorldGenerator.world_to_tile(actor.global_position)
-		var local: Vector2i = tile - world.player.active_map.origin
+		var local: Vector2i = actor.original_spawn_tile - world.player.active_map.origin
 		_check(world.player.active_map.contains_local(local.x, local.y), "neighbor_never_consumes_current_region_spawn_slots")
 	world.hud._refresh()
 	_check(world.hud.info_label.text.contains("战斗"), "hud_identifies_rainforest_combat_room")
@@ -126,7 +126,7 @@ func _run() -> void:
 	_check(returned_guards > 0 and returned_ordinary > 0, "actual_gate_return_keeps_both_supply_guards_and_ordinary_monsters")
 	_check(is_instance_valid(loot) and loot.is_visible_in_tree(), "actual_gate_return_restores_same_uncollected_drop")
 
-	# 同样是第二层雨林，也可能是非战斗房间；显示房型并保留内容预算规则。
+	# 第二层雨林也可能是非战斗房间，仍应按同一生境生成普通怪。
 	world.build_world(777)
 	var noncombat: Dictionary = _rainforest_gate(world)
 	_check(not noncombat.is_empty(), "noncombat_fixture_has_second_layer_rainforest_gate")
@@ -135,8 +135,15 @@ func _run() -> void:
 		await _wait_map(world)
 		var spec: MapSpec = world.player.active_map
 		var room_kind: int = world._generator.run.type_of(spec.node_id)
-		_check(world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) == 0, "noncombat_rainforest_has_zero_enemy_budget")
-		_check(world.monster_spawner.monsters.is_empty(), "noncombat_rainforest_does_not_spawn_combat_enemies")
+		_check(room_kind not in [RoomType.Kind.COMBAT, RoomType.Kind.BOSS] and spec.biome_id == Biome.Kind.TROPICAL_RAINFOREST, "fixture_remains_noncombat_rainforest")
+		if room_kind == RoomType.Kind.EVENT:
+			_check(world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) == 0 and world.monster_spawner.monsters.is_empty(), "event_room_remains_monster_free")
+		else:
+			_check(world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0, "noncombat_rainforest_has_enemy_eligibility")
+			var has_give: bool = false
+			for actor: BaseMonster in world.monster_spawner.monsters:
+				has_give = has_give or actor is GiveMonster
+			_check(has_give, "noncombat_rainforest_spawns_habitat_monsters")
 		world.hud._refresh()
 		_check(world.hud.info_label.text.contains(RoomType.name_of(room_kind)), "hud_discloses_noncombat_room_type")
 	print("MONSTER_REGION_ENTRY: checks=%d failures=%d" % [_checks, _failures])

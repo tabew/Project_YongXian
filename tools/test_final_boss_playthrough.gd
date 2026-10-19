@@ -1,6 +1,7 @@
 extends SceneTree
 
 const SEED: int = 1
+const FINAL_BOSS_SPAWN: MonsterSpawnData = preload("res://resources/monsters/final_boss_spawn_data.tres")
 const MAX_GAME_SECONDS: float = 420.0
 const MAX_WALL_MILLISECONDS: int = 300000
 
@@ -14,6 +15,21 @@ var _attacks: Dictionary = {}
 
 func _initialize() -> void:
 	_run.call_deferred()
+
+
+func bosses_in(spawner: MonsterSpawner) -> Array[FinalBoss]:
+	var bosses: Array[FinalBoss] = []
+	for monster: BaseMonster in spawner.monsters:
+		if monster is FinalBoss:
+			bosses.append(monster as FinalBoss)
+	return bosses
+
+
+func pause_ordinary_monsters(spawner: MonsterSpawner) -> void:
+	spawner.set_process(false)
+	for monster: BaseMonster in spawner.monsters:
+		if not monster is FinalBoss:
+			monster.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 func _steer(direction: Vector2) -> void:
@@ -50,17 +66,27 @@ func _run() -> void:
 	player.set_physics_process(false)
 	var spec: MapSpec = world._generator.map_spec(world._generator.run.final_node())
 	world._enter_map(spec.node_id, -1, spec.west_gate_y)
-	if world.monster_spawner.monsters.size() == 1:
-		(world.monster_spawner.monsters[0] as FinalBoss).set_physics_process(false)
-	for frame: int in 900:
-		if world.chunk_manager.map_ready() and world.monster_spawner.get_pending_spawn_count() == 0:
-			break
-		await process_frame
-	if world.monster_spawner.monsters.size() != 1:
-		push_error("Boss did not spawn for the playthrough")
+	var spawner := world.monster_spawner as MonsterSpawner
+	var bosses: Array[FinalBoss] = bosses_in(spawner)
+	if bosses.size() != 1:
+		push_error("Expected exactly one fixed Boss for the playthrough")
 		quit(1)
 		return
-	var boss := world.monster_spawner.monsters[0] as FinalBoss
+	var boss: FinalBoss = bosses[0]
+	boss.set_physics_process(false)
+	for frame: int in 900:
+		for monster: BaseMonster in spawner.monsters:
+			if not monster is FinalBoss:
+				monster.process_mode = Node.PROCESS_MODE_DISABLED
+		if world.chunk_manager.map_ready() and spawner.get_pending_spawn_count() == 0:
+			break
+		await process_frame
+	if bosses_in(spawner).size() != 1 or spawner.monsters.size() <= 1:
+		push_error("Expected ordinary monsters alongside the fixed Boss")
+		quit(1)
+		return
+	pause_ordinary_monsters(spawner)
+	var boss_spawn_id: String = spawner._spawn_id(FINAL_BOSS_SPAWN, boss.original_spawn_tile)
 	var use_spear: bool = OS.get_cmdline_user_args().has("--spear")
 	if use_spear:
 		player.inventory.select_handy_slot(1)
@@ -156,15 +182,17 @@ func _run() -> void:
 	if victory:
 		await process_frame
 		await process_frame
-		var spawner := world.monster_spawner as MonsterSpawner
-		var recorded: bool = spawner.monsters.is_empty() and not spawner._defeated_spawn_ids.is_empty()
+		var recorded: bool = bosses_in(spawner).is_empty() and spawner._defeated_spawn_ids.has(boss_spawn_id)
 		world._enter_map(0)
 		world._enter_map(spec.node_id, -1, spec.west_gate_y)
 		for frame: int in 900:
+			for monster: BaseMonster in spawner.monsters:
+				if not monster is FinalBoss:
+					monster.process_mode = Node.PROCESS_MODE_DISABLED
 			if world.chunk_manager.map_ready() and spawner.get_pending_spawn_count() == 0:
 				break
 			await process_frame
-		var no_respawn: bool = spawner.monsters.is_empty()
+		var no_respawn: bool = bosses_in(spawner).is_empty() and spawner._defeated_spawn_ids.has(boss_spawn_id) and not bool(world.hud.get("_boss_visible"))
 		print("BOSS_PLAY_PERSISTENCE: kill_recorded=%s no_respawn=%s" % [recorded, no_respawn])
 		victory = recorded and no_respawn
 	world.queue_free()

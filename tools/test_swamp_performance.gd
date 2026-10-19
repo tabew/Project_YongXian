@@ -22,9 +22,10 @@ func _run() -> void:
 	var definition := ShiSpawnData.new()
 	definition.allowed_biomes = [Biome.Kind.SWAMP]
 	var rng: RandomNumberGenerator = MapRng.enemy_chunk_rng(18473, Vector2i.ZERO, &"shi:test")
+	var initial_queries: int = source.walk_queries
 	for attempt: int in 100:
 		definition.select_spawn_tile(source, Vector2i.ZERO, rng, 0)
-	check(source.walk_queries == 1, "anchor_search_once_for_all_slots_and_attempts")
+	check(source.walk_queries == initial_queries + 1, "anchor_search_once_for_all_slots_and_attempts")
 	var original_queries: int = source.walk_queries
 	var non_swamp := MapSpec.new()
 	non_swamp.biome_id = Biome.Kind.FOREST

@@ -22,6 +22,7 @@ func _check(condition: bool, message: String) -> void:
 
 func _run() -> void:
 	var signatures: Dictionary = {}
+	var seen_types: Dictionary = {}
 	for seed_value: int in SEEDS:
 		var generator: WorldGenerator = WorldGenerator.new(seed_value)
 		var content: MapContent = MapContent.build(generator)
@@ -30,12 +31,19 @@ func _run() -> void:
 		var rests: int = 0
 		for spec: MapSpec in generator.map_specs():
 			var kind: int = generator.run.type_of(spec.node_id)
+			seen_types[kind] = true
 			var node_id: int = spec.node_id
+			if RunGraph.floor_of(node_id) == 0 or kind == RoomType.Kind.EVENT:
+				_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "初始区域和事件房不能刷普通怪 seed=%d node=%d" % [seed_value, node_id])
+			else:
+				_check(content.budget_of(node_id, MapContent.ENEMY) >= 3, "第二层后非事件房没有刷怪资格 seed=%d node=%d kind=%s" % [seed_value, node_id, RoomType.name_of(kind)])
 			match kind:
+				RoomType.Kind.START:
+					_check(content.budget_of(node_id, MapContent.DECOR) >= 6, "起点装饰预算丢失 seed=%d node=%d" % [seed_value, node_id])
 				RoomType.Kind.COMBAT:
-					_check(content.budget_of(node_id, MapContent.ENEMY) >= 3, "战斗房没有刷怪预算 seed=%d node=%d" % [seed_value, node_id])
+					_check(content.budget_of(node_id, MapContent.DECOR) >= 4, "战斗房装饰预算丢失 seed=%d node=%d" % [seed_value, node_id])
 				RoomType.Kind.EVENT:
-					_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "事件房不该刷怪 seed=%d node=%d" % [seed_value, node_id])
+					_check(content.budget_of(node_id, MapContent.EVENT) == 1 and content.budget_of(node_id, MapContent.LOOT) == 1, "事件内容预算丢失 seed=%d node=%d" % [seed_value, node_id])
 				RoomType.Kind.REWARD:
 					_check(content.budget_of(node_id, MapContent.LOOT) >= 2, "奖励房没有掉落预算 seed=%d node=%d" % [seed_value, node_id])
 					rewards += 1
@@ -47,16 +55,6 @@ func _run() -> void:
 					rests += 1
 				RoomType.Kind.BOSS:
 					_check(content.budget_of(node_id, MapContent.BOSS) == 1, "Boss 房没有 Boss seed=%d node=%d" % [seed_value, node_id])
-					if node_id == generator.run.final_node():
-						_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "最终房间不能生成普通怪 seed=%d node=%d" % [seed_value, node_id])
-				RoomType.Kind.START:
-					_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "起点房不该刷怪 seed=%d node=%d" % [seed_value, node_id])
-		# 普通敌人只在战斗房及非终点 Boss 房刷新；终点只保留专属 Boss。
-		for spec: MapSpec in generator.map_specs():
-			var kind2: int = generator.run.type_of(spec.node_id)
-			var expects: bool = kind2 == RoomType.Kind.COMBAT or (kind2 == RoomType.Kind.BOSS and spec.node_id != generator.run.final_node())
-			_check((content.budget_of(spec.node_id, MapContent.ENEMY) > 0) == expects,
-				"刷怪预算与房间类型不符 seed=%d node=%d kind=%s" % [seed_value, spec.node_id, RoomType.name_of(kind2)])
 
 		_check(shops >= 1 and rewards >= 1 and rests >= 1,
 			"地图缺少关键内容 seed=%d 商店=%d 奖励=%d 休息=%d" % [seed_value, shops, rewards, rests])
@@ -76,6 +74,8 @@ func _run() -> void:
 				var local: Vector2i = tile - spec.origin
 				_check(spec.contains_local(local.x, local.y), "内容落点越出区域 seed=%d" % seed_value)
 
+	for kind: int in [RoomType.Kind.START, RoomType.Kind.COMBAT, RoomType.Kind.REWARD, RoomType.Kind.SHOP, RoomType.Kind.REST, RoomType.Kind.EVENT, RoomType.Kind.BOSS]:
+		_check(seen_types.has(kind), "测试种子未覆盖房型 %s" % RoomType.name_of(kind))
 	var distinct: Dictionary = {}
 	for seed_value: int in signatures.keys():
 		distinct[signatures[seed_value]] = true

@@ -58,7 +58,13 @@ func _run() -> void:
 	spawner._process(0.016)
 	check(spawner.get_pending_spawn_count() == maxi(waiting - spawner.spawns_per_frame, 0), "spawn_budget_limits_one_frame")
 	world._enter_map(0)
-	check(spawner.monsters.is_empty() and spawner.get_pending_spawn_count() == 0, "leaving_room_cancels_queued_slots")
+	var stale_slots: bool = false
+	for planned: Dictionary in spawner._pending_spawns:
+		var tile: Vector2i = planned["tile"]
+		stale_slots = stale_slots or target.contains_local(tile.x - target.origin.x, tile.y - target.origin.y)
+	for actor: BaseMonster in spawner.monsters:
+		stale_slots = stale_slots or target.contains_local(actor.original_spawn_tile.x - target.origin.x, actor.original_spawn_tile.y - target.origin.y)
+	check(not stale_slots and spawner._active_map.node_id == 0 and spawner.monsters.is_empty() and spawner.get_pending_spawn_count() == 0, "leaving_room_cancels_slots_and_start_remains_safe")
 	world.chunk_manager.set_process(true)
 	world._enter_map(target.node_id)
 	await wait_for_room(world)

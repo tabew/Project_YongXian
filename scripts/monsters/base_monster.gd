@@ -203,6 +203,7 @@ var visual_tint: Color = Color.WHITE:
 
 ## 由通用模板创建，使用各怪物自己的 HealthComponent。
 var health_bar: ProgressBar = null
+var _name_label: Label = null
 var animation_tree: AnimationTree = null
 var animation_playback: AnimationNodeStateMachinePlayback = null
 
@@ -243,6 +244,7 @@ func _physics_process(delta: float) -> void:
 				navigator.clear()
 			return
 		brain.tick(delta)
+	_sync_aggro_display()
 
 
 func _setup_animation() -> void:
@@ -282,6 +284,7 @@ func _build_ai() -> void:
 		attack.setup(self, ai_config)
 	brain = EnemyBrain.new()
 	brain.setup(self, ai_config, blackboard, perception, navigator, attack, _ai_seed())
+	_sync_aggro_display()
 
 
 func set_supply_post(position: Vector2) -> void:
@@ -375,6 +378,7 @@ func has_player_aggro() -> bool:
 func clear_player_aggro() -> void:
 	if brain != null:
 		brain.abandon_target()
+	_sync_aggro_display()
 
 
 ## 通过 /root 路径取共享的自动加载服务。不直接写单例标识符，
@@ -617,9 +621,9 @@ func _setup_health_bar() -> void:
 	health_bar.position = Vector2(-14.0, -22.0)
 	# 高于草丛层（1）：高草盖住身子也不该盖住血条。
 	health_bar.z_index = 2
-	var name_label := get_node_or_null("NameLabel") as Label
-	if name_label != null:
-		health_bar.position.y = name_label.position.y + name_label.size.y + 1.0
+	_name_label = get_node_or_null("NameLabel") as Label
+	if _name_label != null:
+		health_bar.position.y = _name_label.position.y + _name_label.size.y + 1.0
 
 	var background := StyleBoxFlat.new()
 	background.bg_color = Color(0.10, 0.08, 0.08, 0.95)
@@ -636,6 +640,14 @@ func _setup_health_bar() -> void:
 func _update_health_bar(current: float, maximum: float) -> void:
 	health_bar.max_value = maxf(maximum, 1.0)
 	health_bar.value = current
+
+
+func _sync_aggro_display() -> void:
+	var aggro: bool = has_player_aggro()
+	if health_bar != null and health_bar.visible != aggro:
+		health_bar.visible = aggro
+	if _name_label != null and _name_label.visible != aggro:
+		_name_label.visible = aggro
 
 
 ## 调试全灭与正常死亡共用；先释放怪物携带的道具，避免随父节点一起删除。
