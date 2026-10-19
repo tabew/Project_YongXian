@@ -35,6 +35,11 @@ func _on_cards_changed() -> void:
 
 
 func _on_level_up(_level: int) -> void:
+	# 等级本身也带成长(生命上限/武器伤害/药水效果)：先把新的生命上限落到生命组件上，
+	# 再抽卡，否则选卡之前血条上限不会跟着涨。
+	# 武器伤害/药水效果是每次结算时读聚合值，不用重造武器（重造会打断正在挥的这一刀）。
+	if _player != null:
+		_player.apply_progress(false, false)
 	_offer_next()
 
 

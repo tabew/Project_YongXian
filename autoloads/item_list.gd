@@ -91,6 +91,12 @@ func has_runtime_instance(id: int) -> bool:
 
 const POTION_ID_STRAT:int = 300
 
+##药水实例(每瓶独一无二)从这个 id 起发号，见 PotionData.next_potion_id()。
+##和附魔武器实例的号段彻底分开：以前药水从 301 起、武器从 400 起，
+##一瓶一瓶攒到 99 瓶之后两段就撞上了，撞上以后没登记的药水 id 会取不到模板，
+##背包里直接少一格，看起来就是"炼金做出来的药水不见了"
+const POTION_INSTANCE_ID_START:int = 1000
+
 ##附魔武器的运行时实例从这个 id 起发号(见 WeaponData.next_instance_id)
 const WEAPON_INSTANCE_ID_START:int = 400
 
@@ -101,6 +107,10 @@ func _ready() -> void:
 func has_template(id: int) -> bool:
 
 	if runtime_instances.has(id):
+		return true
+
+	#药水号段(含模板 id 本身)没有登记也当药水处理
+	if id >= POTION_INSTANCE_ID_START:
 		return true
 
 	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
@@ -117,6 +127,9 @@ func get_template(id: int) -> ItemData:
 
 
 	#药水区间回退到药水模板；附魔武器区间必须自己登记过，否则视为无效 id
+	if id >= POTION_INSTANCE_ID_START:
+		return table[POTION_ID_STRAT]
+
 	if id >= POTION_ID_STRAT and id < WEAPON_INSTANCE_ID_START:
 		return table[POTION_ID_STRAT]
 

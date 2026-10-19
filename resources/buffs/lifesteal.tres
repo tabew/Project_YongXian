@@ -11,7 +11,6 @@ value = 0.2
 value_per_level = 0.05
 
 [resource]
-max_level = 3
 script = ExtResource("2_uhn1b")
 id = &"lifesteal"
 display_name = "吸血"

@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="BuffData" format=3]
+[gd_resource type="Resource" script_class="BuffData" format=3 uid="uid://dra60qirnkpga"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/buffs/heal_resist.png" id="1_kt7do"]
-[ext_resource type="Script" path="res://scripts/buffs/stat_modifier.gd" id="1_v7c7k"]
-[ext_resource type="Script" path="res://scripts/buffs/buff_data.gd" id="2_kt7do"]
+[ext_resource type="Texture2D" uid="uid://mfm62rrfcrdk" path="res://assets/ui/buffs/heal_resist.png" id="1_kt7do"]
+[ext_resource type="Script" uid="uid://bvh2l1vmniyxv" path="res://scripts/buffs/stat_modifier.gd" id="1_v7c7k"]
+[ext_resource type="Script" uid="uid://b5kh7se7bo2po" path="res://scripts/buffs/buff_data.gd" id="2_kt7do"]
 
 [resource]
 script = ExtResource("2_kt7do")
@@ -12,4 +12,3 @@ description = "无法通过治疗属性恢复生命，持续 30 秒。"
 icon = ExtResource("1_kt7do")
 is_debuff = true
 duration = 30.0
-max_level = 3

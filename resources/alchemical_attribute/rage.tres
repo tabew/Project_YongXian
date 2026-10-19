@@ -10,4 +10,3 @@ script = ExtResource("1_rage")
 buff = SubResource("Resource_6aj6j")
 attribute_id = 24
 name = "暴怒"
-level = 0

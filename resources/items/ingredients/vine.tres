@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://da5rms32lanvn" path="res://assets/items/ingredients/vine.png" id="2_icon"]
 [ext_resource type="Script" uid="uid://dm386uaepk31s" path="res://scripts/physical_attribute/physical_data.gd" id="3_2f72t"]
 [ext_resource type="Script" uid="uid://3m2ygi7m8l3t" path="res://scripts/alchemical_attribute/alchemical_data.gd" id="49_attrtype"]
+[ext_resource type="Resource" uid="uid://dr8pg4jbg83or" path="res://resources/alchemical_attribute/heal.tres" id="50_attr0"]
 [ext_resource type="Resource" uid="uid://dnmf43q3qyiwl" path="res://resources/alchemical_attribute/swift.tres" id="50_attr12"]
 
 [resource]

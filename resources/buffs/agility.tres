@@ -11,7 +11,6 @@ value = 0.2
 value_per_level = 0.08
 
 [resource]
-max_level = 3
 script = ExtResource("2_u6rnx")
 id = &"agility"
 display_name = "敏捷"

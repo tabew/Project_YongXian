@@ -91,6 +91,7 @@ func _run() -> void:
 		return
 
 	_test_curve()
+	_test_level_growth()
 	_test_card_pool()
 	_test_take_card()
 	_test_player_aggregates()
@@ -163,6 +164,64 @@ func _test_curve() -> void:
 	_check(_progress.level == 4, "one grant can cross several levels")
 	_check(_progress.pending_choices == 3, "every level queues its own choice")
 	_check(_progress.add_experience(0.0) == null, "zero exp is a no-op")
+
+
+# --- 等级自带成长 ---------------------------------------------------------
+
+func _test_level_growth() -> void:
+	_progress.reset()
+	_check(is_equal_approx(_progress.level_growth(), 0.0), "level 1 has no level growth")
+	_check(is_equal_approx(_progress.max_health_mult(), 1.0), "level 1 keeps the base health multiplier")
+	_check(is_equal_approx(_progress.damage_mult(), 1.0), "level 1 keeps the base damage multiplier")
+	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.0), "level 1 keeps the base potion multiplier")
+
+	_progress.level = 2
+	_check(is_equal_approx(_progress.level_growth(), 0.10), "level 2 adds ten percent")
+	_check(is_equal_approx(_progress.max_health_mult(), 1.10), "level 2 raises max health by ten percent")
+	_check(is_equal_approx(_progress.damage_mult(), 1.10), "level 2 raises weapon damage by ten percent")
+	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.10), "level 2 raises potion power by ten percent")
+
+	_progress.level = 3
+	_check(is_equal_approx(_progress.max_health_mult(), 1.20), "level 3 grows additively instead of compounding")
+	_check(is_equal_approx(_progress.damage_mult(), 1.20), "level 3 damage is additive too")
+	_check(is_equal_approx(_progress.alchemy_power_mult(), 1.20), "level 3 potion power is additive too")
+
+	# 等级成长和升级卡走同一套加算：3级 +20% 再叠一张利刃 +12% = +32%
+	_take(&"sharp")
+	_check(is_equal_approx(_progress.damage_mult(), 1.32), "card bonuses add onto the level growth instead of multiplying")
+
+	# 出手结算真的读这条倍率（武器伤害就在这里生效）
+	_make_player()
+	var demo: HealthComponent = _target(Vector2(40.0, 0.0))
+	var demo_hurtbox: CombatHurtbox = null
+	for child: Node in demo.get_parent().get_children():
+		if child is CombatHurtbox:
+			demo_hurtbox = child as CombatHurtbox
+	_check(demo_hurtbox != null, "the demo target carries a hurtbox")
+	if demo_hurtbox != null:
+		_check(is_equal_approx(_player.outgoing_damage_multiplier(demo_hurtbox), 1.32),
+			"outgoing hits use the level growth multiplier")
+
+	# 生命上限：基础 100 × 1.2 + 体质固定值 15×2；卡的固定值不被等级放大
+	_take(&"constitution", 2)
+	_make_player()
+	_check(is_equal_approx(_player.max_health, 150.0), "level 3 plus two constitution cards gives 150 max health")
+	_check(is_equal_approx(_player.health_component.max_health, 150.0), "the health component follows the level growth")
+
+	# 升级那一刻就应该把上限补进生命组件（UpgradeManager 走的就是 apply_progress）
+	_progress.level = 4
+	_player.apply_progress(false)
+	_check(is_equal_approx(_player.max_health, 160.0), "level 4 raises max health to 160")
+	_check(is_equal_approx(_player.health, 160.0), "new max health tops up current health immediately")
+
+	# 药水效果：等级成长进的是 player.heal() 读的那条倍率（+30%）
+	_player.health = 100.0
+	var healed: float = _player.heal(10.0)
+	_check(is_equal_approx(healed, 13.0), "level 4 heals thirty percent more from potions")
+
+	_progress.reset()
+	_make_player()
+	_check(is_equal_approx(_player.max_health, 100.0), "reset returns to the 100 point baseline")
 
 
 # --- 卡池规则 -------------------------------------------------------------

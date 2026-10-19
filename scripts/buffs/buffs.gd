@@ -57,7 +57,8 @@ static func apply(target: Node, buff: BuffData, level: int = 0, source: Node = n
 	var scale: float = _next_duration_scale
 
 	_next_duration_scale = 1.0
-	return holder.apply(buff, level, source, scale)
+	#药水威力倍率要让一次结算里的多段效果都读到，所以只读不复位，由药水结算完自己 reset
+	return holder.apply(buff, level, source, scale, _next_power_scale)
 
 
 ##药水"延时"属性用：下一次施加 buff 的时长倍率
@@ -72,6 +73,29 @@ static func set_next_duration_scale(scale: float) -> void:
 ##复位时长倍率：一整套效果结算完调用，避免影响别处
 static func reset_duration_scale() -> void:
 	_next_duration_scale = 1.0
+
+
+##药水效果强度倍率（等级成长 + 药材学）。药水结算时由药水设置，结算完复位。
+##只有药水会设置它，所以武器附魔、怪物攻击、地图事件这些路径天然读到 1.0。
+##属性自己按需读：伤害类乘在伤害上、buff 类在施加时把它记在 buff 上（之后每跳/每条属性修改都吃）
+static var _next_power_scale: float = 1.0
+##没有药水上下文时的默认威力
+const BASE_POWER: float = 1.0
+
+
+##设置本次药水结算的威力倍率
+static func set_next_power_scale(scale: float) -> void:
+	_next_power_scale = maxf(scale, 0.0)
+
+
+##复位威力倍率：一次效果结算完调用，避免漏到下一次别的结算上
+static func reset_power_scale() -> void:
+	_next_power_scale = BASE_POWER
+
+
+##当前威力倍率：属性/buff 自己读它。默认 1.0（不是药水就是原样）
+static func power_scale() -> float:
+	return _next_power_scale
 
 
 static func remove(target: Node, id: StringName) -> bool:

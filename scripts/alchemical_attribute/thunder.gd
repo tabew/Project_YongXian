@@ -16,9 +16,9 @@ extends AlchemicalData
 @export var strike_scene: PackedScene = preload("res://scenes/effects/lightning_strike.tscn")
 
 
-##本次落雷的伤害
+##本次落雷的伤害（吃药水强度）
 func damage_total() -> float:
-	return damage + damage_per_level * float(maxi(level, 0))
+	return (damage + damage_per_level * float(maxi(level, 0))) * Buffs.power_scale()
 
 
 ##作用圈用这个间隔决定多久落一道雷

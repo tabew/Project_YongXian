@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://862mtq7arhfy"]
+[gd_scene format=3 uid="uid://862mtq7arhfy"]
 
 [ext_resource type="PackedScene" uid="uid://cucs5cwgdhwgx" path="res://scenes/alchemy/cauldon.tscn" id="1_0gm81"]
 [ext_resource type="Script" uid="uid://d2q0qwx28g54y" path="res://scripts/alchemy/alchemy_menu.gd" id="1_uy7mj"]
@@ -20,6 +20,54 @@ corner_radius_bottom_left = 14
 shadow_color = Color(0, 0, 0, 0.45)
 shadow_size = 18
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.164706, 0.176471, 0.207843, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.760784, 0.607843, 0.298039, 0.784314)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.101961, 0.109804, 0.129412, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.560784, 0.45098, 0.235294, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.25098, 0.247059, 0.203922, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.933333, 0.780392, 0.435294, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_drop"]
 bg_color = Color(0.129412, 0.152941, 0.176471, 0.784314)
 border_width_left = 2
@@ -32,54 +80,6 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
-bg_color = Color(0.164706, 0.176471, 0.207843, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.760784, 0.607843, 0.298039, 0.784314)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-content_margin_left = 10.0
-content_margin_top = 6.0
-content_margin_right = 10.0
-content_margin_bottom = 6.0
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
-bg_color = Color(0.25098, 0.247059, 0.203922, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.933333, 0.780392, 0.435294, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-content_margin_left = 10.0
-content_margin_top = 6.0
-content_margin_right = 10.0
-content_margin_bottom = 6.0
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
-bg_color = Color(0.101961, 0.109804, 0.129412, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.560784, 0.45098, 0.235294, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-content_margin_left = 10.0
-content_margin_top = 6.0
-content_margin_right = 10.0
-content_margin_bottom = 6.0
-
 [node name="Alchemy" type="Node2D" unique_id=389668861]
 y_sort_enabled = true
 script = ExtResource("1_uy7mj")
@@ -87,7 +87,6 @@ script = ExtResource("1_uy7mj")
 [node name="Backdrop" type="ColorRect" parent="." unique_id=2013378211]
 offset_right = 1280.0
 offset_bottom = 720.0
-mouse_filter = 0
 color = Color(0.027451, 0.0313726, 0.0431373, 0.729412)
 
 [node name="Frame" type="Panel" parent="." unique_id=2013378212]
@@ -95,7 +94,6 @@ offset_left = 100.0
 offset_top = 44.0
 offset_right = 1180.0
 offset_bottom = 676.0
-mouse_filter = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_frame")
 
 [node name="Title" type="Label" parent="." unique_id=2013378213]
@@ -133,8 +131,8 @@ tooltip_text = "开始反应"
 theme_override_colors/font_color = Color(0.960784, 0.901961, 0.74902, 1)
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 text = "开始反应"
 
 [node name="Finish" type="Button" parent="Cauldon" unique_id=2036524929]
@@ -146,15 +144,15 @@ tooltip_text = "把锅里反应完的属性装成一瓶药水，放进背包"
 theme_override_colors/font_color = Color(0.960784, 0.901961, 0.74902, 1)
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 text = "装瓶"
 
 [node name="AttributesText" parent="Cauldon" unique_id=326303259 instance=ExtResource("2_p2eye")]
 offset_left = -140.0
-offset_top = 150.0
+offset_top = 80.0
 offset_right = -140.0
-offset_bottom = 150.0
+offset_bottom = 80.0
 
 [node name="LeftDropZone" type="Control" parent="Cauldon" unique_id=1448328919]
 layout_mode = 3
@@ -185,10 +183,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_colors/font_color = Color(0.760784, 0.858824, 0.729412, 1)
 theme_override_font_sizes/font_size = 16
-text = "投料框\n把材料拖到这里"
+text = "投料框
+把材料拖到这里"
 horizontal_alignment = 1
 vertical_alignment = 1
 

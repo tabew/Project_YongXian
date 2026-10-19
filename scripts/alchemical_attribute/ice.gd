@@ -22,14 +22,14 @@ extends AlchemicalData
 const FREEZE_META: StringName = &"ice_freeze_value"
 
 
-##本次施加积累的冰冻值
+##本次施加积累的冰冻值（吃药水强度：强药水冻得更快）
 func freeze_value() -> float:
-	return freeze_per_apply + freeze_per_apply_per_level * float(maxi(level, 0))
+	return (freeze_per_apply + freeze_per_apply_per_level * float(maxi(level, 0))) * Buffs.power_scale()
 
 
-##触发时的伤害
+##触发时的伤害（吃药水强度）
 func shatter_damage_total() -> float:
-	return shatter_damage + shatter_damage_per_level * float(maxi(level, 0))
+	return (shatter_damage + shatter_damage_per_level * float(maxi(level, 0))) * Buffs.power_scale()
 
 
 ##目标当前的冰冻值（0 表示没在累积）

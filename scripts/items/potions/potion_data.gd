@@ -5,8 +5,9 @@ class_name PotionData
 ##药水数据由坩埚里反应完的属性装瓶而来
 ##药水不可堆叠
 
-##药水id的起始值
-const NEW_POTION_ID:int = 301
+##药水id的起始值：每瓶药水独占一个 id，号段和附魔武器实例(400 起)分开，
+##由 ItemListGlobal.POTION_INSTANCE_ID_START 兜底(未登记的药水 id 也能取回药水模板)
+const NEW_POTION_ID:int = 1000
 
 ##砸碎后生成的圆形范围场景：只放需要目标的属性，圈内每个目标各调用一次 use_effect
 const BURST_SCENE: PackedScene = preload("res://scenes/items/potions/potion_burst.tscn")
@@ -126,6 +127,8 @@ func left_use(player:PlayerCharacter) -> int:
 
 	#整瓶药的时长倍率（延时属性叠加），只影响这次施加的 buff
 	var scale: float = duration_scale()
+	#整瓶药的威力倍率（等级成长 + 药材学），只影响这次结算的数值
+	var power: float = player.potion_power_mult()
 
 	for attribute: AlchemicalData in alchemical_attribute:
 		if attribute == null or not attribute.has_method("use_effect"):
@@ -133,8 +136,10 @@ func left_use(player:PlayerCharacter) -> int:
 		if exempt and attribute.is_negative_effect():
 			continue
 		Buffs.set_next_duration_scale(scale)
+		Buffs.set_next_power_scale(power)
 		attribute.use_effect(player)
-	Buffs.reset_duration_scale()
+		Buffs.reset_duration_scale()
+		Buffs.reset_power_scale()
 	return 1
 
 

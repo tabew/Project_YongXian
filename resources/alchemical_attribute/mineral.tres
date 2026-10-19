@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="Mineral" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="Mineral" format=3 uid="uid://mtigqq4ncrjf"]
 
-[ext_resource type="Script" path="res://scripts/alchemical_attribute/mineral.gd" id="1_attribute"]
+[ext_resource type="Script" uid="uid://8a4j37sr5ojr" path="res://scripts/alchemical_attribute/mineral.gd" id="1_attribute"]
 
 [resource]
 script = ExtResource("1_attribute")
