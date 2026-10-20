@@ -14,6 +14,7 @@ const XP_BAR_SIZE: Vector2 = Vector2(240.0, 8.0)
 @onready var toast_label: Label = $ToastLabel
 @onready var weapon_icon: TextureRect = $WeaponIcon
 @onready var weapon_label: Label = $WeaponLabel
+@onready var defeat_overlay: Control = $DefeatOverlay
 
 var _world: ChunkManager = null
 var _player: Node2D = null
@@ -25,6 +26,7 @@ var _xp_fill: ColorRect = null
 var _boss_visible: bool = false
 var _boss_mobile_layout: bool = false
 var _stats_visible_before_boss: bool = true
+var _defeat_hidden_nodes: Array[CanvasItem] = []
 
 
 func _ready() -> void:
@@ -40,7 +42,7 @@ func _ready() -> void:
 		"1-9 / 滚轮 / 点格子 换选中",
 		"Tab 背包",
 		"M 地图",
-		"R 重开世界",
+		"R 重开本局",
 	]))
 	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
 	# ==========================================================================
@@ -174,14 +176,51 @@ func bind_world(manager: ChunkManager, player: Node2D) -> void:
 		var previous_controller: WeaponController = (_player as PlayerCharacter).weapon_controller
 		if previous_controller.weapon_changed.is_connected(_on_weapon_changed):
 			previous_controller.weapon_changed.disconnect(_on_weapon_changed)
+		if (_player as PlayerCharacter).defeated.is_connected(show_defeat):
+			(_player as PlayerCharacter).defeated.disconnect(show_defeat)
 	_world = manager
 	_player = player
 	if player is PlayerCharacter:
 		var controller: WeaponController = (player as PlayerCharacter).weapon_controller
 		controller.weapon_changed.connect(_on_weapon_changed)
 		_on_weapon_changed(controller.equipped_weapon)
+		(player as PlayerCharacter).defeated.connect(show_defeat)
+	hide_defeat()
 	minimap.bind(manager, player)
 	_refresh_timer = 0.0
+
+
+## 死亡时显示统一的失败界面；R / Esc 的输入由 GameWorld 处理。
+func show_defeat() -> void:
+	if defeat_overlay.visible:
+		return
+	_defeat_hidden_nodes.clear()
+	for child: Node in get_children():
+		if child == defeat_overlay or not child is CanvasItem:
+			continue
+		var item := child as CanvasItem
+		if item.visible:
+			_defeat_hidden_nodes.append(item)
+			item.visible = false
+	var hotbar := get_parent().get_node_or_null("BottomBagUi") as CanvasItem
+	if hotbar != null and hotbar.visible:
+		_defeat_hidden_nodes.append(hotbar)
+		hotbar.visible = false
+	defeat_overlay.visible = true
+	defeat_overlay.modulate.a = 0.0
+	var tween: Tween = create_tween()
+	tween.tween_property(defeat_overlay, "modulate:a", 1.0, 0.25)
+
+
+func hide_defeat() -> void:
+	if defeat_overlay == null:
+		return
+	for item: CanvasItem in _defeat_hidden_nodes:
+		if is_instance_valid(item):
+			item.visible = true
+	_defeat_hidden_nodes.clear()
+	defeat_overlay.visible = false
+	defeat_overlay.modulate.a = 1.0
 
 
 func show_pickup(pickup: GroundPickup) -> void:

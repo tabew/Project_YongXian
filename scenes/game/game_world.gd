@@ -147,6 +147,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _transitioning:
 		get_viewport().set_input_as_handled()
 		return
+	# 死亡后只保留两个明确选项：R 重开本局，Esc 退出游戏。
+	if player.health <= 0.0:
+		if event.is_action_pressed("regenerate_world") and not event.is_echo():
+			_restart_after_defeat()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_cancel") and not event.is_echo():
+			AudioManager.play_sfx(&"ui_click")
+			get_tree().quit()
+		return
 	if event.is_action_pressed("pickup_item") and (player.stun_remaining > 0.0 or player.boss_captured or player.boss_grappled):
 		get_viewport().set_input_as_handled()
 		return
@@ -984,3 +993,14 @@ func _clamp_to_map(position: Vector2, spec: MapSpec) -> Vector2:
 func regenerate_world() -> void:
 	build_world(WorldGenerator.random_seed())
 	EventBus.notification.emit("已生成新世界（种子 %d）" % GameState.world_seed)
+
+
+## 死亡后的重开走完整场景重载，确保生命、动画、地图和本局成长都回到初始状态。
+func _restart_after_defeat() -> void:
+	if _transitioning or SceneManager.is_transitioning():
+		return
+	_transitioning = true
+	player.set_physics_process(false)
+	player.set_process_unhandled_input(false)
+	GameState.start_new_world()
+	await SceneManager.change_scene("res://scenes/game/game_world.tscn")

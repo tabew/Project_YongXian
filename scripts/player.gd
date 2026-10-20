@@ -612,6 +612,8 @@ func spawn_on(source: WorldGenerator, world_position: Vector2, map_spec: MapSpec
 	global_position = world_position
 	_cached_tile = Vector2i(2147483647, 2147483647)
 	if reset_health:
+		_was_defeated = false
+		health_component.invulnerable = false
 		apply_progress(true)
 
 
