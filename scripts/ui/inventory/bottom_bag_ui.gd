@@ -39,6 +39,7 @@ func init_button() -> void:
 		button.quick_move_signal.connect(_on_slot_quick_move.bind(pos)) #shift+左键：整堆挪回背包
 
 		button.select_item_signal.connect(_on_slot_select.bind(pos)) #左键切换选中
+		button.use_item_signal.connect(_on_slot_use_requested) #右键格子：选中并使用
 
 		button.enchant_item_signal.connect(_on_slot_enchant.bind(pos)) #药水拖到本格武器上：附魔
 
@@ -104,6 +105,12 @@ func _refresh_selection() ->void:
 ##左键切换选中
 func _on_slot_select(pos:int, _bound_pos:int) ->void:
 	inventory.select_handy_slot(pos)
+
+##右键格子：选中后交给玩家走统一的使用逻辑。药水默认喝下，其他物品走右键效果。
+func _on_slot_use_requested(_item_id:int, pos:int) ->void:
+	if player == null or !is_instance_valid(player):
+		return
+	player.use_handy_slot(pos, false)
 
 ##选中只在物品栏露出来、又没在拖东西的时候生效
 func _can_operate() ->bool:

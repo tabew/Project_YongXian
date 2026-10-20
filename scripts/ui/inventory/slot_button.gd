@@ -170,6 +170,11 @@ func _on_gui_input(event: InputEvent) -> void:
 
 	if mouse_event.button_index == MOUSE_BUTTON_LEFT:
 		select_item_signal.emit(handy_slot)
+	elif mouse_event.button_index == MOUSE_BUTTON_RIGHT:
+		# 右键格子：先选中，再走与游戏内右键一致的使用流程。
+		select_item_signal.emit(handy_slot)
+		request_use()
+		accept_event()
 
 
 ##把物品放至光标

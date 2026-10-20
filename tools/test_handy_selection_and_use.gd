@@ -7,6 +7,8 @@ extends SceneTree
 ## 运行：godot --headless --path . --script res://tools/test_handy_selection_and_use.gd
 
 const STUB_ITEM_SCRIPT: GDScript = preload("res://tests/fixtures/test_use_item.gd")
+const POTION_TEMPLATE: PotionData = preload("res://resources/items/potions/potion_model.tres")
+const HEAL_ATTRIBUTE: AlchemicalData = preload("res://resources/alchemical_attribute/heal.tres")
 
 ## 不与项目里的正式物品 id 冲突：
 ## 材料 0-4、武器 200-299（player.hand_item 按这个区间认武器）、药水 300 起（注册表把 >=300 当药水）
@@ -109,6 +111,7 @@ func _run() -> void:
 	_test_use_consumption(inventory, player)
 	_test_weapon(inventory, items, controller, player)
 	_test_input(hotbar, inventory)
+	_test_potion_use(hotbar, inventory, player, items)
 	await _test_drag_guard(hotbar, inventory)
 
 	game.queue_free()
@@ -309,6 +312,59 @@ func _test_input(hotbar: Control, inventory: Inventory) -> void:
 	hotbar.item_buttons[4]._on_gui_input(_mouse_event(MOUSE_BUTTON_LEFT))
 	_check(inventory.get_selected_handy() == 4, "左键点格子切换选中")
 	_check(inventory.get_handy_slot_count(0) == filled_before, "左键点格子不使用、不扣数量")
+
+
+## 药水右键：格子右键与游戏内右键都默认喝下；Shift+右键投掷。
+## 药水不先走 add_item()，专门覆盖运行时实例缓存缺失的回归。
+func _test_potion_use(hotbar: Control, inventory: Inventory, player: PlayerCharacter, items: Node) -> void:
+	for slot: int in Inventory.HANDY_SLOT_COUNT:
+		inventory.clear_handy_slot(slot)
+
+	var slot_potion: PotionData = _make_heal_potion(items)
+	inventory.add_handy_slot(4, slot_potion.id, 1)
+	player.health = 40.0
+	Buffs.clear(player)
+	hotbar.item_buttons[4]._on_gui_input(_mouse_event(MOUSE_BUTTON_RIGHT))
+	_check(inventory.get_selected_handy() == 4, "右键快捷栏药水会选中该格")
+	_check(inventory.get_handy_slot_count(4) == 0, "右键快捷栏药水会消耗一瓶")
+	_check(player.health > 40.0, "右键快捷栏药水会喝下并回血")
+
+	var world_potion: PotionData = _make_heal_potion(items)
+	inventory.add_handy_slot(5, world_potion.id, 1)
+	inventory.select_handy_slot(5)
+	player.health = 40.0
+	Buffs.clear(player)
+	var right_event := InputEventAction.new()
+	right_event.action = &"throw"
+	right_event.pressed = true
+	player._unhandled_input(right_event)
+	_check(inventory.get_handy_slot_count(5) == 0, "游戏内右键药水会消耗一瓶")
+	_check(player.health > 40.0, "游戏内右键药水会喝下并回血")
+
+	var throw_potion: PotionData = _make_heal_potion(items)
+	inventory.add_handy_slot(6, throw_potion.id, 1)
+	inventory.select_handy_slot(6)
+	player.health = 40.0
+	Buffs.clear(player)
+	var throw_event: InputEventMouseButton = _mouse_event(MOUSE_BUTTON_RIGHT)
+	throw_event.shift_pressed = true
+	player._unhandled_input(throw_event)
+	var thrown_models: int = 0
+	for child: Node in player.get_parent().get_children():
+		if child is ItemModel:
+			thrown_models += 1
+	_check(inventory.get_handy_slot_count(6) == 0, "Shift+右键会消耗药水")
+	_check(is_equal_approx(player.health, 40.0), "Shift+右键不会直接喝下药水")
+	_check(thrown_models == 1, "Shift+右键会生成投掷药水")
+
+
+func _make_heal_potion(items: Node) -> PotionData:
+	var potion: PotionData = POTION_TEMPLATE.duplicate() as PotionData
+	potion.alchemical_attribute = [HEAL_ATTRIBUTE]
+	potion.id = PotionData.next_potion_id()
+	while not bool(items.call("register_instance", potion)):
+		potion.id = PotionData.next_potion_id()
+	return potion
 
 
 ## 拖拽期间的输入行为：当前版本的 _can_operate() 只看"面板可见 + 有玩家/背包"，

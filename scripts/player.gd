@@ -377,8 +377,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if is_ui_blocking():
 				return
 
-			inventory.right_use_handy_slot(self)
-			reveal_by_action()
+			use_handy_slot(inventory.get_selected_handy(), _throw_modifier_pressed(event))
 			get_viewport().set_input_as_handled()
 			return
 		
@@ -389,6 +388,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			if try_dodge(input_direction):
 				get_viewport().set_input_as_handled()
 			return
+
+
+##右键使用快捷栏物品：药水默认喝下；按 Shift 时改为投掷。
+##快捷栏格子右键也复用这条路径，避免按钮吃掉输入后毫无反应。
+func use_handy_slot(pos: int, throw_mode: bool = false) -> void:
+	if inventory == null or health <= 0.0 or pos < 0:
+		return
+	inventory.select_handy_slot(pos)
+	var item_id: int = inventory.get_handy_slot_id(pos)
+	var item: ItemData = inventory.get_item_template(item_id)
+	if item == null:
+		return
+	if item is PotionData and not throw_mode:
+		inventory.left_use_handy_slot(self)
+	else:
+		inventory.right_use_handy_slot(self)
+	reveal_by_action()
+
+
+func _throw_modifier_pressed(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		return (event as InputEventMouseButton).shift_pressed
+	if event is InputEventKey:
+		return (event as InputEventKey).shift_pressed
+	return Input.is_key_pressed(KEY_SHIFT)
 
 func handy_item_changed()->void:
 	handy_item = inventory.get_handy_slot_id(inventory.get_selected_handy())

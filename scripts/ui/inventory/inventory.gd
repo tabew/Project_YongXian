@@ -133,7 +133,7 @@ func left_use_handy_slot(player:PlayerCharacter) -> void:
     if item_id < 0 or get_handy_slot_count(pos) <= 0:
         return
 
-    var item:ItemData = get_item_data[item_id]
+    var item:ItemData = _item_for_slot(item_id)
 
     if item == null:
         return
@@ -160,7 +160,7 @@ func right_use_handy_slot(player:PlayerCharacter) -> void:
     if item_id < 0 or get_handy_slot_count(pos) <= 0:
         return
 
-    var item:ItemData = get_item_data[item_id]
+    var item:ItemData = _item_for_slot(item_id)
 
     if item == null:
         return
@@ -173,6 +173,16 @@ func right_use_handy_slot(player:PlayerCharacter) -> void:
            release_runtime_instance_if_gone(item_id)
 
     return
+
+
+##快捷栏里的运行时实例可能不在旧缓存里；优先查缓存，缺失时回注册表补齐。
+func _item_for_slot(item_id:int) -> ItemData:
+    var item: ItemData = get_item_data.get(item_id) as ItemData
+    if item == null:
+        item = get_item_template(item_id)
+        if item != null:
+            get_item_data[item_id] = item
+    return item
 #//////////////////////////////
 
 ##注销一个"真没人要了"的运行时实例(药水/附魔武器)：背包和快捷栏都还有就不动它。
@@ -205,6 +215,10 @@ func add_handy_slot(pos:int,item_id:int,num:int = 1) ->bool:
 
     handy_items_pos[pos] = item_id
     handy_items[pos] = get_handy_slot_count(pos) + num
+
+    #运行时药水/附魔武器不一定先经过 add_item()，快捷栏使用前要确保模板缓存存在。
+    if !get_item_data.has(item_id) or get_item_data[item_id] == null:
+        get_item_data[item_id] = get_item_template(item_id)
 
     inventory_update.emit()
 
