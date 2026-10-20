@@ -10,10 +10,10 @@ config_version=5
 
 [application]
 
-config/name="Project YongXian"
-config/description="使用 Godot 开发的游戏项目。"
+config/name="AlcheMerge"
+config/description="AlcheMerge，使用 Godot 开发的 2D 肉鸽游戏。"
 config/version="0.1.0"
-run/main_scene="res://scenes/game/game_world.tscn"
+run/main_scene="res://scenes/menus/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -38,7 +38,7 @@ window/stretch/aspect="expand"
 
 [dotnet]
 
-project/assembly_name="Project YongXian"
+project/assembly_name="AlcheMerge"
 
 [gdscript]
 

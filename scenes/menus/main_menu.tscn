@@ -1,6 +1,11 @@
-[gd_scene format=3 uid="uid://c385go7ge1ek4"]
+[gd_scene load_steps=4 format=3 uid="uid://c385go7ge1ek4"]
 
 [ext_resource type="Script" uid="uid://bda351x2qjirh" path="res://scenes/menus/main_menu.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bidovucapn3f5" path="res://assets/player_paint.png" id="2_portrait"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_menu_portrait"]
+atlas = ExtResource("2_portrait")
+region = Rect2(747, 1268, 905, 1064)
 
 [node name="MainMenu" type="Control" unique_id=850917211]
 layout_mode = 3
@@ -16,14 +21,29 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -486.0
-offset_top = -202.0
-offset_right = -486.0
-offset_bottom = -202.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.08, 0.08, 0.12, 1)
+color = Color(0.055, 0.06, 0.09, 1)
+
+[node name="Portrait" type="TextureRect" parent="." unique_id=1671889021]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -500.0
+offset_top = -500.0
+offset_right = -40.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+modulate = Color(1, 1, 1, 0.9)
+texture = SubResource("AtlasTexture_menu_portrait")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="TitleLabel" type="Label" parent="." unique_id=1033633744]
 layout_mode = 1
@@ -36,7 +56,10 @@ offset_right = 240.0
 offset_bottom = 152.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 52
-text = "Project YongXian"
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.65)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+text = "AlcheMerge"
 horizontal_alignment = 1
 
 [node name="SubtitleLabel" type="Label" parent="." unique_id=569820987]
@@ -51,7 +74,7 @@ offset_bottom = 184.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.62, 0.66, 0.76, 1)
 theme_override_font_sizes/font_size = 16
-text = "随机地图 · 占位主角"
+text = "随机箱庭 · 炼金战斗 · 局内成长"
 horizontal_alignment = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=324047542]
@@ -79,7 +102,7 @@ text = "开始游戏"
 custom_minimum_size = Vector2(220, 46)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "退出"
+text = "退出游戏"
 
 [node name="VersionLabel" type="Label" parent="." unique_id=1712998191]
 layout_mode = 1

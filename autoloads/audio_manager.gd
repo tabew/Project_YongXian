@@ -334,21 +334,26 @@ func _load_streams() -> void:
 
 
 ## 目录扫描：文件名（去掉扩展名）就是 id。wav 还没被编辑器导入时跳过，不报错。
+## 导出包里的音频会以 .wav.remap / .wav.import 出现在目录中，还原逻辑路径后再加载。
 func _scan_directory(directory: String) -> Dictionary:
 	var streams: Dictionary = {}
 	if not DirAccess.dir_exists_absolute(directory):
 		push_warning("音频目录不存在：%s" % directory)
 		return streams
 	for file_name: String in DirAccess.get_files_at(directory):
-		if not AUDIO_EXTENSIONS.has(file_name.get_extension().to_lower()):
+		var logical_name: String = file_name
+		for suffix: String in [".remap", ".import"]:
+			if logical_name.ends_with(suffix):
+				logical_name = logical_name.trim_suffix(suffix)
+		if not AUDIO_EXTENSIONS.has(logical_name.get_extension().to_lower()):
 			continue
-		var path: String = directory.path_join(file_name)
+		var path: String = directory.path_join(logical_name)
 		if not ResourceLoader.exists(path):
 			continue
 		var stream: AudioStream = load(path) as AudioStream
 		if stream == null:
 			continue
-		streams[StringName(file_name.get_basename())] = stream
+		streams[StringName(logical_name.get_basename())] = stream
 	return streams
 
 
