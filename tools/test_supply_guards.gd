@@ -226,8 +226,8 @@ func _run() -> void:
 			final_boss_count += 1
 		elif monster.has_supply_post:
 			boss_guard_count += 1
-	check(final_boss_count == 1, "final_room_contains_one_fixed_boss_alongside_possible_ordinary_monsters")
-	check(boss_guard_count == plan_signature(spawner).size(), "final_room_guards_match_eligible_supply_plan")
+	check(final_boss_count == 1 and spawner.monsters.size() == 1, "final_room_contains_only_one_fixed_boss")
+	check(boss_guard_count == 0 and plan_signature(spawner).is_empty(), "final_room_has_no_supply_guards")
 
 	world.build_world(18473)
 	check(world._combat_entry_count == 0 and spawner.monsters.is_empty(), "new_run_restarts_safe_at_zero")

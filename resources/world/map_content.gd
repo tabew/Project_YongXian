@@ -46,7 +46,7 @@ func _plan(generator: WorldGenerator, spec: MapSpec) -> Array:
 	var span: int = maxi(generator.run.floors.size() - 1, 1)
 	var difficulty: float = clampf(float(RunGraph.floor_of(spec.node_id)) / float(span), 0.0, 1.0)
 	var result: Array = []
-	if RunGraph.floor_of(spec.node_id) > 0 and kind != RoomType.Kind.EVENT:
+	if RunGraph.floor_of(spec.node_id) > 0 and kind not in [RoomType.Kind.EVENT, RoomType.Kind.BOSS]:
 		result.append(_entry(ENEMY, 3 + roundi(difficulty * 4.0), MapRng.Stream.ENEMY, spec.node_id))
 	match kind:
 		RoomType.Kind.START:

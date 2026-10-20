@@ -49,6 +49,20 @@ func hit_boss(boss: FinalBoss, amount: float, from_player: bool = true) -> void:
 	(boss.get_node("Health") as HealthComponent).receive_hit(hit)
 
 
+func far_walkable_position(generator: WorldGenerator, spec: MapSpec, origin: Vector2) -> Vector2:
+	var farthest: Vector2 = origin
+	var best_distance: float = 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 72841
+	for tile: Vector2i in MapContent.pick_tiles(generator, spec.node_id, 128, rng):
+		var position: Vector2 = WorldGenerator.tile_to_world(tile)
+		var distance: float = position.distance_squared_to(origin)
+		if distance > best_distance:
+			best_distance = distance
+			farthest = position
+	return farthest
+
+
 func _run() -> void:
 	Engine.max_fps = 120
 	root.size = Vector2i(1280, 720)
@@ -70,8 +84,10 @@ func _run() -> void:
 	var boss: FinalBoss = bosses[0]
 	boss.set_physics_process(false)
 	await wait_room(world)
-	check(bosses_in(spawner).size() == 1 and spawner.monsters.size() > 1, "ordinary_monsters_coexist_with_one_fixed_boss")
+	check(bosses_in(spawner).size() == 1 and spawner.monsters.size() == 1, "boss_room_contains_only_one_fixed_boss")
 	pause_ordinary_monsters(spawner)
+	var far_position: Vector2 = far_walkable_position(world._generator, spec, boss.global_position)
+	check(far_position.distance_to(boss.global_position) > 64.0 * WorldGenerator.TILE_SIZE, "far_target_is_inside_same_boss_room")
 	check(boss.phase == 1 and boss.attack_state == FinalBoss.AttackState.WAIT, "boss_starts_in_first_attack_state")
 
 	boss._start_normal_attack()
@@ -79,31 +95,52 @@ func _run() -> void:
 	for missile: BossSoulMissile in boss._missiles:
 		missile.set_physics_process(false)
 	var first: BossSoulMissile = boss._missiles[0]
+	check(BossSoulMissile.SPEED == 300.0 and is_equal_approx(first._speed, BossSoulMissile.SPEED) and first._remaining >= BossSoulMissile.LIFE_SECONDS, "soul_missile_uses_fixed_three_hundred_speed")
 	var health_before: float = player.health
 	player.global_position = first.global_position
 	first._physics_process(0.01)
-	check(is_equal_approx(player.health, health_before - 10.0) and is_equal_approx(player.fear_remaining, 2.0), "direct_missile_hit_deals_ten_and_adds_two_fear")
+	check(is_equal_approx(player.health, health_before - 10.0) and is_equal_approx(player.fear_remaining, 0.0), "direct_missile_hit_deals_ten_without_fear")
 	player.apply_fear(2.0)
-	check(is_equal_approx(player.fear_remaining, 4.0), "repeated_fear_adds_duration")
-	Input.action_press("move_up")
-	player._physics_process(0.01)
-	check(player.input_direction.y > 0.0, "fear_reverses_up_to_down")
-	Input.action_press("move_right")
-	player._physics_process(0.01)
-	check(player.input_direction.x < 0.0 and player.input_direction.y > 0.0, "fear_reverses_both_axes_of_diagonal_movement")
-	Input.action_release("move_up")
-	Input.action_release("move_right")
+	check(is_equal_approx(player.fear_remaining, 2.0), "fear_is_only_from_other_effects")
+	player._reset_boss_status()
 	var expiring: BossSoulMissile = boss._missiles[1]
 	var flash_count: int = boss._flashes.size()
 	health_before = player.health
-	player.global_position = expiring.global_position + Vector2(0.0, 1000.0)
-	expiring._physics_process(4.01)
-	check(expiring.is_queued_for_deletion() and boss._flashes.size() == flash_count + 1 and player.health == health_before, "unlanded_missile_explodes_after_four_seconds")
+	player.global_position = far_position
+	expiring._speed = 0.0
+	expiring._physics_process(expiring._remaining + 0.01)
+	check(expiring.is_queued_for_deletion() and boss._flashes.size() == flash_count + 1 and player.health == health_before, "unlanded_missile_explodes_after_its_flight_budget")
 	boss._cancel_attack()
 	boss.attack_state = FinalBoss.AttackState.SOULS
+	player.global_position = boss.global_position
 	health_before = player.health
 	boss.soul_explosion(player.global_position)
 	check(is_equal_approx(player.health, health_before - 15.0), "expired_soul_explosion_deals_fifteen")
+	boss._cancel_attack()
+
+	player.health_component.max_health = 500.0
+	player.health_component.reset()
+	player.global_position = far_position
+	boss._start_normal_attack()
+	var far_missiles: Array[BossSoulMissile] = boss._missiles.duplicate()
+	var far_flight_budget: float = 0.0
+	for missile: BossSoulMissile in far_missiles:
+		missile.set_physics_process(false)
+		far_flight_budget = maxf(far_flight_budget, missile._remaining)
+	check(far_flight_budget > BossSoulMissile.LIFE_SECONDS, "distant_missiles_keep_fixed_speed_and_gain_time_to_cross_room")
+	health_before = player.health
+	for frame: int in ceili(far_flight_budget / 0.05) + 1:
+		for missile: BossSoulMissile in far_missiles:
+			if is_instance_valid(missile) and not missile.is_queued_for_deletion():
+				missile._physics_process(0.05)
+	check(player.health < health_before, "souls_can_reach_player_at_far_end_of_boss_room")
+	boss._cancel_attack()
+
+	boss._start_lasso()
+	var distant_rope: BossLasso = boss._lasso
+	distant_rope.set_physics_process(false)
+	distant_rope._physics_process(boss.global_position.distance_to(far_position) / BossLasso.TRAVEL_SPEED + 0.1)
+	check(player.boss_grappled, "lasso_can_catch_player_at_far_end_of_boss_room")
 	boss._cancel_attack()
 
 	player.health_component.max_health = 500.0
@@ -151,21 +188,25 @@ func _run() -> void:
 	check(player.boss_grappled, "second_rope_catches_player")
 	health_before = player.health
 	pulling_rope._physics_process(1.0)
-	check(is_equal_approx(player.health, health_before - 0.5) and player.global_position.distance_to(boss.global_position) <= 80.0, "rope_pulls_two_tiles_and_takes_half_health_per_second")
+	check(BossLasso.DAMAGE_INTERVAL == 0.5 and is_equal_approx(player.health, health_before - 1.0) and player.global_position.distance_to(boss.global_position) <= 80.0, "rope_pulls_two_tiles_and_deals_half_damage_twice_per_second")
 	pulling_rope._physics_process(1.1)
-	check(not player.boss_grappled and boss.attack_state == FinalBoss.AttackState.WAIT and is_equal_approx(player.health, health_before - 51.0), "rope_reaching_three_tiles_causes_six_tile_fifty_damage_blast")
+	check(not player.boss_grappled and boss.attack_state == FinalBoss.AttackState.WAIT and is_equal_approx(player.health, health_before - 52.0), "rope_reaching_three_tiles_causes_six_tile_fifty_damage_blast")
 	player.collide_with_terrain = true
 	await process_frame
 
 	boss.phase = 2
 	boss._refresh_phase_display()
+	player.global_position = far_position
 	boss._start_normal_attack()
 	check(boss.attack_state == FinalBoss.AttackState.SLAM and boss._slam_centers.size() == 5 and boss._attack_remaining == 3.0, "second_phase_telegraphs_five_slams_for_three_seconds")
-	var slams_near_player: bool = true
+	var slams_cover_room: bool = false
+	var slams_in_room: bool = true
 	for center: Vector2 in boss._slam_centers:
-		if absf(center.x - player.global_position.x) > 128.0 or absf(center.y - player.global_position.y) > 128.0:
-			slams_near_player = false
-	check(slams_near_player, "five_slam_warnings_stay_within_visible_range_of_cast_position")
+		var tile: Vector2i = WorldGenerator.world_to_tile(center) - spec.origin
+		slams_in_room = slams_in_room and spec.contains_local(tile.x, tile.y)
+		slams_cover_room = slams_cover_room or center.distance_to(player.global_position) > 8.0 * WorldGenerator.TILE_SIZE
+	check(boss._slam_centers[0].distance_to(player.global_position) <= WorldGenerator.TILE_SIZE, "slam_targets_player_at_far_end_of_room")
+	check(slams_in_room and slams_cover_room, "other_slam_warnings_span_walkable_boss_room")
 	boss._tentacle_warning = -1.0
 	boss._slam_centers.clear()
 	for index: int in 5:
@@ -174,7 +215,7 @@ func _run() -> void:
 	boss._resolve_slams()
 	check(is_equal_approx(player.health, health_before - 150.0), "overlapping_slams_each_deal_thirty")
 	boss._finish_normal_attack()
-	check(boss.attack_state == FinalBoss.AttackState.WAIT and boss._normal_wait == 5.0, "normal_cooldown_starts_after_slam_ends")
+	check(boss.attack_state == FinalBoss.AttackState.WAIT and boss._normal_wait == FinalBoss.NORMAL_INTERVAL, "normal_cooldown_starts_after_slam_ends")
 	boss._tentacle_target = player.global_position
 	boss._tentacle_warning = 0.3
 	boss._tick_tentacle(0.1)
@@ -218,13 +259,18 @@ func _run() -> void:
 	check(rage_bar.visible and rage_bar.current_rage == 500 and BossRageBar.SEGMENT_COUNT == 10 and BossRageBar.RAGE_PER_SEGMENT == 100, "phase_three_starts_with_five_of_ten_rage_segments")
 	check(rage_bar.size.x < boss.boss_hud.health_bar.size.x and rage_bar.get_global_rect().position.y > boss.boss_hud.health_bar.get_global_rect().end.y, "narrower_rage_segments_stay_below_health")
 	player.health_component.reset()
+	player.global_position = far_position
 	boss._start_normal_attack()
 	check(boss.attack_state == FinalBoss.AttackState.EYES and boss._attack_remaining == 10.0, "twenty_eye_barrier_lasts_ten_seconds")
 	health_before = player.health
-	boss._physics_process(10.0)
-	check(is_equal_approx(player.health, health_before - 10.0) and boss.attack_state == FinalBoss.AttackState.WAIT and boss._normal_wait == 5.0, "all_lasers_share_one_damage_tick_and_finish_before_cooldown")
-	boss._physics_process(4.9)
-	check(boss.attack_state == FinalBoss.AttackState.WAIT, "eye_barrier_does_not_recast_before_five_seconds")
+	boss._physics_process(0.25)
+	check(player.health == health_before, "laser_does_not_hit_before_half_second_interval")
+	boss._physics_process(0.25)
+	check(is_equal_approx(player.health, health_before - 1.0), "laser_hits_after_half_second_interval")
+	boss._physics_process(9.5)
+	check(is_equal_approx(player.health, health_before - 20.0) and boss.attack_state == FinalBoss.AttackState.WAIT and boss._normal_wait == FinalBoss.NORMAL_INTERVAL, "all_lasers_share_one_damage_tick_and_finish_before_cooldown")
+	boss._physics_process(2.4)
+	check(boss.attack_state == FinalBoss.AttackState.WAIT, "eye_barrier_does_not_recast_before_two_and_half_seconds")
 	boss._physics_process(0.2)
 	check(boss.attack_state == FinalBoss.AttackState.EYES, "eye_barrier_recasts_after_finished_attack_cooldown")
 	for index: int in 20:
@@ -235,6 +281,8 @@ func _run() -> void:
 	health_before = player.health
 	boss._physics_process(15.1)
 	check(boss.rage == 500 and boss.attack_state == FinalBoss.AttackState.WAIT and is_equal_approx(player.health, health_before - 80.0), "self_destruct_damages_player_and_resets_rage")
+	var room_flash: Dictionary = boss._flashes.back()
+	check(room_flash.has("rect") and (room_flash["rect"] as Rect2).has_point(far_position), "self_destruct_flash_covers_far_end_of_boss_room")
 	check(rage_bar.current_rage == 500 and not rage_bar.charging and not boss.boss_hud.rage_label.text.contains("蓄力"), "rage_meter_exits_charge_without_stale_countdown")
 	check(is_equal_approx((boss.get_node("Health") as HealthComponent).current_health, boss_health_before - 400.0), "self_destruct_damages_boss_by_four_hundred")
 	for index: int in 20:
@@ -279,6 +327,20 @@ func _run() -> void:
 	Buffs.hurt_entity(boss, 1.0, null, &"damage_over_time")
 	Buffs.hurt_entity(boss, 1.0, null, &"damage_over_time")
 	check(boss.rage == 650, "tagged_alchemy_fire_pulses_count_at_most_once_per_second")
+
+	player.active_map = world._generator.map_spec(0)
+	player.global_position = world._generator.start_world_position()
+	player.health_component.reset()
+	health_before = player.health
+	boss.attack_state = FinalBoss.AttackState.EYES
+	boss._attack_remaining = FinalBoss.EYE_SECONDS
+	boss._laser_tick = FinalBoss.LASER_TICK_SECONDS
+	boss._physics_process(1.0)
+	check(player.health == health_before and boss._attack_remaining == FinalBoss.EYE_SECONDS, "eye_attack_does_not_reach_adjacent_room")
+	boss._complete_self_destruct()
+	check(player.health == health_before, "room_wide_explosion_does_not_hit_other_room")
+	boss._start_normal_attack()
+	check(boss.attack_state == FinalBoss.AttackState.WAIT, "boss_does_not_cast_at_player_in_other_room")
 
 	world.queue_free()
 	await process_frame

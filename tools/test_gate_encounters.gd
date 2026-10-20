@@ -48,6 +48,12 @@ func _run() -> void:
 			await ready_map(world)
 			check(world.monster_spawner.monsters.is_empty(), "event_habitat_stays_monster_free")
 			continue
+		if room_kind == RoomType.Kind.BOSS:
+			check(world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) == 0, "boss_habitat_has_no_enemy_budget")
+			world._enter_map(spec.node_id)
+			await ready_map(world)
+			check(world.monster_spawner.monsters.size() == 1 and world.monster_spawner.monsters[0] is FinalBoss, "boss_habitat_contains_only_boss")
+			continue
 		check(world.monster_spawner.content.budget_of(spec.node_id, MapContent.ENEMY) > 0, "supported_non_event_habitat_has_enemy_eligibility")
 		if room_kind != RoomType.Kind.COMBAT:
 			world._enter_map(spec.node_id)

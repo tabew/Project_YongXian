@@ -33,7 +33,9 @@ func _run() -> void:
 			var kind: int = generator.run.type_of(spec.node_id)
 			seen_types[kind] = true
 			var node_id: int = spec.node_id
-			if RunGraph.floor_of(node_id) == 0 or kind == RoomType.Kind.EVENT:
+			if kind == RoomType.Kind.BOSS:
+				_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "Boss 房不能有普通怪预算 seed=%d node=%d" % [seed_value, node_id])
+			elif RunGraph.floor_of(node_id) == 0 or kind == RoomType.Kind.EVENT:
 				_check(content.budget_of(node_id, MapContent.ENEMY) == 0, "初始区域和事件房不能刷普通怪 seed=%d node=%d" % [seed_value, node_id])
 			else:
 				_check(content.budget_of(node_id, MapContent.ENEMY) >= 3, "第二层后非事件房没有刷怪资格 seed=%d node=%d kind=%s" % [seed_value, node_id, RoomType.name_of(kind)])

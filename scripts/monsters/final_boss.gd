@@ -7,23 +7,21 @@ signal rage_changed(current: int)
 
 const BOSS_NAME: String = "贝&%*#彩？？？"
 const PHASE_COUNT: int = 3
-const PHASE_HEALTH: float = 3000.0
+const PHASE_HEALTH: float = 10000.0
 const TRANSITION_SECONDS: float = 4.0
-const NORMAL_INTERVAL: float = 5.0
+const NORMAL_INTERVAL: float = 2.5
 const PHASE_COLORS: Array[Color] = [Color("b75072"), Color("8586c2"), Color("d17d46")]
 const TILE: float = float(WorldGenerator.TILE_SIZE)
 const SLAM_WARNING_SECONDS: float = 3.0
 const EYE_SECONDS: float = 10.0
+const LASER_TICK_SECONDS: float = 0.5
 const CHARGE_SECONDS: float = 15.0
-const ENGAGE_RADIUS: float = 9.0 * TILE
-const SLAM_SPREAD_TILES: int = 7
 
 enum AttackState { WAIT, SOULS, LASSO, SLAM, EYES, ENRAGED }
 
 var phase: int = 1
 var attack_state: AttackState = AttackState.WAIT
 var rage: int = 0
-var _engaged: bool = false
 var _transition_timer: SceneTreeTimer = null
 var _normal_wait: float = NORMAL_INTERVAL
 var _attack_remaining: float = 0.0
@@ -37,7 +35,7 @@ var _tentacle_warning: float = -1.0
 var _throw_remaining: float = -1.0
 var _throw_origin: Vector2 = Vector2.ZERO
 var _throw_destination: Vector2 = Vector2.ZERO
-var _laser_tick: float = 1.0
+var _laser_tick: float = LASER_TICK_SECONDS
 var _dot_last_rage_ms: int = -1000000
 var _flashes: Array[Dictionary] = []
 var _rng: RandomNumberGenerator = null
@@ -68,7 +66,7 @@ func configure_target(target_player: PlayerCharacter, generator: WorldGenerator)
 	navigation_speed = 0.0
 
 
-## The boss keeps exactly 3000 health per phase, even on later room entries.
+## The boss keeps exactly 10000 health per phase, even on later room entries.
 func apply_difficulty(entry: int) -> void:
 	if _difficulty_applied:
 		return
@@ -77,15 +75,31 @@ func apply_difficulty(entry: int) -> void:
 	difficulty_multiplier = 1.0
 
 
+func _boss_room() -> MapSpec:
+	if world_generator == null:
+		return null
+	return world_generator.map_spec(world_generator.run.final_node())
+
+
+func player_in_boss_room() -> bool:
+	if not is_instance_valid(player):
+		return false
+	var room: MapSpec = _boss_room()
+	if room == null or player.active_map == null or player.active_map.node_id != room.node_id:
+		return false
+	var tile: Vector2i = WorldGenerator.world_to_tile(player.global_position) - room.origin
+	return room.contains_local(tile.x, tile.y)
+
+
+func _room_rect(room: MapSpec) -> Rect2:
+	return Rect2(Vector2(room.origin) * TILE, Vector2(room.extent) * TILE)
+
+
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	_tick_flashes(delta)
-	if _death_committed or not is_instance_valid(player) or player.health <= 0.0:
+	if _death_committed or not is_instance_valid(player) or player.health <= 0.0 or not player_in_boss_room():
 		return
-	if not _engaged:
-		if player.global_position.distance_squared_to(global_position) > ENGAGE_RADIUS * ENGAGE_RADIUS:
-			return
-		_engaged = true
 	var health := get_node("Health") as HealthComponent
 	if health.invulnerable:
 		return
@@ -106,7 +120,7 @@ func _physics_process(delta: float) -> void:
 			_attack_remaining -= delta
 			_laser_tick -= delta
 			while _laser_tick <= 0.0 and _attack_remaining > -1.0:
-				_laser_tick += 1.0
+				_laser_tick += LASER_TICK_SECONDS
 				if player.health > 0.0:
 					player.take_damage(1.0, self)
 			if _attack_remaining <= 0.0:
@@ -122,7 +136,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _start_normal_attack() -> void:
-	if not is_instance_valid(player) or player.health <= 0.0:
+	if not is_instance_valid(player) or player.health <= 0.0 or not player_in_boss_room():
 		return
 	match phase:
 		1:
@@ -151,7 +165,7 @@ func _start_normal_attack() -> void:
 		3:
 			attack_state = AttackState.EYES
 			_attack_remaining = EYE_SECONDS
-			_laser_tick = 1.0
+			_laser_tick = LASER_TICK_SECONDS
 			attack_started.emit(&"eyes")
 			queue_redraw()
 
@@ -185,7 +199,7 @@ func _finish_normal_attack() -> void:
 
 
 func _start_lasso() -> void:
-	if not is_instance_valid(player) or player.health <= 0.0:
+	if not is_instance_valid(player) or player.health <= 0.0 or not player_in_boss_room():
 		return
 	attack_state = AttackState.LASSO
 	_lasso = BossLasso.new()
@@ -208,20 +222,22 @@ func _on_lasso_resolved(reached_boss: bool) -> void:
 
 func _pick_slam_centers() -> void:
 	_slam_centers.clear()
-	var spec: MapSpec = player.active_map
+	var spec: MapSpec = _boss_room()
 	if world_generator != null and spec != null:
-		var origin: Vector2i = WorldGenerator.world_to_tile(player.global_position)
+		var player_tile: Vector2i = WorldGenerator.world_to_tile(player.global_position)
 		var selected: Dictionary = {}
+		if spec.contains_local(player_tile.x - spec.origin.x, player_tile.y - spec.origin.y) and world_generator.is_walkable(player_tile):
+			selected[player_tile] = true
+			_slam_centers.append(WorldGenerator.tile_to_world(player_tile))
 		for attempt: int in 160:
 			if _slam_centers.size() >= 5:
 				break
-			var tile: Vector2i = origin + Vector2i(
-				_rng.randi_range(-SLAM_SPREAD_TILES, SLAM_SPREAD_TILES),
-				_rng.randi_range(-SLAM_SPREAD_TILES, SLAM_SPREAD_TILES)
+			var local := Vector2i(
+				_rng.randi_range(2, spec.extent.x - 3),
+				_rng.randi_range(2, spec.extent.y - 3)
 			)
-			if not spec.contains_local(tile.x - spec.origin.x, tile.y - spec.origin.y):
-				continue
-			if not world_generator.is_walkable(tile) or selected.has(tile):
+			var tile: Vector2i = spec.origin + local
+			if not spec.contains_local(local.x, local.y) or not world_generator.is_walkable(tile) or selected.has(tile):
 				continue
 			selected[tile] = true
 			_slam_centers.append(WorldGenerator.tile_to_world(tile))
@@ -280,7 +296,7 @@ func _random_throw_destination() -> Vector2:
 
 
 func _hit_player_in_circle(center: Vector2, radius: float, damage: float) -> void:
-	if is_instance_valid(player) and player.health > 0.0 and player.global_position.distance_to(center) <= radius:
+	if player_in_boss_room() and player.health > 0.0 and player.global_position.distance_to(center) <= radius:
 		player.take_damage(damage, self)
 
 
@@ -325,8 +341,11 @@ func _exit_rage() -> void:
 
 
 func _complete_self_destruct() -> void:
-	_hit_player_in_circle(player.global_position, INF, 80.0)
-	_add_flash(global_position, 6.0 * TILE, Color(1.0, 0.66, 0.23, 0.95))
+	if player_in_boss_room() and player.health > 0.0:
+		player.take_damage(80.0, self)
+	var room: MapSpec = _boss_room()
+	if room != null:
+		_add_room_flash(room, Color(1.0, 0.66, 0.23, 0.95))
 	var hit := CombatHit.new()
 	hit.source = self
 	hit.damage = 400.0
@@ -403,6 +422,11 @@ func _add_flash(at: Vector2, radius: float, tint: Color) -> void:
 	queue_redraw()
 
 
+func _add_room_flash(room: MapSpec, tint: Color) -> void:
+	_flashes.append({"rect": _room_rect(room), "color": tint, "remaining": 0.32})
+	queue_redraw()
+
+
 func _tick_flashes(delta: float) -> void:
 	if _flashes.is_empty():
 		return
@@ -418,9 +442,15 @@ func _draw() -> void:
 		var fade: float = clampf(float(flash["remaining"]) / 0.32, 0.0, 1.0)
 		var color: Color = flash["color"]
 		color.a *= fade
-		var center: Vector2 = to_local(flash["position"])
-		draw_circle(center, float(flash["radius"]), Color(color.r, color.g, color.b, color.a * 0.22))
-		draw_arc(center, float(flash["radius"]), 0.0, TAU, 64, color, 3.0)
+		if flash.has("rect"):
+			var bounds: Rect2 = flash["rect"]
+			var local_bounds := Rect2(to_local(bounds.position), bounds.size)
+			draw_rect(local_bounds, Color(color.r, color.g, color.b, color.a * 0.22))
+			draw_rect(local_bounds, color, false, 3.0)
+		else:
+			var center: Vector2 = to_local(flash["position"])
+			draw_circle(center, float(flash["radius"]), Color(color.r, color.g, color.b, color.a * 0.22))
+			draw_arc(center, float(flash["radius"]), 0.0, TAU, 64, color, 3.0)
 	if attack_state == AttackState.SLAM:
 		var strength: float = clampf(1.0 - _attack_remaining / SLAM_WARNING_SECONDS, 0.0, 1.0)
 		for center: Vector2 in _slam_centers:
@@ -453,6 +483,12 @@ func _draw() -> void:
 		draw_arc(target, 13.0, 0.0, TAU, 24, Color(1.0, 0.41, 0.37, 0.95), 2.0)
 	if attack_state == AttackState.ENRAGED:
 		var fill: float = 1.0 - _attack_remaining / CHARGE_SECONDS
+		var room: MapSpec = _boss_room()
+		if room != null:
+			var bounds: Rect2 = _room_rect(room)
+			var local_bounds := Rect2(to_local(bounds.position), bounds.size)
+			draw_rect(local_bounds, Color(1.0, 0.35, 0.17, 0.06 + 0.16 * fill))
+			draw_rect(local_bounds, Color(1.0, 0.6, 0.21, 0.6), false, 3.0)
 		draw_arc(Vector2.ZERO, 70.0, -PI * 0.5, -PI * 0.5 + TAU * fill, 60, Color(1.0, 0.6, 0.21, 0.95), 4.0)
 
 

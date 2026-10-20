@@ -6,6 +6,7 @@ signal resolved(reached_boss: bool)
 const HEALTH: float = 300.0
 const TRAVEL_SPEED: float = 640.0
 const PULL_SPEED: float = 32.0
+const DAMAGE_INTERVAL: float = 0.5
 const CATCH_RADIUS: float = 14.0
 const DETONATE_DISTANCE: float = 48.0
 
@@ -61,6 +62,9 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(victim) or victim.health <= 0.0:
 		_resolve(false)
 		return
+	if boss is FinalBoss and not (boss as FinalBoss).player_in_boss_room():
+		_resolve(false)
+		return
 	if not _caught:
 		var previous: Vector2 = _tip
 		_tip += _direction * TRAVEL_SPEED * delta
@@ -80,8 +84,8 @@ func _physics_process(delta: float) -> void:
 			return
 		_tip = victim.global_position
 		_damage_time += delta
-		while _damage_time >= 1.0:
-			_damage_time -= 1.0
+		while _damage_time >= DAMAGE_INTERVAL:
+			_damage_time -= DAMAGE_INTERVAL
 			victim.take_damage(0.5, boss)
 		if _tip.distance_to(boss.global_position) <= DETONATE_DISTANCE:
 			_resolve(true)

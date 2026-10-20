@@ -235,7 +235,7 @@ func _enter_map(map_node_id: int, side: int = 0, gate_y: int = -1, reset_health:
 	if spec == null:
 		return
 	_current_node = map_node_id
-	if monster_spawner.content != null and monster_spawner.content.budget_of(map_node_id, MapContent.ENEMY) > 0:
+	if monster_spawner.content != null and (monster_spawner.content.budget_of(map_node_id, MapContent.ENEMY) > 0 or monster_spawner.content.budget_of(map_node_id, MapContent.BOSS) > 0):
 		_combat_entry_count += 1
 	if _cottage_view == null:
 		_cottage_view = CottageView.new()
