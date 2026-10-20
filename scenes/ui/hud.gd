@@ -1,10 +1,10 @@
 extends Control
 
-## 游戏内 HUD：左上角基本信息，右上角小地图 + 性能面板（F3 开关），
-## 底部操作提示，顶部临时消息。
+## 游戏内 HUD：左上角基本信息，右侧竖排操作提示，右上角小地图 + 性能面板（F3 开关），
+## 左下角玩家立绘，底部快捷栏右侧显示当前武器，顶部临时消息。
 
 const REFRESH_INTERVAL: float = 0.2
-## 左下角经验条的尺寸。
+## 快捷栏上方经验条的尺寸。
 const XP_BAR_SIZE: Vector2 = Vector2(240.0, 8.0)
 
 @onready var info_label: Label = $InfoLabel
@@ -30,8 +30,18 @@ var _stats_visible_before_boss: bool = true
 func _ready() -> void:
 	# ==========================================================================
 	# ↓↓↓↓ 改动：操作提示跟着新的物品栏选中/使用方式走 ↓↓↓↓
-	#操作提示分两行放在物品栏上方：物品栏常驻显示，提示压在它下面就会被挡住
-	hint_label.text = "WASD 移动　·　Space 闪避　·　E 拾取/开箱/用炼金台　·　左键 使用选中物品　·　右键 使用/投掷选中物品\n1-9 / 滚轮 / 点格子 换选中　·　Tab 背包　·　M 地图　·　R 重开世界"
+	# 操作提示贴在右侧边缘，一项一行，避免横跨画面遮挡游玩区域。
+	hint_label.text = "\n".join(PackedStringArray([
+		"WASD 移动",
+		"Space 闪避",
+		"E 拾取 / 开箱 / 炼金台",
+		"左键 使用选中物品",
+		"右键 使用 / 投掷",
+		"1-9 / 滚轮 / 点格子 换选中",
+		"Tab 背包",
+		"M 地图",
+		"R 重开世界",
+	]))
 	# ↑↑↑↑ 改动：操作提示结束 ↑↑↑↑
 	# ==========================================================================
 	_pickup_label = Label.new()
@@ -79,11 +89,16 @@ func _layout_for_boss() -> void:
 	elif not mobile and _boss_mobile_layout:
 		stats_label.visible = _stats_visible_before_boss
 	_boss_mobile_layout = mobile
-	info_label.position.y = 272.0 if mobile else (114.0 if compact else 10.0)
+	var info_top: float = 272.0 if mobile else (114.0 if compact else 10.0)
+	info_label.position.y = info_top
 	minimap.size = Vector2(120.0, 120.0) if mobile else Vector2(164.0, 164.0)
 	minimap.position = Vector2(roundf((size.x - 120.0) * 0.5), 112.0) if mobile else Vector2(size.x - 178.0, 114.0 if compact else 14.0)
 	stats_label.position.y = 286.0 if compact else 186.0
-	($BuffBar as Control).position.y = 400.0 if mobile else (240.0 if compact else 140.0)
+	var buff_bar := $BuffBar as Control
+	buff_bar.position.y = info_top + info_label.size.y + 8.0
+	hint_label.visible = not mobile
+	hint_label.offset_top = 450.0 if compact else 360.0
+	hint_label.offset_bottom = 610.0 if compact else 520.0
 	if mobile:
 		toast_label.position = Vector2(14.0, 240.0)
 		toast_label.size.x = maxf(0.0, size.x - 28.0)
@@ -95,7 +110,7 @@ func _layout_for_boss() -> void:
 		toast_label.size.x = 480.0
 
 
-## 左下角等级与经验条：贴在武器信息上方，不抢左上角信息面板的位置。
+## 等级与经验条：贴在快捷栏正上方，避开左下角立绘和右侧武器信息。
 func _build_progress_readout() -> void:
 	_level_label = Label.new()
 	_level_label.name = "LevelLabel"
@@ -106,22 +121,23 @@ func _build_progress_readout() -> void:
 	_level_label.add_theme_constant_override("shadow_offset_y", 1)
 	_level_label.add_theme_font_size_override("font_size", 14)
 	add_child(_level_label)
-	_level_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_level_label.offset_left = 14.0
-	_level_label.offset_right = 314.0
-	_level_label.offset_top = -124.0
-	_level_label.offset_bottom = -102.0
+	_level_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_level_label.offset_left = -150.0
+	_level_label.offset_right = 150.0
+	_level_label.offset_top = -154.0
+	_level_label.offset_bottom = -132.0
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var background := ColorRect.new()
 	background.name = "XpBarBackground"
 	background.color = Color(0.05, 0.06, 0.08, 0.72)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
-	background.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	background.offset_left = 14.0
-	background.offset_right = 14.0 + XP_BAR_SIZE.x
-	background.offset_top = -102.0
-	background.offset_bottom = -102.0 + XP_BAR_SIZE.y
+	background.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	background.offset_left = -XP_BAR_SIZE.x * 0.5
+	background.offset_right = XP_BAR_SIZE.x * 0.5
+	background.offset_top = -128.0
+	background.offset_bottom = -128.0 + XP_BAR_SIZE.y
 
 	_xp_fill = ColorRect.new()
 	_xp_fill.name = "XpBarFill"
